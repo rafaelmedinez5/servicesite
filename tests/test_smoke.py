@@ -41,3 +41,11 @@ def test_production_rejects_placeholder_secret(monkeypatch):
 
     with pytest.raises(RuntimeError, match="Production SECRET_KEY"):
         Settings.from_env()
+
+
+def test_production_requires_explicit_secret(monkeypatch):
+    monkeypatch.setenv("ENVIRONMENT", "production")
+    monkeypatch.delenv("SECRET_KEY", raising=False)
+
+    with pytest.raises(RuntimeError, match="Production SECRET_KEY"):
+        Settings.from_env()
