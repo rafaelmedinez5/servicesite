@@ -19,8 +19,8 @@ Status: confirmed for the Task 0 scaffold on 2026-08-17.
 - Invoice creation locks the service/category description, USD price, exchange
   rate, expected XMR atomic amount, and quote timestamp.
 - Later catalog edits never alter historical purchase or invoice snapshots.
-- The production rate source and maximum quote age remain blocked until the XMR
-  configuration task.
+- The production rate source and maximum quote age remain blocked until an
+  approved checkout pricing policy is recorded.
 
 ## Administration
 

@@ -1,7 +1,8 @@
 # Servicesite architecture
 
-Status: Task 0 scaffold. Catalog, admin, persistence, XMR, and deployment units
-are intentionally not implemented yet.
+Status: Tasks 0 through 3. The validated wallet transport, minimal catalog
+persistence, canonical invoice domain, and fresh SQLite schema are implemented.
+Admin/web checkout, polling, and deployment units remain separate tasks.
 
 ## Runtime components
 
@@ -37,11 +38,23 @@ price snapshot, XMR conversion snapshot, and exact integer atomic amount. A
 settled payment does not authorize any cybersecurity testing; engagement scope
 and authorization remain separate records and operator checks.
 
+## Task 3 persistence boundary
+
+The fresh SQLite schema contains minimal category and service records plus
+immutable invoice snapshots. Catalog publication/archive state and version are
+rechecked transactionally when an invoice is inserted. The only invoice creation
+entry point lives in `app/payments/invoice.py`; SQLite access remains isolated in
+`app/persistence.py`.
+
+The invoice locks its price in integer USD cents, XMR/USD rate as exact decimal
+text, expected integer atomic amount, confirmation count, sweep policy, catalog
+snapshots, and expiry. A later catalog edit cannot alter historical invoices.
+
 ## Task boundaries
 
 - Task 0: scaffold and decisions only.
 - Task 2: wallet-rpc transport and complete XMR configuration validation.
-- Task 3: catalog/purchase/invoice persistence and canonical invoice domain.
+- Task 3: minimal catalog/invoice persistence and canonical invoice domain.
 - Task 4: public catalog, admin authentication/CRUD, checkout, and status views.
 - Task 5: poll/confirm/sweep orchestration.
 - Tasks 6-10: reproducible deployment, staging, cutover, and reconciliation.

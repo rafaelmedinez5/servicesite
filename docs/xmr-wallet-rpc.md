@@ -58,6 +58,7 @@ separate later tasks.
 | `XMR_RPC_RETRIES` | Total attempts | 1 through 10 |
 | `XMR_RPC_RETRY_BACKOFF` | Base delay seconds | 0 through 60 |
 | `XMR_MIN_CONFIRMATIONS` | Canonical confirmation default | 1 through 1000; default 10 |
+| `XMR_INVOICE_TTL_SECONDS` | Locked invoice payment window | 60 through 604800; default 7200 |
 | `XMR_SWEEP_ENABLED` | Later sweep policy gate | Strict boolean; default false |
 | `XMR_COLD_ADDRESS` | Later sweep destination | Production: required and non-placeholder only when sweeping is enabled |
 | `XMR_SWEEP_ACCOUNT_INDEX` | Later sweep account | Non-negative integer |

@@ -105,6 +105,7 @@ class Settings:
     xmr_rpc_max_attempts: int
     xmr_rpc_retry_backoff_seconds: float
     xmr_min_confirmations: int
+    xmr_invoice_ttl_seconds: int
     xmr_sweep_enabled: bool
     xmr_cold_address: str = field(repr=False)
     xmr_sweep_account_index: int
@@ -205,6 +206,12 @@ class Settings:
                 os.getenv("XMR_MIN_CONFIRMATIONS", "10").strip(),
                 minimum=1,
                 maximum=1000,
+            ),
+            xmr_invoice_ttl_seconds=_parse_int(
+                "XMR_INVOICE_TTL_SECONDS",
+                os.getenv("XMR_INVOICE_TTL_SECONDS", "7200").strip(),
+                minimum=60,
+                maximum=604800,
             ),
             xmr_sweep_enabled=xmr_sweep_enabled,
             xmr_cold_address=xmr_cold_address,

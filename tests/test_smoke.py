@@ -108,6 +108,7 @@ def test_xmr_configuration_defaults_are_safe(monkeypatch):
 
     assert settings.xmr_wallet_rpc_url == "http://127.0.0.1:28088/json_rpc"
     assert settings.xmr_min_confirmations == 10
+    assert settings.xmr_invoice_ttl_seconds == 7200
     assert settings.xmr_sweep_enabled is False
     assert settings.allow_public_xmr_wallet_rpc is False
 

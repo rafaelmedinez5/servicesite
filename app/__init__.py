@@ -23,6 +23,7 @@ def create_app(test_config: dict | None = None) -> Flask:
         XMR_RPC_RETRIES=settings.xmr_rpc_max_attempts,
         XMR_RPC_RETRY_BACKOFF=settings.xmr_rpc_retry_backoff_seconds,
         XMR_MIN_CONFIRMATIONS=settings.xmr_min_confirmations,
+        XMR_INVOICE_TTL_SECONDS=settings.xmr_invoice_ttl_seconds,
         XMR_SWEEP_ENABLED=settings.xmr_sweep_enabled,
         XMR_COLD_ADDRESS=settings.xmr_cold_address,
         XMR_SWEEP_ACCOUNT_INDEX=settings.xmr_sweep_account_index,

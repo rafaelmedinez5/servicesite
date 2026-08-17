@@ -1,0 +1,119 @@
+# Invoice domain and persistence
+
+Status: Task 3 complete. This is a local, tested domain/persistence layer; no
+production database or wallet was accessed.
+
+## Fresh database boundary
+
+`SQLiteDatabase.initialize()` creates schema version 1 with WAL mode and applies
+mode `0600` to the database file. Initialization is idempotent for a recognized
+`servicesite` database. If a database already contains tables but has no
+`servicesite` schema marker, initialization refuses it instead of treating a
+legacy database as compatible.
+
+The production parent directory must already exist with operator-reviewed
+ownership and permissions. The application does not copy or inspect the legacy
+database.
+
+## Tables
+
+### `categories`
+
+Stores the minimum catalog category fields needed for later admin/public work:
+identity, name, slug, description, publish/archive flags, sort order, and
+timestamps.
+
+### `services`
+
+Stores category ownership, identity, name, slug, description, integer USD cents,
+optional duration, publish/archive flags, sort order, a catalog version, and
+timestamps. A service is purchasable only when both it and its category are
+published and not archived.
+
+### `invoices`
+
+Stores:
+
+- a 128-bit hexadecimal invoice ID and strong bearer status token;
+- service/category identifiers, catalog version, and immutable name/description/
+  duration snapshots;
+- integer USD cents, exact XMR/USD `Decimal` text, rate source, and quote time;
+- expected and observed integer atomic units;
+- unique XMR address plus wallet account and subaddress indexes;
+- required and observed confirmations;
+- deposit and sweep transaction identifiers;
+- the sweep policy locked for that invoice;
+- payment status, customer-safe status note, and lifecycle timestamps.
+
+The database enforces unique status tokens, unique addresses, and unique
+`(wallet account index, subaddress index)` pairs. Catalog rows referenced by
+invoices cannot be deleted; later admin workflows archive them.
+
+## Canonical creation path
+
+`InvoiceCreator.create_invoice(service_id, quote)` is the only application
+invoice-creation method. It:
+
+1. resolves a currently purchasable service;
+2. validates the rate as `Decimal` and calculates atomic units with exact decimal
+   arithmetic, rounding upward only to the next indivisible atomic unit;
+3. creates a strong invoice ID and bearer token;
+4. requests a newly labeled wallet subaddress;
+5. builds immutable service, category, price, rate, confirmation, sweep-policy,
+   and expiry snapshots;
+6. rechecks the catalog snapshot inside a SQLite `BEGIN IMMEDIATE` transaction;
+7. inserts the complete invoice before returning it.
+
+If the catalog changes during creation, persistence aborts. If wallet access
+fails, no database row is written. If a database insert fails after subaddress
+creation, the transaction leaves no partial invoice, but the wallet may contain
+an unused subaddress. Wallet subaddresses cannot participate in a SQLite
+transaction; an unused address is safe and must never be reassigned.
+
+## Locked pricing
+
+Service price is stored as integer USD cents. XMR/USD rate input must be a
+positive finite `Decimal`; binary floats are rejected. Expected atomic units are
+calculated as:
+
+`ceil((USD cents × 10^12) / (100 × USD per XMR))`
+
+Later service-price or category/service text edits do not alter an existing
+invoice. The production rate source and maximum quote-age policy remain blocked;
+Task 4 must fail checkout when the eventual approved quote policy is unavailable
+or stale.
+
+## Payment state machine
+
+The normal sweep-required path is:
+
+`awaiting_payment -> paid_pending_confirmations -> paid_pending_sweep -> sweeping_to_cold -> settled`
+
+An ordinary sweep failure may return `sweeping_to_cold` to
+`paid_pending_sweep`. A sweep-required invoice cannot settle until a sweep
+transaction identifier is stored.
+
+When the invoice's locked sweep policy is disabled, the confirmed path is:
+
+`awaiting_payment -> paid_pending_confirmations -> settled`
+
+Only `awaiting_payment` and `paid_pending_confirmations` may transition to
+`expired`. The expiry boundary is inclusive: `now >= expires_at`. Settled,
+expired, and confirmed sweep-pending invoices cannot expire.
+
+Entering confirmed/sweep/settled states requires observed atomic units to meet or
+exceed the locked expectation and confirmations to meet or exceed the locked
+requirement. Partial payment never settles; overpayment remains representable in
+`observed_atomic` for later reconciliation.
+
+## Deferred behavior
+
+- admin authentication and catalog forms;
+- public service selection and checkout routes;
+- approved XMR/USD rate retrieval and quote-age enforcement;
+- polling, transfer matching, concurrency control, and uncertain-sweep
+  reconciliation;
+- manual fulfillment state and admin purchase workflow;
+- production database initialization and backups.
+
+These remain separate approval/test checkpoints.
