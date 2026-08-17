@@ -9,6 +9,7 @@ PLACEHOLDER_SECRET_VALUES = {
     "",
     "change-me",
     "changeme",
+    "development-only-not-for-production",
     "replace_me",
     "replace_with_at_least_32_random_characters",
 }
