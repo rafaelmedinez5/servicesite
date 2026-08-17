@@ -48,7 +48,7 @@ Status: confirmed for the Task 0 scaffold on 2026-08-17.
 - External access is through the separately configured Tor onion service.
 - Production configuration and secrets remain outside Git.
 
-## Deferred decisions
+## Still blocked
 
 - initial categories and service packages;
 - production XMR/USD rate source and quote-age limit;
