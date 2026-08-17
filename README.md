@@ -3,10 +3,11 @@
 Server-rendered Flask service catalog with XMR-only checkout, an authenticated
 admin-managed catalog, purchase visibility, and manual fulfillment.
 
-Tasks 0 through 4 establish the application boundary, source inventory, strict
+Tasks 0 through 5 establish the application boundary, source inventory, strict
 configuration contract, isolated XMR wallet-RPC transport, fresh SQLite schema,
-canonical invoice domain, and private server-rendered checkout/status flow.
-Admin authentication, payment polling, and production units remain deferred.
+canonical invoice domain, private server-rendered checkout/status flow, and the
+protected payment reconciliation boundary. Admin authentication and production
+units remain deferred.
 
 ## Confirmed direction
 
@@ -34,7 +35,9 @@ app/
   payments/
     invoice.py            canonical invoice creation and state machine
     xmr_rate.py           exact CoinGecko quote and freshness enforcement
+    xmr_reconciliation.py transfer, confirmation, expiry, and sweep orchestration
     xmr_wallet_rpc.py     isolated amount and wallet-RPC transport
+  internal.py             loopback-and-token-protected polling endpoint
   static/css/style.css    local CSS
   templates/index.html    scaffold landing page
 deploy/systemd/           sanitized unit templates added in Task 6
@@ -44,6 +47,7 @@ docs/
   decisions/xmr-migration.md
   invoice-domain.md
   web-checkout.md
+  xmr-reconciliation.md
   xmr-source-inventory.md
   xmr-wallet-rpc.md
 scripts/                  operational scripts added in later tasks
@@ -84,7 +88,15 @@ The expected response is `OK`.
 - Do not install or start systemd/Tor/wallet services from this scaffold.
 - A passing mocked or local test is not proof of production payment behavior.
 
+## Task 5 safety boundary
+
+`POST /internal/poll-xmr` is available only from a loopback source with the
+exact `X-Internal-Token`. It reconciles open invoices using both wallet account
+and subaddress indexes, serializes work with SQLite leases, and persists sweep
+attempt state before making a non-retried sweep call. See
+`docs/xmr-reconciliation.md` for state, recovery, and residual-risk details.
+
 ## Next task
 
-Proceed to Task 5: transfer matching, confirmation polling, expiry, and safe
-sweep reconciliation. Do not enable production polling or sweeping yet.
+Proceed to Task 6: add sanitized deployment scripts and systemd unit templates.
+Do not enable a production timer or sweeping from this repository checkpoint.

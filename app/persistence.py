@@ -4,6 +4,7 @@ import os
 import secrets
 import sqlite3
 from contextlib import contextmanager
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Iterator
@@ -18,7 +19,7 @@ from app.payments.invoice import (
 from app.payments.xmr_wallet_rpc import MAX_ATOMIC_UNITS
 
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 
 
 class PersistenceError(RuntimeError):
@@ -47,6 +48,15 @@ class CatalogChangedError(PersistenceError):
 
 class InvoicePersistenceError(PersistenceError):
     """An invoice could not be stored without violating an invariant."""
+
+
+@dataclass(frozen=True)
+class SweepAttempt:
+    invoice_id: str
+    attempt_token: str
+    started_at: datetime
+    uncertain: bool
+    updated_at: datetime
 
 
 class SQLiteDatabase:
@@ -85,15 +95,21 @@ class SQLiteDatabase:
                 version_row = connection.execute(
                     "SELECT value FROM schema_meta WHERE key='schema_version'"
                 ).fetchone()
-                if version_row is None:
+                previous_version = version_row["value"] if version_row is not None else None
+                if previous_version is None:
                     connection.execute(
                         "INSERT INTO schema_meta(key, value) VALUES ('schema_version', ?)",
                         (str(SCHEMA_VERSION),),
                     )
-                elif version_row["value"] != str(SCHEMA_VERSION):
+                elif previous_version not in {"1", str(SCHEMA_VERSION)}:
                     raise SchemaVersionError("database schema version is unsupported")
 
                 connection.executescript(_SCHEMA_SQL)
+                if previous_version == "1":
+                    connection.execute(
+                        "UPDATE schema_meta SET value=? WHERE key='schema_version'",
+                        (str(SCHEMA_VERSION),),
+                    )
         finally:
             connection.close()
 
@@ -300,6 +316,226 @@ class ServicesiteRepository:
             return int(connection.execute("SELECT COUNT(*) FROM invoices").fetchone()[0])
         finally:
             connection.close()
+
+    def list_open_invoices(self) -> list[Invoice]:
+        connection = self.database.connect()
+        try:
+            rows = connection.execute(
+                """
+                SELECT * FROM invoices
+                WHERE status IN (
+                    'awaiting_payment',
+                    'paid_pending_confirmations',
+                    'paid_pending_sweep',
+                    'sweeping_to_cold'
+                )
+                ORDER BY created_at, id
+                """
+            ).fetchall()
+            return [_row_to_invoice(row) for row in rows]
+        finally:
+            connection.close()
+
+    def claim_invoice(
+        self,
+        invoice_id: str,
+        *,
+        claim_token: str,
+        claimed_at: datetime,
+        expires_at: datetime,
+    ) -> bool:
+        _require_token(claim_token, "poll claim token")
+        _require_aware_datetime(claimed_at, "poll claim time")
+        _require_aware_datetime(expires_at, "poll claim expiry")
+        if expires_at <= claimed_at:
+            raise InvoiceValidationError("poll claim expiry must follow claim time")
+        with self.database.transaction(immediate=True) as connection:
+            connection.execute(
+                "DELETE FROM invoice_poll_claims WHERE expires_at<=?",
+                (_serialize_datetime(claimed_at),),
+            )
+            result = connection.execute(
+                """
+                INSERT OR IGNORE INTO invoice_poll_claims(
+                    invoice_id, claim_token, claimed_at, expires_at
+                ) VALUES (?, ?, ?, ?)
+                """,
+                (
+                    invoice_id,
+                    claim_token,
+                    _serialize_datetime(claimed_at),
+                    _serialize_datetime(expires_at),
+                ),
+            )
+            return result.rowcount == 1
+
+    def release_invoice_claim(self, invoice_id: str, *, claim_token: str) -> None:
+        _require_token(claim_token, "poll claim token")
+        with self.database.transaction(immediate=True) as connection:
+            connection.execute(
+                "DELETE FROM invoice_poll_claims WHERE invoice_id=? AND claim_token=?",
+                (invoice_id, claim_token),
+            )
+
+    def get_sweep_attempt(self, invoice_id: str) -> SweepAttempt | None:
+        connection = self.database.connect()
+        try:
+            row = connection.execute(
+                "SELECT * FROM invoice_sweep_attempts WHERE invoice_id=?",
+                (invoice_id,),
+            ).fetchone()
+            if row is None:
+                return None
+            return SweepAttempt(
+                invoice_id=row["invoice_id"],
+                attempt_token=row["attempt_token"],
+                started_at=_parse_datetime(row["started_at"]),
+                uncertain=bool(row["uncertain"]),
+                updated_at=_parse_datetime(row["updated_at"]),
+            )
+        finally:
+            connection.close()
+
+    def claim_sweep(
+        self,
+        invoice_id: str,
+        *,
+        attempt_token: str,
+        now: datetime,
+    ) -> Invoice | None:
+        _require_token(attempt_token, "sweep attempt token")
+        _require_aware_datetime(now, "sweep claim time")
+        with self.database.transaction(immediate=True) as connection:
+            current = _require_invoice(connection, invoice_id)
+            if current.status is not PaymentStatus.PAID_PENDING_SWEEP:
+                return None
+            if current.sweep_txid:
+                return None
+            transitioned = transition_invoice(
+                current, PaymentStatus.SWEEPING_TO_COLD, now=now
+            )
+            connection.execute(
+                """
+                UPDATE invoices SET status=?, status_note=?, updated_at=?
+                WHERE id=? AND status='paid_pending_sweep' AND sweep_txid IS NULL
+                """,
+                (
+                    transitioned.status.value,
+                    transitioned.status_note,
+                    _serialize_datetime(transitioned.updated_at),
+                    invoice_id,
+                ),
+            )
+            connection.execute(
+                """
+                INSERT INTO invoice_sweep_attempts(
+                    invoice_id, attempt_token, started_at, uncertain, updated_at
+                ) VALUES (?, ?, ?, 0, ?)
+                """,
+                (
+                    invoice_id,
+                    attempt_token,
+                    _serialize_datetime(now),
+                    _serialize_datetime(now),
+                ),
+            )
+            return _require_invoice(connection, invoice_id)
+
+    def mark_sweep_uncertain(
+        self, invoice_id: str, *, attempt_token: str, now: datetime
+    ) -> None:
+        _require_token(attempt_token, "sweep attempt token")
+        _require_aware_datetime(now, "sweep update time")
+        with self.database.transaction(immediate=True) as connection:
+            result = connection.execute(
+                """
+                UPDATE invoice_sweep_attempts
+                SET uncertain=1, updated_at=?
+                WHERE invoice_id=? AND attempt_token=?
+                """,
+                (_serialize_datetime(now), invoice_id, attempt_token),
+            )
+            if result.rowcount != 1:
+                raise InvoicePersistenceError("sweep attempt claim was lost")
+
+    def record_claimed_sweep_transaction(
+        self,
+        invoice_id: str,
+        *,
+        attempt_token: str,
+        sweep_txid: str,
+        now: datetime,
+    ) -> Invoice:
+        _require_token(attempt_token, "sweep attempt token")
+        if not isinstance(sweep_txid, str) or not sweep_txid or len(sweep_txid) > 200:
+            raise InvoiceValidationError("sweep transaction ID is invalid")
+        _require_aware_datetime(now, "sweep record time")
+        with self.database.transaction(immediate=True) as connection:
+            attempt = connection.execute(
+                """
+                SELECT attempt_token FROM invoice_sweep_attempts
+                WHERE invoice_id=?
+                """,
+                (invoice_id,),
+            ).fetchone()
+            if attempt is None or not secrets.compare_digest(
+                attempt["attempt_token"], attempt_token
+            ):
+                raise InvoicePersistenceError("sweep attempt claim was lost")
+            current = _require_invoice(connection, invoice_id)
+            if current.status is not PaymentStatus.SWEEPING_TO_COLD:
+                raise InvoicePersistenceError("invoice is not in a sweep attempt")
+            if current.sweep_txid and current.sweep_txid != sweep_txid:
+                raise InvoicePersistenceError("a different sweep transaction is already recorded")
+            connection.execute(
+                """
+                UPDATE invoices
+                SET sweep_txid=COALESCE(sweep_txid, ?), updated_at=?
+                WHERE id=?
+                """,
+                (sweep_txid, _serialize_datetime(now), invoice_id),
+            )
+            connection.execute(
+                "DELETE FROM invoice_sweep_attempts WHERE invoice_id=?",
+                (invoice_id,),
+            )
+            return _require_invoice(connection, invoice_id)
+
+    def release_sweep_attempt(
+        self, invoice_id: str, *, attempt_token: str, now: datetime
+    ) -> Invoice:
+        _require_token(attempt_token, "sweep attempt token")
+        _require_aware_datetime(now, "sweep release time")
+        with self.database.transaction(immediate=True) as connection:
+            attempt = connection.execute(
+                "SELECT attempt_token FROM invoice_sweep_attempts WHERE invoice_id=?",
+                (invoice_id,),
+            ).fetchone()
+            if attempt is None or not secrets.compare_digest(
+                attempt["attempt_token"], attempt_token
+            ):
+                raise InvoicePersistenceError("sweep attempt claim was lost")
+            current = _require_invoice(connection, invoice_id)
+            transitioned = transition_invoice(
+                current, PaymentStatus.PAID_PENDING_SWEEP, now=now
+            )
+            connection.execute(
+                """
+                UPDATE invoices SET status=?, status_note=?, updated_at=?
+                WHERE id=? AND status='sweeping_to_cold'
+                """,
+                (
+                    transitioned.status.value,
+                    transitioned.status_note,
+                    _serialize_datetime(transitioned.updated_at),
+                    invoice_id,
+                ),
+            )
+            connection.execute(
+                "DELETE FROM invoice_sweep_attempts WHERE invoice_id=?",
+                (invoice_id,),
+            )
+            return _require_invoice(connection, invoice_id)
 
     def record_observation(
         self,
@@ -541,6 +777,11 @@ def _require_aware_datetime(value: datetime, label: str) -> None:
         raise InvoiceValidationError(f"{label} must be timezone-aware")
 
 
+def _require_token(value: str, label: str) -> None:
+    if not isinstance(value, str) or not 16 <= len(value) <= 200:
+        raise InvoiceValidationError(f"{label} is invalid")
+
+
 _SCHEMA_SQL = """
 CREATE TABLE IF NOT EXISTS categories (
     id TEXT PRIMARY KEY,
@@ -612,6 +853,21 @@ CREATE TABLE IF NOT EXISTS invoices (
     UNIQUE (xmr_account_index, xmr_address_index),
     CHECK ((status = 'expired') = (expired_at IS NOT NULL)),
     CHECK ((status = 'settled') = (settled_at IS NOT NULL))
+);
+
+CREATE TABLE IF NOT EXISTS invoice_poll_claims (
+    invoice_id TEXT PRIMARY KEY REFERENCES invoices(id) ON DELETE CASCADE,
+    claim_token TEXT NOT NULL UNIQUE,
+    claimed_at TEXT NOT NULL,
+    expires_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS invoice_sweep_attempts (
+    invoice_id TEXT PRIMARY KEY REFERENCES invoices(id) ON DELETE CASCADE,
+    attempt_token TEXT NOT NULL UNIQUE,
+    started_at TEXT NOT NULL,
+    uncertain INTEGER NOT NULL CHECK (uncertain IN (0, 1)),
+    updated_at TEXT NOT NULL
 );
 
 CREATE INDEX IF NOT EXISTS idx_services_public

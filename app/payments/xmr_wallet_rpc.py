@@ -165,12 +165,19 @@ class XmrWalletRpcClient:
         self.sleeper = sleeper
         self.auth = HTTPDigestAuth(config.username, config.password)
 
-    def rpc_call(self, method: str, params: dict[str, Any] | None = None) -> dict[str, Any]:
+    def rpc_call(
+        self,
+        method: str,
+        params: dict[str, Any] | None = None,
+        *,
+        retry_safe: bool = True,
+    ) -> dict[str, Any]:
         if not method:
             raise ValueError("wallet-RPC method is required")
         payload = {"jsonrpc": "2.0", "id": "0", "method": method, "params": params or {}}
 
-        for attempt in range(1, self.config.max_attempts + 1):
+        attempt_limit = self.config.max_attempts if retry_safe else 1
+        for attempt in range(1, attempt_limit + 1):
             try:
                 response = self.session.post(
                     self.config.url,
@@ -179,7 +186,7 @@ class XmrWalletRpcClient:
                     auth=self.auth,
                 )
             except requests.RequestException as exc:
-                if attempt < self.config.max_attempts:
+                if attempt < attempt_limit:
                     self._backoff(attempt)
                     continue
                 raise XmrWalletRpcTransportError(
@@ -191,7 +198,7 @@ class XmrWalletRpcClient:
                 raise XmrWalletRpcProtocolError("XMR wallet-RPC response has no valid HTTP status")
             if not 200 <= status_code < 300:
                 http_error = XmrWalletRpcHttpError(status_code)
-                if (status_code == 429 or status_code >= 500) and attempt < self.config.max_attempts:
+                if (status_code == 429 or status_code >= 500) and attempt < attempt_limit:
                     self._backoff(attempt)
                     continue
                 raise http_error
@@ -246,6 +253,24 @@ class XmrWalletRpcClient:
         result = self.rpc_call("get_transfers", {"in": True, "account_index": account_index})
         return _require_transfer_list(result.get("in", []))
 
+    def get_transfers_out(self, account_index: int) -> list[dict[str, Any]]:
+        """Return relayed outgoing transfers, including unmined pool entries."""
+
+        _require_non_negative_int(account_index, "account index")
+        result = self.rpc_call(
+            "get_transfers",
+            {
+                "out": True,
+                "pending": True,
+                "pool": True,
+                "account_index": account_index,
+            },
+        )
+        combined: list[dict[str, Any]] = []
+        for key in ("out", "pending", "pool"):
+            combined.extend(_require_transfer_list(result.get(key, [])))
+        return combined
+
     def get_transfer_by_txid(
         self, txid: str, account_index: int | None = None
     ) -> list[dict[str, Any]]:
@@ -285,7 +310,10 @@ class XmrWalletRpcClient:
             for address_index in subaddr_indices:
                 _require_non_negative_int(address_index, "subaddress index")
             params["subaddr_indices"] = list(subaddr_indices)
-        return self.rpc_call("sweep_all", params)
+        # A timeout may occur after broadcast. Automatic transport retry could
+        # therefore broadcast a second sweep before persistence can reconcile
+        # the first attempt. The orchestrator owns all retry decisions.
+        return self.rpc_call("sweep_all", params, retry_safe=False)
 
     def _backoff(self, attempt: int) -> None:
         self.sleeper(self.config.retry_backoff_seconds * attempt)

@@ -1,7 +1,7 @@
 # XMR wallet-RPC transport and configuration
 
-Status: Task 2 transport complete; no live wallet connection or payment behavior
-is enabled by this module.
+Status: Task 2 transport and Task 5 reconciliation-facing methods complete; no
+live wallet connection or production payment behavior is enabled.
 
 ## Boundary
 
@@ -35,11 +35,13 @@ wallet. Every request uses HTTP Digest authentication.
 - Remote error messages and HTTP bodies are not included in exceptions.
 - Retry delay is linear: configured backoff multiplied by the failed attempt
   number.
+- `sweep_all` is deliberately non-retrying because a lost response could follow
+  a successful broadcast. The orchestrator reconciles outgoing history before a
+  later operator-visible retry.
 
 The transport exposes `create_address`/`create_subaddress`, `get_height`, incoming
-transfers, transfer lookup by transaction ID, and `sweep_all`. Invoice matching,
-state transitions, concurrency control, and uncertain-sweep reconciliation remain
-separate later tasks.
+and outgoing transfers, transfer lookup by transaction ID, and `sweep_all`.
+Invoice matching and state transitions remain outside this transport module.
 
 ## Environment contract
 
@@ -68,7 +70,8 @@ separate later tasks.
 | `XMR_SWEEP_ACCOUNT_INDEX` | Later sweep account | Non-negative integer |
 | `XMR_SWEEP_PRIORITY` | wallet-RPC priority | Integer 0 through 4 |
 | `XMR_SWEEP_RELAY` | Relay sweep transaction | Strict boolean |
-| `X_INTERNAL_TOKEN` | Later poll authorization | Production: non-placeholder, at least 32 characters |
+| `XMR_SWEEP_RECONCILE_SECONDS` | Minimum outgoing-history observation window before retry | 30 through 3600; default 300 |
+| `X_INTERNAL_TOKEN` | Internal poll authorization | Production: non-placeholder, at least 32 characters |
 | `ALLOW_PUBLIC_XMR_WALLET_RPC` | Dangerous network override | Strict boolean; default false |
 
 In production, wallet-RPC must resolve from a literal loopback/private IP or the

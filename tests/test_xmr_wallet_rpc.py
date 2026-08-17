@@ -263,3 +263,50 @@ def test_transfer_and_sweep_methods_preserve_required_parameters():
         "relay": False,
         "subaddr_indices": [9],
     }
+
+
+def test_outgoing_transfer_lookup_includes_relayed_and_pool_entries():
+    session = FakeSession(
+        [
+            FakeResponse(
+                {
+                    "result": {
+                        "out": [{"txid": "test-only-mined"}],
+                        "pending": [{"txid": "test-only-pending"}],
+                        "pool": [{"txid": "test-only-pool"}],
+                    }
+                }
+            )
+        ]
+    )
+    client = XmrWalletRpcClient(rpc_config(), session=session)
+
+    assert client.get_transfers_out(7) == [
+        {"txid": "test-only-mined"},
+        {"txid": "test-only-pending"},
+        {"txid": "test-only-pool"},
+    ]
+    assert session.calls[0]["json"]["params"] == {
+        "out": True,
+        "pending": True,
+        "pool": True,
+        "account_index": 7,
+    }
+
+
+def test_sweep_transport_failure_is_never_automatically_retried():
+    session = FakeSession(
+        [requests.Timeout("response lost"), requests.Timeout("must remain unused")]
+    )
+    client = XmrWalletRpcClient(
+        rpc_config(max_attempts=3), session=session, sleeper=lambda _: None
+    )
+
+    with pytest.raises(XmrWalletRpcTransportError):
+        client.sweep_all(
+            address="test-only-cold-destination",
+            account_index=7,
+            subaddr_indices=[9],
+        )
+
+    assert len(session.calls) == 1

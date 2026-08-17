@@ -1,9 +1,10 @@
 # Servicesite architecture
 
-Status: Tasks 0 through 4. The validated wallet transport, minimal catalog
+Status: Tasks 0 through 5. The validated wallet transport, minimal catalog
 persistence, canonical invoice domain, fresh SQLite schema, and private web
-checkout/status boundary are implemented. Admin, polling, and deployment units
-remain separate tasks.
+checkout/status boundary are implemented. The protected reconciliation boundary
+is implemented but not scheduled or production-verified. Admin and deployment
+units remain separate tasks.
 
 ## Runtime components
 
@@ -65,6 +66,20 @@ Customer state mapping hides wallet indexes, transaction identifiers, internal
 payment states, and sweep details. Only `settled` is described as eligible for
 manual fulfillment review.
 
+## Task 5 reconciliation boundary
+
+The internal poll endpoint accepts only an actual loopback peer and an exact,
+constant-time-compared internal token. It loads wallet incoming history for the
+configured account, then matches each invoice using both account and subaddress
+indexes. SQLite leases serialize invoice work across processes.
+
+Sweep-required invoices persist an attempt and enter `sweeping_to_cold` before
+the wallet call. The sweep transport performs one request only. A missing
+response or malformed success stays uncertain until outgoing wallet history is
+checked; a stored or reconciled transaction ID prevents another sweep. Summary
+responses and logs contain counts and shortened invoice references, never
+addresses, transaction IDs, tokens, or RPC response text.
+
 ## Task boundaries
 
 - Task 0: scaffold and decisions only.
@@ -72,5 +87,5 @@ manual fulfillment review.
 - Task 3: minimal catalog/invoice persistence and canonical invoice domain.
 - Task 4: public catalog, checkout, QR, and private status views.
 - Admin authentication and catalog CRUD remain a separate application task.
-- Task 5: poll/confirm/sweep orchestration.
+- Task 5: poll/confirm/sweep orchestration (implemented; staged verification pending).
 - Tasks 6-10: reproducible deployment, staging, cutover, and reconciliation.

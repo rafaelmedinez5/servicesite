@@ -161,7 +161,14 @@ def test_fresh_schema_initialization_is_idempotent_and_uses_wal(tmp_path):
     finally:
         connection.close()
 
-    assert tables == {"schema_meta", "categories", "services", "invoices"}
+    assert tables == {
+        "schema_meta",
+        "categories",
+        "services",
+        "invoices",
+        "invoice_poll_claims",
+        "invoice_sweep_attempts",
+    }
     assert journal_mode.lower() == "wal"
     assert stat.S_IMODE(database_path.stat().st_mode) == 0o600
 
@@ -173,6 +180,39 @@ def test_schema_initialization_refuses_an_unrecognized_existing_database(tmp_pat
 
     with pytest.raises(DatabaseNotFreshError, match="import is refused"):
         SQLiteDatabase(database_path).initialize()
+
+
+def test_schema_version_one_is_upgraded_with_reconciliation_tables(tmp_path):
+    database = SQLiteDatabase(tmp_path / "upgrade.db")
+    database.initialize()
+    connection = database.connect()
+    try:
+        connection.execute("DROP TABLE invoice_poll_claims")
+        connection.execute("DROP TABLE invoice_sweep_attempts")
+        connection.execute(
+            "UPDATE schema_meta SET value='1' WHERE key='schema_version'"
+        )
+        connection.commit()
+    finally:
+        connection.close()
+
+    database.initialize()
+    connection = database.connect()
+    try:
+        version = connection.execute(
+            "SELECT value FROM schema_meta WHERE key='schema_version'"
+        ).fetchone()[0]
+        tables = {
+            row[0]
+            for row in connection.execute(
+                "SELECT name FROM sqlite_master WHERE type='table'"
+            )
+        }
+    finally:
+        connection.close()
+
+    assert version == "2"
+    assert {"invoice_poll_claims", "invoice_sweep_attempts"} <= tables
 
 
 def test_each_invoice_gets_a_unique_persisted_subaddress(repository_context):

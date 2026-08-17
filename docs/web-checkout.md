@@ -14,9 +14,9 @@ database, CoinGecko key, payment, or polling job was accessed.
 | `GET` | `/status/<invoice_id>/<status_token>` | Customer-safe payment state | Invoice bearer token |
 | `GET` | `/health` | Process health response | Public loopback health check |
 
-There is no customer-triggered wallet-RPC refresh route in Task 4. The status
-page reads the last transactionally stored invoice state. Task 5 adds the
-separate timer-driven polling boundary.
+There is no customer-triggered wallet-RPC refresh route. The status page reads
+the last transactionally stored invoice state. Task 5 adds a separate protected
+polling boundary; no timer is installed or enabled at this checkpoint.
 
 ## Pricing policy
 
@@ -63,7 +63,7 @@ payment does not authorize a cybersecurity engagement.
 
 - live CoinGecko access through the production network;
 - live wallet-RPC invoice creation and QR scanning with a Monero wallet;
-- timer-driven transfer matching, confirmations, expiry, and sweep behavior;
+- live transfer matching, confirmations, expiry, and sweep behavior;
 - admin authentication, catalog CRUD, purchase visibility, and manual
   fulfillment actions;
 - production database initialization and deployment.

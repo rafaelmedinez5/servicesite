@@ -3,6 +3,7 @@ from __future__ import annotations
 from flask import Flask
 
 from app.config import Settings
+from app.internal import register_internal
 from app.persistence import SQLiteDatabase, ServicesiteRepository
 from app.web import register_web
 
@@ -35,6 +36,7 @@ def create_app(test_config: dict | None = None) -> Flask:
         XMR_SWEEP_ACCOUNT_INDEX=settings.xmr_sweep_account_index,
         XMR_SWEEP_PRIORITY=settings.xmr_sweep_priority,
         XMR_SWEEP_RELAY=settings.xmr_sweep_relay,
+        XMR_SWEEP_RECONCILE_SECONDS=settings.xmr_sweep_reconcile_seconds,
         X_INTERNAL_TOKEN=settings.internal_token,
         ALLOW_PUBLIC_XMR_WALLET_RPC=settings.allow_public_xmr_wallet_rpc,
     )
@@ -64,8 +66,13 @@ def create_app(test_config: dict | None = None) -> Flask:
         app.extensions["servicesite_now_factory"] = app.config[
             "SERVICESITE_NOW_FACTORY"
         ]
+    if app.config.get("SERVICESITE_RECONCILIATION_SERVICE") is not None:
+        app.extensions["servicesite_reconciliation_service"] = app.config[
+            "SERVICESITE_RECONCILIATION_SERVICE"
+        ]
 
     register_web(app)
+    register_internal(app)
 
     @app.get("/health")
     def health():

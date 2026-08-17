@@ -116,6 +116,7 @@ class Settings:
     xmr_sweep_account_index: int
     xmr_sweep_priority: int
     xmr_sweep_relay: bool
+    xmr_sweep_reconcile_seconds: int
     internal_token: str = field(repr=False)
     allow_public_xmr_wallet_rpc: bool
 
@@ -255,6 +256,12 @@ class Settings:
             ),
             xmr_sweep_relay=_parse_bool(
                 "XMR_SWEEP_RELAY", os.getenv("XMR_SWEEP_RELAY", "true")
+            ),
+            xmr_sweep_reconcile_seconds=_parse_int(
+                "XMR_SWEEP_RECONCILE_SECONDS",
+                os.getenv("XMR_SWEEP_RECONCILE_SECONDS", "300").strip(),
+                minimum=30,
+                maximum=3600,
             ),
             internal_token=internal_token,
             allow_public_xmr_wallet_rpc=allow_public_xmr_wallet_rpc,

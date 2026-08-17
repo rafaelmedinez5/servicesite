@@ -1,15 +1,16 @@
 # Invoice domain and persistence
 
-Status: Task 3 complete. This is a local, tested domain/persistence layer; no
-production database or wallet was accessed.
+Status: Tasks 3 and 5 complete. This is a local, tested domain, persistence, and
+reconciliation layer; no production database or wallet was accessed.
 
 ## Fresh database boundary
 
-`SQLiteDatabase.initialize()` creates schema version 1 with WAL mode and applies
+`SQLiteDatabase.initialize()` creates schema version 2 with WAL mode and applies
 mode `0600` to the database file. Initialization is idempotent for a recognized
 `servicesite` database. If a database already contains tables but has no
 `servicesite` schema marker, initialization refuses it instead of treating a
-legacy database as compatible.
+legacy database as compatible. A recognized schema version 1 database is
+upgraded in place by adding only the Task 5 coordination tables.
 
 The production parent directory must already exist with operator-reviewed
 ownership and permissions. The application does not copy or inspect the legacy
@@ -48,6 +49,12 @@ Stores:
 The database enforces unique status tokens, unique addresses, and unique
 `(wallet account index, subaddress index)` pairs. Catalog rows referenced by
 invoices cannot be deleted; later admin workflows archive them.
+
+### `invoice_poll_claims` and `invoice_sweep_attempts`
+
+Short-lived poll claims serialize one invoice across overlapping poll runs.
+Sweep attempts persist a strong attempt token, start/update timestamps, and the
+uncertain-response flag. These rows contain no wallet credentials or addresses.
 
 ## Canonical creation path
 
@@ -106,11 +113,21 @@ exceed the locked expectation and confirmations to meet or exceed the locked
 requirement. Partial payment never settles; overpayment remains representable in
 `observed_atomic` for later reconciliation.
 
+## Task 5 behavior
+
+The reconciliation service lists only open payment states, takes a per-invoice
+SQLite lease, and matches transfers with both stored wallet indexes. It sums
+integer atomic amounts and computes confirmation coverage over enough transfers
+to satisfy the exact locked expectation. Zero, partial, exact, and overpayment
+observations preserve the required state rules.
+
+Sweep attempts are serialized and persisted before the wallet call. Confirmed
+invoices cannot expire while waiting for or reconciling a sweep. Full operational
+and recovery details are in `xmr-reconciliation.md`.
+
 ## Deferred behavior
 
 - admin authentication and catalog forms;
-- polling, transfer matching, concurrency control, and uncertain-sweep
-  reconciliation;
 - manual fulfillment state and admin purchase workflow;
 - production database initialization and backups.
 

@@ -122,6 +122,7 @@ def test_xmr_configuration_defaults_are_safe(monkeypatch):
     assert settings.xmr_rate_source == "coingecko"
     assert settings.xmr_quote_max_age_seconds == 300
     assert settings.xmr_sweep_enabled is False
+    assert settings.xmr_sweep_reconcile_seconds == 300
     assert settings.allow_public_xmr_wallet_rpc is False
 
 
