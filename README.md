@@ -3,10 +3,10 @@
 Server-rendered Flask service catalog with XMR-only checkout, an authenticated
 admin-managed catalog, purchase visibility, and manual fulfillment.
 
-Task 0 is complete in this scaffold: it establishes the application boundary,
-loopback configuration, documentation, dependencies, and smoke tests. Catalog
-persistence, admin authentication, XMR wallet-rpc integration, invoices, polling,
-and production units are intentionally deferred to their numbered tasks.
+Tasks 0 through 2 establish the application boundary, source inventory, strict
+configuration contract, and isolated XMR wallet-RPC transport. Catalog
+persistence, admin authentication, invoices, polling, and production units are
+intentionally deferred to their numbered tasks.
 
 ## Confirmed direction
 
@@ -26,7 +26,9 @@ and production units are intentionally deferred to their numbered tasks.
 ```text
 app/
   __init__.py             Flask application factory and Task 0 routes
-  config.py               startup configuration and loopback validation
+  config.py               typed startup and XMR configuration validation
+  payments/
+    xmr_wallet_rpc.py     isolated amount and wallet-RPC transport
   static/css/style.css    local CSS
   templates/index.html    scaffold landing page
 deploy/systemd/           sanitized unit templates added in Task 6
@@ -34,6 +36,8 @@ docs/
   architecture.md
   decisions/application.md
   decisions/xmr-migration.md
+  xmr-source-inventory.md
+  xmr-wallet-rpc.md
 scripts/                  operational scripts added in later tasks
 tests/test_smoke.py
 wsgi.py
@@ -74,5 +78,5 @@ The expected response is `OK`.
 
 ## Next task
 
-Complete the read-only source/VPS inventory required by Task 1, then proceed to
-the isolated wallet-rpc transport and configuration contract in Task 2.
+Proceed to Task 3: the canonical invoice domain and fresh transactional
+persistence. Do not connect to a production wallet or enable polling yet.
