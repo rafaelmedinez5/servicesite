@@ -1,0 +1,11 @@
+[Unit]
+Description=Run Servicesite XMR reconciliation every minute
+
+[Timer]
+OnCalendar=*-*-* *:*:00
+AccuracySec=5s
+Persistent=true
+Unit=servicesite-poll-xmr.service
+
+[Install]
+WantedBy=timers.target

@@ -1,0 +1,33 @@
+[Unit]
+Description=Reconcile Servicesite XMR invoices
+Requires=servicesite-web.service servicesite-wallet-rpc.service
+After=network-online.target servicesite-web.service servicesite-wallet-rpc.service
+
+[Service]
+Type=oneshot
+User=servicesite
+Group=servicesite
+WorkingDirectory=/opt/servicesite/app
+EnvironmentFile=/etc/servicesite/servicesite.env
+ExecStart=/opt/servicesite/app/scripts/poll-xmr
+TimeoutStartSec=300s
+UMask=0077
+StandardOutput=journal
+StandardError=journal
+
+NoNewPrivileges=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+LockPersonality=true
+RestrictRealtime=true
+CapabilityBoundingSet=
+AmbientCapabilities=
+SystemCallArchitectures=native
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+ReadWritePaths=/opt/servicesite/instance /opt/servicesite/logs

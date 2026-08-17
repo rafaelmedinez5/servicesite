@@ -3,11 +3,11 @@
 Server-rendered Flask service catalog with XMR-only checkout, an authenticated
 admin-managed catalog, purchase visibility, and manual fulfillment.
 
-Tasks 0 through 5 establish the application boundary, source inventory, strict
+Tasks 0 through 6 establish the application boundary, source inventory, strict
 configuration contract, isolated XMR wallet-RPC transport, fresh SQLite schema,
 canonical invoice domain, private server-rendered checkout/status flow, and the
-protected payment reconciliation boundary. Admin authentication and production
-units remain deferred.
+protected payment reconciliation boundary, as well as sanitized deployment templates.
+Admin authentication and live deployment remain deferred.
 
 ## Confirmed direction
 
@@ -40,17 +40,19 @@ app/
   internal.py             loopback-and-token-protected polling endpoint
   static/css/style.css    local CSS
   templates/index.html    scaffold landing page
-deploy/systemd/           sanitized unit templates added in Task 6
+deploy/systemd/           sanitized web, poll, timer, and wallet-RPC units
 docs/
   architecture.md
   decisions/application.md
+  decisions/systemd.md
   decisions/xmr-migration.md
   invoice-domain.md
+  systemd-install.md
   web-checkout.md
   xmr-reconciliation.md
   xmr-source-inventory.md
   xmr-wallet-rpc.md
-scripts/                  operational scripts added in later tasks
+scripts/poll-xmr          token-safe loopback reconciliation launcher
 tests/test_smoke.py
 wsgi.py
 ```
@@ -85,7 +87,7 @@ The expected response is `OK`.
 - The application must never bind a public interface.
 - Wallet files, passwords, internal tokens, databases, backups, and Tor private
   keys must never enter the repository.
-- Do not install or start systemd/Tor/wallet services from this scaffold.
+- Do not install or start systemd/Tor/wallet services from this checkpoint.
 - A passing mocked or local test is not proof of production payment behavior.
 
 ## Task 5 safety boundary
@@ -96,7 +98,18 @@ and subaddress indexes, serializes work with SQLite leases, and persists sweep
 attempt state before making a non-retried sweep call. See
 `docs/xmr-reconciliation.md` for state, recovery, and residual-risk details.
 
+## Task 6 deployment boundary
+
+The committed units use separate least-privilege identities, protected external
+configuration, restrictive filesystem access, bounded timeouts, and a persistent
+one-minute timer. The polling launcher keeps the internal token out of process
+arguments. Gunicorn access logging is disabled because bearer tokens occur in
+private request paths.
+
+The wallet-RPC binary is not installed, so its runtime and external configuration
+remain blocked. No unit has been copied, enabled, or started.
+
 ## Next task
 
-Proceed to Task 6: add sanitized deployment scripts and systemd unit templates.
-Do not enable a production timer or sweeping from this repository checkpoint.
+Proceed to Task 7: write the complete deployment, secret, wallet, Tor, preflight,
+and rollback runbook. Do not enable the timer or sweeping yet.

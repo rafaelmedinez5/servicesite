@@ -1,10 +1,10 @@
 # Servicesite architecture
 
-Status: Tasks 0 through 5. The validated wallet transport, minimal catalog
+Status: Tasks 0 through 6. The validated wallet transport, minimal catalog
 persistence, canonical invoice domain, fresh SQLite schema, and private web
 checkout/status boundary are implemented. The protected reconciliation boundary
-is implemented but not scheduled or production-verified. Admin and deployment
-units remain separate tasks.
+is implemented but not scheduled or production-verified. Sanitized deployment
+units exist; admin and live deployment remain separate tasks.
 
 ## Runtime components
 
@@ -80,6 +80,21 @@ checked; a stored or reconciled transaction ID prevents another sweep. Summary
 responses and logs contain counts and shortened invoice references, never
 addresses, transaction IDs, tokens, or RPC response text.
 
+## Task 6 process topology
+
+The committed systemd templates keep Gunicorn, the one-shot HTTP poll client,
+and the dedicated wallet-RPC in separate processes. Gunicorn and the poller run
+as `servicesite`; wallet-RPC runs as `xmrwallet` and receives only a protected
+external config-file path. A persistent calendar timer coalesces missed
+one-minute polls. Filesystem write access is limited to the recorded instance and
+log directories for each identity.
+
+Gunicorn validates the configured loopback bind before opening its listener and
+does not produce access logs containing private status-token URLs. The poll
+client disables proxies for its loopback call and keeps the internal token out of
+arguments and output. Wallet runtime validation is blocked until Task 7 installs
+and verifies a selected Monero binary.
+
 ## Task boundaries
 
 - Task 0: scaffold and decisions only.
@@ -88,4 +103,5 @@ addresses, transaction IDs, tokens, or RPC response text.
 - Task 4: public catalog, checkout, QR, and private status views.
 - Admin authentication and catalog CRUD remain a separate application task.
 - Task 5: poll/confirm/sweep orchestration (implemented; staged verification pending).
-- Tasks 6-10: reproducible deployment, staging, cutover, and reconciliation.
+- Task 6: sanitized systemd units, poll launcher, and install/rollback commands.
+- Tasks 7-10: complete runbook, staging, cutover, and reconciliation.

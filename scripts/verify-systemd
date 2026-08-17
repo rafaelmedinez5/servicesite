@@ -1,0 +1,14 @@
+#!/bin/sh
+set -eu
+
+script_dir=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+unit_dir=$(dirname -- "$script_dir")/deploy/systemd
+verify_dir=$(mktemp -d)
+trap 'rm -rf -- "$verify_dir"' EXIT HUP INT TERM
+
+for unit in "$unit_dir"/*.service "$unit_dir"/*.timer; do
+    sed 's|^ExecStart=.*$|ExecStart=/bin/true|' "$unit" >"$verify_dir/$(basename -- "$unit")"
+done
+
+systemd-analyze verify "$verify_dir"/*.service "$verify_dir"/*.timer
+printf '%s\n' 'systemd syntax verification passed; target executables remain a deployment preflight check'

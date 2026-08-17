@@ -1,0 +1,39 @@
+[Unit]
+Description=Dedicated Servicesite Monero wallet RPC
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=simple
+User=xmrwallet
+Group=xmrwallet
+WorkingDirectory=/opt/monero
+ExecStart=/opt/monero/bin/monero-wallet-rpc --config-file=/etc/servicesite/monero-wallet-rpc.conf
+Restart=on-failure
+RestartSec=10s
+TimeoutStartSec=180s
+TimeoutStopSec=120s
+KillSignal=SIGINT
+UMask=0077
+StandardOutput=null
+StandardError=journal
+
+NoNewPrivileges=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+LockPersonality=true
+RestrictRealtime=true
+CapabilityBoundingSet=
+AmbientCapabilities=
+SystemCallArchitectures=native
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+ReadWritePaths=/opt/monero/wallet /opt/monero/logs
+
+[Install]
+WantedBy=multi-user.target
