@@ -1,101 +1,96 @@
 # XMR migration decisions
 
-Status: VPS architecture decisions recorded. Application implementation and deployment remain separate approval gates.
+Status: Task 0 decisions frozen on 2026-08-17. Payment implementation and
+deployment remain separate approval gates.
 
 ## Product
 
-`servicesite` is a service sales site for authorized cybersecurity engagements. The initial service offering is red-team / blue-team security assessment work in which a client authorizes testing of its systems and receives a detailed findings report, exploit analysis, risk assessment, and mitigation guidance.
+`servicesite` is a service sales site for authorized cybersecurity engagements.
+The initial direction is red-team / blue-team security assessment work in which
+a client authorizes testing of its systems and receives findings, exploit
+analysis, risk assessment, and mitigation guidance.
 
-The website is a sales/intake/payment front end. It is not itself an autonomous penetration-testing platform. Any client engagement must have explicit scope and authorization before testing begins.
+The website is a catalog, sales, intake, and payment front end. It is not an
+autonomous penetration-testing platform. Payment never constitutes authorization
+to begin testing.
+
+## Confirmed application decisions
+
+- Backend: Python 3.12 and Flask.
+- Frontend: server-rendered HTML/Jinja and CSS; no JavaScript.
+- Web bind: `127.0.0.1:5100`.
+- Catalog: categories and services are managed from an authenticated admin panel.
+- Public visibility: only published categories and services appear publicly.
+- Pricing input: the administrator enters prices in USD.
+- Checkout pricing: USD is converted to XMR and locked when an invoice is created.
+- Historical integrity: each purchase stores immutable service, category, USD
+  price, rate, and XMR amount snapshots.
+- Fulfillment: manual for the initial release and recorded separately from payment.
+- Catalog deletion: archive/unpublish rather than destroy records referenced by
+  purchases.
+- Authentication: one administrator account initially; only a password hash is
+  stored outside Git.
+- Admin forms: session-authenticated, CSRF-protected, rate-limited, and
+  server-rendered.
+- Database: fresh SQLite database with WAL mode.
 
 ## Deployment
 
 - VPS provider: **Shinjiru**.
-- OS: **Ubuntu 24.04 LTS, x86_64**.
+- OS: **Ubuntu 24.04 LTS, x86_64**, in an OpenVZ container.
 - Deployment topology: **new VPS**.
 - Administration: **HTML5 serial console** supplied by the VPS provider.
-- SSH: **not used for routine server administration**. If GitHub SSH credentials are configured, they are for GitHub repository access only and must not be confused with server-management access.
-- The legacy `salessite` VPS/application remains untouched during development and cutover.
-- The new application gets a new Linux service identity, install directory, database path, web port, systemd service/timer names, and Tor onion service.
-- Database: **SQLite** for the initial application.
-- The new application will use a fresh database. Legacy invoices remain with the legacy application until resolved.
+- The legacy application and its invoices remain untouched.
+- Application root: `/opt/servicesite`.
+- Source checkout: `/opt/servicesite/app`.
+- Python virtual environment: `/opt/servicesite/.venv`.
+- Instance data: `/opt/servicesite/instance`.
+- Production environment file: `/etc/servicesite/servicesite.env`, mode `0600`.
+- Application identity: `servicesite:servicesite`, without sudo or login shell.
 
-## Proposed filesystem layout
-
-Use `/opt/servicesite` as the application root unless a later deployment decision changes it:
-
-- `/opt/servicesite/app` — application source/runtime code
-- `/opt/servicesite/venv` — Python virtual environment
-- `/opt/servicesite/instance` — SQLite database and instance data
-- `/opt/servicesite/scripts` — operational scripts
-- `/opt/servicesite/logs` — application-specific logs only if needed
-- `/opt/servicesite/secrets` — application-local secret files, restricted and never committed
-- `/etc/servicesite/servicesite.env` — production environment configuration, mode 0600
-
-Keep wallet files outside the application tree so the web application user cannot read them.
-
-## Linux identities
-
-Use separate least-privilege identities:
-
-- `servicesite` — Flask/Gunicorn application and application-owned SQLite data
-- `xmrwallet` — dedicated `monero-wallet-rpc` process and wallet files
-- `debian-tor` — system Tor service
-
-Do not add `servicesite` to the `xmrwallet` group. Do not grant either service account sudo privileges. Administrative system changes are performed through the serial-console administrator/root workflow.
+The provider image has a known unresolved `tzdata`/`dpkg` configuration issue.
+Application work may continue inside the isolated virtual environment, but the
+package state remains a deployment risk that must be recorded and re-evaluated
+before production approval.
 
 ## Monero
 
-- A **new `monero-wallet-rpc` instance** will be created for `servicesite`.
-- Do not reuse the legacy wallet-rpc process, wallet files, wallet database, or systemd unit.
-- Wallet-rpc must bind to loopback/private networking and require authentication.
-- The new wallet must be initialized and backed up according to the deployment runbook. Seeds/private keys/passwords never enter Git.
-- Default confirmation requirement: **10 confirmations** unless explicitly changed later.
-- Initial staging policy: **sweep disabled** until end-to-end reconciliation has been verified. Production sweep behavior is an explicit later decision.
-- Invoice amounts are stored internally as integer atomic units.
-- Each invoice receives a unique Monero subaddress.
-
-## Application behavior
-
-The service checkout should be simple and server-rendered. The payment flow should create an invoice, display the exact locked XMR amount and unique address/QR, and provide a private status page. Fulfillment is not considered complete until the configured payment lifecycle reaches `settled`.
-
-The XMR payment subsystem should remain independent from the cybersecurity engagement workflow. Payment confirms that a purchase/engagement request has been paid; it must not automatically authorize a security test or grant access to a target. Engagement authorization and scope are separate business records/processes.
+- A new, dedicated `monero-wallet-rpc` instance will be created.
+- Wallet root: `/opt/monero`.
+- Wallet identity: `xmrwallet:xmrwallet`, without sudo or login shell.
+- `servicesite` is not a member of the `xmrwallet` group and cannot read wallet files.
+- Wallet-rpc binds to loopback/private networking and requires digest authentication.
+- Default confirmation requirement: 10 confirmations.
+- Invoice amounts are integer atomic units internally.
+- Every invoice receives a unique subaddress.
+- Initial stagenet policy: sweep disabled until reconciliation is verified.
+- Production sweep behavior remains an explicit later approval.
 
 ## Tor onion service
 
-- Create a **new dedicated onion service** for `servicesite`.
-- Do not reuse or copy the legacy site's onion private key.
-- Tor should expose only the application's loopback listener through `HiddenServicePort`.
-- The application and wallet-rpc ports remain inaccessible from the public network.
-- Onion private keys remain on the VPS under Tor's protected state directory and never enter Git.
+- Create a new onion service and new hidden-service directory.
+- Map `HiddenServicePort` only to `127.0.0.1:5100`.
+- Do not reuse or copy the legacy onion private key.
+- Application and wallet-rpc ports remain inaccessible from the public network.
 
 ## Security-service governance baseline
 
-Before an engagement is accepted for testing, the service workflow should eventually capture:
+Before an engagement is accepted for testing, the workflow should eventually
+capture the authorized representative, signed authorization reference, scope and
+exclusions, permitted and prohibited techniques, testing window, critical-asset
+restrictions, emergency contact, evidence requirements, and immutable scope
+snapshot. Ambiguous or incomplete scope must be denied.
 
-- client identity/contact and authorized representative
-- explicit authorization / signed engagement reference
-- in-scope domains, IP ranges, applications, cloud resources, and exclusions
-- permitted testing techniques and prohibited actions
-- testing window and timezone
-- production/critical-asset restrictions
-- emergency contact and escalation procedure
-- evidence/reporting requirements
-- engagement identifier and immutable scope snapshot
+## Still blocked
 
-The platform should deny ambiguous or incomplete scope rather than treating payment as authorization.
+- final brand and initial catalog contents;
+- exact wallet-rpc port and daemon/onion endpoint;
+- wallet account/index strategy;
+- cold-wallet destination and production sweep policy;
+- engagement, purchase, and payment retention periods;
+- report format and customer delivery workflow;
+- final onion hostname, which is generated only during deployment.
 
-## Still to decide
-
-- final service name/brand
-- final service packages and pricing
-- XMR pricing/rate source and quote-age policy
-- application loopback port
-- exact Linux service account naming, if different from the proposed names above
-- new onion-service deployment details
-- new wallet account/index strategy
-- cold-wallet sweep destination and sweep policy
-- retention period for engagement/payment records
-- exact report format and customer delivery workflow
-
-These are not to be guessed by an agent. Record them when decided.
+Catalog contents and service prices are not implementation blockers because the
+administrator will create them after the catalog workflow exists. The remaining
+items must not be guessed by an agent.

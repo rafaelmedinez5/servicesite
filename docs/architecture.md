@@ -1,8 +1,9 @@
 # Servicesite architecture
 
-Status: Tasks 0 through 3. The validated wallet transport, minimal catalog
-persistence, canonical invoice domain, and fresh SQLite schema are implemented.
-Admin/web checkout, polling, and deployment units remain separate tasks.
+Status: Tasks 0 through 4. The validated wallet transport, minimal catalog
+persistence, canonical invoice domain, fresh SQLite schema, and private web
+checkout/status boundary are implemented. Admin, polling, and deployment units
+remain separate tasks.
 
 ## Runtime components
 
@@ -50,11 +51,26 @@ The invoice locks its price in integer USD cents, XMR/USD rate as exact decimal
 text, expected integer atomic amount, confirmation count, sweep policy, catalog
 snapshots, and expiry. A later catalog edit cannot alter historical invoices.
 
+## Task 4 web boundary
+
+The public catalog reads only published, non-archived categories and services.
+Checkout uses a signed-session CSRF token plus a single-use form nonce, obtains
+a timestamped CoinGecko quote, and calls only the canonical `InvoiceCreator`.
+The route does not calculate amounts or create subaddresses itself.
+
+Checkout, QR, and status resources require the invoice bearer token and return
+`no-store`, `noindex`, no-referrer, frame-denial, and no-script headers. The QR
+contains only a Monero URI with the unique address and numeric decimal amount.
+Customer state mapping hides wallet indexes, transaction identifiers, internal
+payment states, and sweep details. Only `settled` is described as eligible for
+manual fulfillment review.
+
 ## Task boundaries
 
 - Task 0: scaffold and decisions only.
 - Task 2: wallet-rpc transport and complete XMR configuration validation.
 - Task 3: minimal catalog/invoice persistence and canonical invoice domain.
-- Task 4: public catalog, admin authentication/CRUD, checkout, and status views.
+- Task 4: public catalog, checkout, QR, and private status views.
+- Admin authentication and catalog CRUD remain a separate application task.
 - Task 5: poll/confirm/sweep orchestration.
 - Tasks 6-10: reproducible deployment, staging, cutover, and reconciliation.

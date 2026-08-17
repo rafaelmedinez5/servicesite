@@ -1,22 +1,52 @@
-<!doctype html>
-<html lang="en">
-  <head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta name="robots" content="noindex">
-    <title>Servicesite</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
-  </head>
-  <body>
-    <main class="shell">
-      <section class="card" aria-labelledby="page-title">
-        <p class="eyebrow">Servicesite</p>
-        <h1 id="page-title">Service catalog setup in progress</h1>
-        <p>
-          Published categories and services will appear here after the catalog and
-          admin workflow are implemented.
-        </p>
+{% extends "base.html" %}
+
+{% block title %}Services | Servicesite{% endblock %}
+
+{% block content %}
+  <section class="hero" aria-labelledby="page-title">
+    <p class="eyebrow">Authorized security services</p>
+    <h1 id="page-title">Choose the engagement that fits your scope.</h1>
+    <p class="lede">
+      Prices are defined in USD. At checkout, the exact amount is converted to XMR,
+      locked for the displayed payment window, and assigned to a unique address.
+    </p>
+  </section>
+
+  {% if categories %}
+    {% for category in categories %}
+      <section class="catalog-section" aria-labelledby="category-{{ category.id }}">
+        <div class="section-heading">
+          <p class="eyebrow">Service category</p>
+          <h2 id="category-{{ category.id }}">{{ category.name }}</h2>
+          {% if category.description %}<p>{{ category.description }}</p>{% endif %}
+        </div>
+        <div class="service-grid">
+          {% for service in category.services %}
+            <article class="service-card">
+              <div>
+                <p class="service-duration">{{ service.duration_label or "Custom engagement" }}</p>
+                <h3>{{ service.service_name }}</h3>
+                <p>{{ service.service_description }}</p>
+              </div>
+              <div class="service-action">
+                <p class="price">{{ service.price_usd_cents|usd }}</p>
+                <form method="post" action="{{ url_for('public.create_checkout') }}">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                  <input type="hidden" name="checkout_nonce" value="{{ checkout_nonce }}">
+                  <input type="hidden" name="service_id" value="{{ service.service_id }}">
+                  <button type="submit">Create XMR invoice</button>
+                </form>
+              </div>
+            </article>
+          {% endfor %}
+        </div>
       </section>
-    </main>
-  </body>
-</html>
+    {% endfor %}
+  {% else %}
+    <section class="empty-state card" aria-labelledby="empty-title">
+      <p class="eyebrow">Catalog</p>
+      <h2 id="empty-title">No services are published yet.</h2>
+      <p>Published services will appear here when they are available for purchase.</p>
+    </section>
+  {% endif %}
+{% endblock %}

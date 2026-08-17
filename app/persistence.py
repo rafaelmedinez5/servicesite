@@ -207,6 +207,33 @@ class ServicesiteRepository:
         finally:
             connection.close()
 
+    def list_purchasable_services(self) -> list[PurchasableService]:
+        connection = self.database.connect()
+        try:
+            rows = connection.execute(
+                """
+                SELECT
+                    s.id AS service_id,
+                    s.version AS service_version,
+                    s.name AS service_name,
+                    s.description AS service_description,
+                    s.duration_label,
+                    s.price_usd_cents,
+                    c.id AS category_id,
+                    c.name AS category_name,
+                    c.description AS category_description
+                FROM services AS s
+                JOIN categories AS c ON c.id=s.category_id
+                WHERE s.published=1 AND s.archived=0
+                  AND c.published=1 AND c.archived=0
+                ORDER BY c.sort_order, c.name COLLATE NOCASE,
+                         s.sort_order, s.name COLLATE NOCASE
+                """
+            ).fetchall()
+            return [_row_to_purchasable_service(row) for row in rows]
+        finally:
+            connection.close()
+
     def insert_invoice(
         self, invoice: Invoice, expected_service: PurchasableService
     ) -> None:
@@ -382,6 +409,10 @@ def _fetch_purchasable_service(
     ).fetchone()
     if row is None:
         return None
+    return _row_to_purchasable_service(row)
+
+
+def _row_to_purchasable_service(row: sqlite3.Row) -> PurchasableService:
     return PurchasableService(
         service_id=row["service_id"],
         service_version=int(row["service_version"]),

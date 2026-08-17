@@ -215,6 +215,7 @@ class InvoiceCreator:
         required_confirmations: int,
         sweep_required: bool,
         invoice_ttl: timedelta = DEFAULT_INVOICE_TTL,
+        maximum_quote_age: timedelta | None = None,
         now_factory: Callable[[], datetime] = lambda: datetime.now(timezone.utc),
         invoice_id_factory: Callable[[], str] = lambda: secrets.token_hex(16),
         status_token_factory: Callable[[], str] = lambda: secrets.token_urlsafe(32),
@@ -224,11 +225,17 @@ class InvoiceCreator:
             raise InvoiceValidationError("sweep_required must be boolean")
         if not isinstance(invoice_ttl, timedelta) or invoice_ttl <= timedelta(0):
             raise InvoiceValidationError("invoice TTL must be positive")
+        if maximum_quote_age is not None and (
+            not isinstance(maximum_quote_age, timedelta)
+            or maximum_quote_age <= timedelta(0)
+        ):
+            raise InvoiceValidationError("maximum quote age must be positive")
         self.repository = repository
         self.wallet = wallet
         self.required_confirmations = required_confirmations
         self.sweep_required = sweep_required
         self.invoice_ttl = invoice_ttl
+        self.maximum_quote_age = maximum_quote_age
         self.now_factory = now_factory
         self.invoice_id_factory = invoice_id_factory
         self.status_token_factory = status_token_factory
@@ -246,6 +253,11 @@ class InvoiceCreator:
         _require_aware_datetime(now, "invoice creation time")
         if quote.quoted_at > now:
             raise InvoiceValidationError("quote timestamp cannot be in the future")
+        if (
+            self.maximum_quote_age is not None
+            and now - quote.quoted_at > self.maximum_quote_age
+        ):
+            raise InvoiceValidationError("quote is older than the approved policy")
 
         expected_atomic = calculate_expected_atomic(
             service.price_usd_cents, quote.usd_per_xmr

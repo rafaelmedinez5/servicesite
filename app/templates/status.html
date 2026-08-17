@@ -1,0 +1,60 @@
+{% set private_page = true %}
+{% extends "base.html" %}
+
+{% block title %}Private payment status | Servicesite{% endblock %}
+
+{% block content %}
+  <section class="private-heading" aria-labelledby="status-title">
+    <p class="eyebrow">Private payment status</p>
+    <h1 id="status-title">{{ customer_state.title }}</h1>
+    <p class="lede">{{ customer_state.message }}</p>
+  </section>
+
+  <div class="status-layout">
+    <section class="card status-card">
+      <div class="status-summary {{ customer_state.tone }}">
+        <span class="status-dot" aria-hidden="true"></span>
+        <div>
+          <strong>{{ customer_state.title }}</strong>
+          {% if customer_state.confirmation_text %}<p>{{ customer_state.confirmation_text }}</p>{% endif %}
+        </div>
+      </div>
+
+      <dl class="details-list compact">
+        <div>
+          <dt>Service</dt>
+          <dd>{{ invoice.service_name_snapshot }}</dd>
+        </div>
+        <div>
+          <dt>Locked amount</dt>
+          <dd class="monospace">{{ xmr_amount }} XMR</dd>
+        </div>
+        <div>
+          <dt>Invoice ID</dt>
+          <dd class="monospace breakable">{{ invoice.id }}</dd>
+        </div>
+        <div>
+          <dt>Payment window</dt>
+          <dd><time datetime="{{ invoice.expires_at.isoformat() }}">{{ invoice.expires_at|display_datetime }}</time></dd>
+        </div>
+      </dl>
+
+      <div class="fulfillment-note">
+        <p class="field-label">Fulfillment</p>
+        <p>{{ customer_state.fulfillment_text }}</p>
+      </div>
+
+      <div class="button-row">
+        {% if invoice.status.value == "awaiting_payment" %}
+          <a class="button" href="{{ url_for('public.checkout', invoice_id=invoice.id, status_token=invoice.status_token) }}">Return to checkout</a>
+        {% endif %}
+      </div>
+    </section>
+
+    <aside class="card privacy-card">
+      <p class="eyebrow">Keep this link private</p>
+      <h2>Status access</h2>
+      <p>This URL acts as the access credential for this invoice. Support will never ask for wallet credentials or private keys.</p>
+    </aside>
+  </div>
+{% endblock %}

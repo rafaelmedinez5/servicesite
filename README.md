@@ -3,10 +3,10 @@
 Server-rendered Flask service catalog with XMR-only checkout, an authenticated
 admin-managed catalog, purchase visibility, and manual fulfillment.
 
-Tasks 0 through 3 establish the application boundary, source inventory, strict
+Tasks 0 through 4 establish the application boundary, source inventory, strict
 configuration contract, isolated XMR wallet-RPC transport, fresh SQLite schema,
-and canonical invoice domain. Admin authentication, web checkout, polling, and
-production units remain deferred to their numbered tasks.
+canonical invoice domain, and private server-rendered checkout/status flow.
+Admin authentication, payment polling, and production units remain deferred.
 
 ## Confirmed direction
 
@@ -29,8 +29,11 @@ app/
   catalog.py              validated minimal category/service records
   config.py               typed startup and XMR configuration validation
   persistence.py          fresh SQLite schema and transactional repositories
+  web.py                  catalog, checkout, QR, and private status routes
+  web_security.py         CSRF and single-use checkout form tokens
   payments/
     invoice.py            canonical invoice creation and state machine
+    xmr_rate.py           exact CoinGecko quote and freshness enforcement
     xmr_wallet_rpc.py     isolated amount and wallet-RPC transport
   static/css/style.css    local CSS
   templates/index.html    scaffold landing page
@@ -40,6 +43,7 @@ docs/
   decisions/application.md
   decisions/xmr-migration.md
   invoice-domain.md
+  web-checkout.md
   xmr-source-inventory.md
   xmr-wallet-rpc.md
 scripts/                  operational scripts added in later tasks
@@ -82,6 +86,5 @@ The expected response is `OK`.
 
 ## Next task
 
-Proceed to Task 4: server-rendered service selection, private checkout/QR/status
-pages, and route security. Do not connect to a production wallet or enable
-polling yet.
+Proceed to Task 5: transfer matching, confirmation polling, expiry, and safe
+sweep reconciliation. Do not enable production polling or sweeping yet.

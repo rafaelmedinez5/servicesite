@@ -1,0 +1,13 @@
+{% set private_page = true %}
+{% extends "base.html" %}
+
+{% block title %}{{ title }} | Servicesite{% endblock %}
+
+{% block content %}
+  <section class="card error-card" aria-labelledby="error-title">
+    <p class="eyebrow">Servicesite</p>
+    <h1 id="error-title">{{ title }}</h1>
+    <p class="lede">{{ message }}</p>
+    <a class="button secondary" href="{{ url_for('public.index') }}">Return to services</a>
+  </section>
+{% endblock %}

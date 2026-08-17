@@ -55,8 +55,9 @@ invoices cannot be deleted; later admin workflows archive them.
 invoice-creation method. It:
 
 1. resolves a currently purchasable service;
-2. validates the rate as `Decimal` and calculates atomic units with exact decimal
-   arithmetic, rounding upward only to the next indivisible atomic unit;
+2. validates the rate as `Decimal`, enforces the configured maximum quote age,
+   and calculates atomic units with exact decimal arithmetic, rounding upward
+   only to the next indivisible atomic unit;
 3. creates a strong invoice ID and bearer token;
 4. requests a newly labeled wallet subaddress;
 5. builds immutable service, category, price, rate, confirmation, sweep-policy,
@@ -79,9 +80,8 @@ calculated as:
 `ceil((USD cents × 10^12) / (100 × USD per XMR))`
 
 Later service-price or category/service text edits do not alter an existing
-invoice. The production rate source and maximum quote-age policy remain blocked;
-Task 4 must fail checkout when the eventual approved quote policy is unavailable
-or stale.
+invoice. Task 4 uses a timestamped CoinGecko quote with a maximum age of 300
+seconds and fails checkout when the approved quote is unavailable or stale.
 
 ## Payment state machine
 
@@ -109,8 +109,6 @@ requirement. Partial payment never settles; overpayment remains representable in
 ## Deferred behavior
 
 - admin authentication and catalog forms;
-- public service selection and checkout routes;
-- approved XMR/USD rate retrieval and quote-age enforcement;
 - polling, transfer matching, concurrency control, and uncertain-sweep
   reconciliation;
 - manual fulfillment state and admin purchase workflow;

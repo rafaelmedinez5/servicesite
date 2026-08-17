@@ -1,0 +1,66 @@
+{% set private_page = true %}
+{% extends "base.html" %}
+
+{% block title %}Private XMR checkout | Servicesite{% endblock %}
+
+{% block content %}
+  <section class="private-heading" aria-labelledby="checkout-title">
+    <p class="eyebrow">Private checkout</p>
+    <h1 id="checkout-title">Pay the exact locked amount.</h1>
+    <p class="lede">Send one payment before the expiry time. This page is private; do not share its URL.</p>
+  </section>
+
+  <div class="payment-layout">
+    <section class="card payment-card" aria-labelledby="payment-details-title">
+      <div class="card-heading">
+        <div>
+          <p class="eyebrow">{{ invoice.category_name_snapshot }}</p>
+          <h2 id="payment-details-title">{{ invoice.service_name_snapshot }}</h2>
+        </div>
+        <span class="status-chip waiting">Awaiting payment</span>
+      </div>
+
+      <dl class="details-list">
+        <div>
+          <dt>Amount</dt>
+          <dd class="monospace amount">{{ xmr_amount }} XMR</dd>
+        </div>
+        <div>
+          <dt>USD price snapshot</dt>
+          <dd>{{ invoice.price_usd_cents|usd }}</dd>
+        </div>
+        <div>
+          <dt>Expires</dt>
+          <dd><time datetime="{{ invoice.expires_at.isoformat() }}">{{ invoice.expires_at|display_datetime }}</time></dd>
+        </div>
+        <div>
+          <dt>Invoice ID</dt>
+          <dd class="monospace breakable">{{ invoice.id }}</dd>
+        </div>
+      </dl>
+
+      <div class="address-block">
+        <p class="field-label">Unique Monero address</p>
+        <p class="monospace breakable address">{{ invoice.xmr_address }}</p>
+      </div>
+
+      <div class="button-row">
+        <a class="button" href="{{ monero_uri }}">Open Monero wallet</a>
+        <a class="button secondary" href="{{ url_for('public.status', invoice_id=invoice.id, status_token=invoice.status_token) }}">View payment status</a>
+      </div>
+    </section>
+
+    <aside class="card qr-card" aria-labelledby="qr-title">
+      <p class="eyebrow">Monero payment URI</p>
+      <h2 id="qr-title">Scan to pay</h2>
+      <img
+        class="qr-code"
+        src="{{ url_for('public.checkout_qr', invoice_id=invoice.id, status_token=invoice.status_token) }}"
+        alt="QR code containing the unique Monero address and exact numeric amount"
+        width="320"
+        height="320"
+      >
+      <p>Confirm both the address and exact amount in your wallet before sending.</p>
+    </aside>
+  </div>
+{% endblock %}

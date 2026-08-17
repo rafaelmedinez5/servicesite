@@ -17,6 +17,7 @@ PLACEHOLDER_SECRET_VALUES = {
     "replace_only_when_sweeping_is_approved",
     "replace_with_a_strong_random_token",
     "replace_with_at_least_32_random_characters",
+    "replace_with_coingecko_api_key",
     "replace_with_rpc_password",
     "replace_with_rpc_username",
 }
@@ -106,6 +107,10 @@ class Settings:
     xmr_rpc_retry_backoff_seconds: float
     xmr_min_confirmations: int
     xmr_invoice_ttl_seconds: int
+    xmr_rate_source: str
+    coingecko_api_key: str = field(repr=False)
+    xmr_rate_timeout_seconds: float
+    xmr_quote_max_age_seconds: int
     xmr_sweep_enabled: bool
     xmr_cold_address: str = field(repr=False)
     xmr_sweep_account_index: int
@@ -146,6 +151,10 @@ class Settings:
         )
         xmr_cold_address = os.getenv("XMR_COLD_ADDRESS", "").strip()
         internal_token = os.getenv("X_INTERNAL_TOKEN", "").strip()
+        xmr_rate_source = os.getenv("XMR_RATE_SOURCE", "coingecko").strip().lower()
+        if xmr_rate_source != "coingecko":
+            raise RuntimeError("XMR_RATE_SOURCE must be coingecko")
+        coingecko_api_key = os.getenv("COINGECKO_API_KEY", "").strip()
 
         if environment == "production":
             _require_production_secret("SECRET_KEY", secret_key, minimum_length=32)
@@ -156,6 +165,9 @@ class Settings:
                 "XMR_WALLET_RPC_PASS", xmr_wallet_rpc_password, minimum_length=16
             )
             _require_production_secret("X_INTERNAL_TOKEN", internal_token, minimum_length=32)
+            _require_production_secret(
+                "COINGECKO_API_KEY", coingecko_api_key, minimum_length=16
+            )
             if not _is_loopback_or_private(parsed_rpc_url) and not allow_public_xmr_wallet_rpc:
                 raise RuntimeError(
                     "Production XMR_WALLET_RPC_URL must use loopback/private networking; "
@@ -212,6 +224,20 @@ class Settings:
                 os.getenv("XMR_INVOICE_TTL_SECONDS", "7200").strip(),
                 minimum=60,
                 maximum=604800,
+            ),
+            xmr_rate_source=xmr_rate_source,
+            coingecko_api_key=coingecko_api_key,
+            xmr_rate_timeout_seconds=_parse_float(
+                "XMR_RATE_TIMEOUT",
+                os.getenv("XMR_RATE_TIMEOUT", "10").strip(),
+                minimum=0.1,
+                maximum=30,
+            ),
+            xmr_quote_max_age_seconds=_parse_int(
+                "XMR_QUOTE_MAX_AGE_SECONDS",
+                os.getenv("XMR_QUOTE_MAX_AGE_SECONDS", "300").strip(),
+                minimum=30,
+                maximum=300,
             ),
             xmr_sweep_enabled=xmr_sweep_enabled,
             xmr_cold_address=xmr_cold_address,

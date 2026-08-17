@@ -59,6 +59,10 @@ separate later tasks.
 | `XMR_RPC_RETRY_BACKOFF` | Base delay seconds | 0 through 60 |
 | `XMR_MIN_CONFIRMATIONS` | Canonical confirmation default | 1 through 1000; default 10 |
 | `XMR_INVOICE_TTL_SECONDS` | Locked invoice payment window | 60 through 604800; default 7200 |
+| `XMR_RATE_SOURCE` | Approved XMR/USD provider | Must be `coingecko` |
+| `COINGECKO_API_KEY` | CoinGecko Demo credential | Production: explicit, secret, at least 16 characters |
+| `XMR_RATE_TIMEOUT` | CoinGecko request seconds | 0.1 through 30; default 10 |
+| `XMR_QUOTE_MAX_AGE_SECONDS` | Maximum provider quote age | 30 through 300; chosen policy 300 |
 | `XMR_SWEEP_ENABLED` | Later sweep policy gate | Strict boolean; default false |
 | `XMR_COLD_ADDRESS` | Later sweep destination | Production: required and non-placeholder only when sweeping is enabled |
 | `XMR_SWEEP_ACCOUNT_INDEX` | Later sweep account | Non-negative integer |

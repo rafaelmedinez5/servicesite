@@ -2,14 +2,23 @@ import pytest
 
 from app import create_app
 from app.config import Settings
+from app.persistence import SQLiteDatabase, ServicesiteRepository
 
 
-def test_application_smoke(monkeypatch):
+def test_application_smoke(monkeypatch, tmp_path):
     monkeypatch.setenv("ENVIRONMENT", "test")
     monkeypatch.setenv("APP_HOST", "127.0.0.1")
     monkeypatch.setenv("APP_PORT", "5100")
 
-    app = create_app({"TESTING": True})
+    database = SQLiteDatabase(tmp_path / "smoke.db")
+    database.initialize()
+    app = create_app(
+        {
+            "TESTING": True,
+            "DB_PATH": str(tmp_path / "smoke.db"),
+            "SERVICESITE_REPOSITORY": ServicesiteRepository(database),
+        }
+    )
     client = app.test_client()
 
     assert client.get("/").status_code == 200
@@ -58,6 +67,7 @@ def _set_valid_production_xmr_environment(monkeypatch):
     monkeypatch.setenv("XMR_WALLET_RPC_USER", "rpc-test-user")
     monkeypatch.setenv("XMR_WALLET_RPC_PASS", "p" * 16)
     monkeypatch.setenv("X_INTERNAL_TOKEN", "t" * 32)
+    monkeypatch.setenv("COINGECKO_API_KEY", "c" * 32)
     monkeypatch.setenv("XMR_SWEEP_ENABLED", "false")
     monkeypatch.setenv("ALLOW_PUBLIC_XMR_WALLET_RPC", "false")
 
@@ -109,6 +119,8 @@ def test_xmr_configuration_defaults_are_safe(monkeypatch):
     assert settings.xmr_wallet_rpc_url == "http://127.0.0.1:28088/json_rpc"
     assert settings.xmr_min_confirmations == 10
     assert settings.xmr_invoice_ttl_seconds == 7200
+    assert settings.xmr_rate_source == "coingecko"
+    assert settings.xmr_quote_max_age_seconds == 300
     assert settings.xmr_sweep_enabled is False
     assert settings.allow_public_xmr_wallet_rpc is False
 
@@ -122,3 +134,19 @@ def test_settings_repr_hides_secrets(monkeypatch):
     assert "p" * 16 not in rendered
     assert "t" * 32 not in rendered
     assert "rpc-test-user" not in rendered
+    assert "c" * 32 not in rendered
+
+
+def test_production_requires_coingecko_api_key(monkeypatch):
+    _set_valid_production_xmr_environment(monkeypatch)
+    monkeypatch.delenv("COINGECKO_API_KEY", raising=False)
+
+    with pytest.raises(RuntimeError, match="COINGECKO_API_KEY"):
+        Settings.from_env()
+
+
+def test_quote_age_cannot_exceed_five_minutes(monkeypatch):
+    monkeypatch.setenv("XMR_QUOTE_MAX_AGE_SECONDS", "301")
+
+    with pytest.raises(RuntimeError, match="XMR_QUOTE_MAX_AGE_SECONDS"):
+        Settings.from_env()

@@ -1,8 +1,10 @@
 from __future__ import annotations
 
-from flask import Flask, render_template
+from flask import Flask
 
 from app.config import Settings
+from app.persistence import SQLiteDatabase, ServicesiteRepository
+from app.web import register_web
 
 
 def create_app(test_config: dict | None = None) -> Flask:
@@ -24,6 +26,10 @@ def create_app(test_config: dict | None = None) -> Flask:
         XMR_RPC_RETRY_BACKOFF=settings.xmr_rpc_retry_backoff_seconds,
         XMR_MIN_CONFIRMATIONS=settings.xmr_min_confirmations,
         XMR_INVOICE_TTL_SECONDS=settings.xmr_invoice_ttl_seconds,
+        XMR_RATE_SOURCE=settings.xmr_rate_source,
+        COINGECKO_API_KEY=settings.coingecko_api_key,
+        XMR_RATE_TIMEOUT=settings.xmr_rate_timeout_seconds,
+        XMR_QUOTE_MAX_AGE_SECONDS=settings.xmr_quote_max_age_seconds,
         XMR_SWEEP_ENABLED=settings.xmr_sweep_enabled,
         XMR_COLD_ADDRESS=settings.xmr_cold_address,
         XMR_SWEEP_ACCOUNT_INDEX=settings.xmr_sweep_account_index,
@@ -35,9 +41,31 @@ def create_app(test_config: dict | None = None) -> Flask:
     if test_config:
         app.config.update(test_config)
 
-    @app.get("/")
-    def index():
-        return render_template("index.html")
+    app.config.from_mapping(
+        MAX_CONTENT_LENGTH=16 * 1024,
+        SESSION_COOKIE_HTTPONLY=True,
+        SESSION_COOKIE_SAMESITE="Strict",
+        SESSION_COOKIE_SECURE=app.config["ENVIRONMENT"] == "production",
+    )
+
+    app.extensions["servicesite_repository"] = app.config.get(
+        "SERVICESITE_REPOSITORY",
+        ServicesiteRepository(SQLiteDatabase(app.config["DB_PATH"])),
+    )
+    if app.config.get("SERVICESITE_RATE_PROVIDER") is not None:
+        app.extensions["servicesite_rate_provider"] = app.config[
+            "SERVICESITE_RATE_PROVIDER"
+        ]
+    if app.config.get("SERVICESITE_WALLET_CLIENT") is not None:
+        app.extensions["servicesite_wallet_client"] = app.config[
+            "SERVICESITE_WALLET_CLIENT"
+        ]
+    if app.config.get("SERVICESITE_NOW_FACTORY") is not None:
+        app.extensions["servicesite_now_factory"] = app.config[
+            "SERVICESITE_NOW_FACTORY"
+        ]
+
+    register_web(app)
 
     @app.get("/health")
     def health():

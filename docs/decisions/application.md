@@ -1,6 +1,6 @@
 # Application decisions
 
-Status: confirmed for the Task 0 scaffold on 2026-08-17.
+Status: application and Task 4 pricing decisions confirmed on 2026-08-17.
 
 ## Catalog and public pages
 
@@ -15,12 +15,15 @@ Status: confirmed for the Task 0 scaffold on 2026-08-17.
 ## Pricing and purchase integrity
 
 - The administrator enters service prices in USD.
-- Checkout converts USD into XMR using an approved rate source.
+- Checkout converts USD into XMR using the CoinGecko Demo price endpoint.
+- The provider timestamp may be no more than 300 seconds old. Missing, stale,
+  malformed, rate-limited, or unavailable quotes fail checkout without creating
+  an invoice or using a fallback rate.
+- The CoinGecko API key is stored only in external production configuration and
+  is never rendered, logged, or committed.
 - Invoice creation locks the service/category description, USD price, exchange
   rate, expected XMR atomic amount, and quote timestamp.
 - Later catalog edits never alter historical purchase or invoice snapshots.
-- The production rate source and maximum quote age remain blocked until an
-  approved checkout pricing policy is recorded.
 
 ## Administration
 
@@ -51,7 +54,6 @@ Status: confirmed for the Task 0 scaffold on 2026-08-17.
 ## Still blocked
 
 - initial categories and service packages;
-- production XMR/USD rate source and quote-age limit;
 - record-retention periods;
 - customer report and delivery workflow;
 - production sweep policy.
