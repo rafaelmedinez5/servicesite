@@ -32,6 +32,7 @@ app/
 deploy/systemd/           sanitized unit templates added in Task 6
 docs/
   architecture.md
+  decisions/application.md
   decisions/xmr-migration.md
 scripts/                  operational scripts added in later tasks
 tests/test_smoke.py
