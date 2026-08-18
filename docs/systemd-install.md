@@ -5,12 +5,12 @@ installed, enabled, started, restarted, or stopped.
 
 ## Prerequisites and boundary
 
-The selected topology uses a dedicated wallet-RPC process. Its binary is not yet
-installed at `/opt/monero/bin/monero-wallet-rpc`, so wallet runtime validation is
-**BLOCKED until Task 7**. Task 7 must also create the protected external wallet
-configuration only after checking the installed binary's `--version` and
-`--help`. The only wallet command-line option in the unit is the officially
-documented `--config-file` path.
+The selected topology uses a dedicated wallet-RPC process. The repository does
+not install its binary or external configuration. Follow `docs/deploy-xmr.md`
+to verify the pinned release signature/hash, install the target binary, check
+its `--version` and `--help`, and create the protected configuration. The only
+wallet command-line option in the unit is the officially documented
+`--config-file` path.
 
 Before any installation, an operator must verify:
 
@@ -40,10 +40,11 @@ python -m pytest
 ```
 
 The helper validates unit syntax against the local systemd parser while replacing
-target-host executable paths only in temporary copies. After Task 7 installs all
-reviewed files on the target, run direct `systemd-analyze verify` there before
-copying units. A missing wallet binary is an expected runtime blocker before
-Task 7; it is not permission to download, install, or start an unreviewed binary.
+target-host executable paths only in temporary copies. After the approved
+operator installs all reviewed files on the target, run direct
+`systemd-analyze verify` there before copying units. A missing wallet binary is
+an expected install-preflight blocker; it is not permission to download,
+install, or start an unreviewed binary.
 
 ## Install units
 
@@ -57,21 +58,27 @@ install -o root -g root -m 0644 deploy/systemd/servicesite-poll-xmr.timer /etc/s
 systemctl daemon-reload
 ```
 
-Do not perform this section until Task 7 preflight passes.
+Do not perform this section until `scripts/preflight --phase install` passes and
+the operator records approval.
 
 ## Enable and start
 
-**OPERATOR ACTION — starts processes and enables boot persistence:**
+**OPERATOR ACTION — starts the two runtime processes:**
 
 ```bash
 systemctl enable --now servicesite-wallet-rpc.service
 systemctl enable --now servicesite-web.service
+```
+
+Run `scripts/preflight --phase runtime`. The timer is enabled separately only
+after the Task 8 stagenet matrix and its approval pass:
+
+```bash
 systemctl enable --now servicesite-poll-xmr.timer
 ```
 
-The timer is enabled only after wallet-RPC and the web health check pass. A
-manual start of `servicesite-poll-xmr.service` is a payment-state mutation and is
-reserved for an approved staging or production procedure.
+A manual start of `servicesite-poll-xmr.service` is a payment-state mutation and
+is reserved for an approved staging or production procedure.
 
 ## Status, timer, and logs
 

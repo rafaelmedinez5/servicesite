@@ -3,11 +3,12 @@
 Server-rendered Flask service catalog with XMR-only checkout, an authenticated
 admin-managed catalog, purchase visibility, and manual fulfillment.
 
-Tasks 0 through 6 establish the application boundary, source inventory, strict
+Tasks 0 through 7 establish the application boundary, source inventory, strict
 configuration contract, isolated XMR wallet-RPC transport, fresh SQLite schema,
 canonical invoice domain, private server-rendered checkout/status flow, and the
-protected payment reconciliation boundary, as well as sanitized deployment templates.
-Admin authentication and live deployment remain deferred.
+protected payment reconciliation boundary, sanitized deployment templates, and
+a gated deployment/preflight/rollback runbook. Admin authentication and live
+deployment remain deferred.
 
 ## Confirmed direction
 
@@ -46,6 +47,7 @@ docs/
   decisions/application.md
   decisions/systemd.md
   decisions/xmr-migration.md
+  deploy-xmr.md
   invoice-domain.md
   systemd-install.md
   web-checkout.md
@@ -53,6 +55,7 @@ docs/
   xmr-source-inventory.md
   xmr-wallet-rpc.md
 scripts/poll-xmr          token-safe loopback reconciliation launcher
+scripts/preflight         read-only, redacting install/runtime deployment checks
 tests/test_smoke.py
 wsgi.py
 ```
@@ -109,7 +112,20 @@ private request paths.
 The wallet-RPC binary is not installed, so its runtime and external configuration
 remain blocked. No unit has been copied, enabled, or started.
 
+## Task 7 deployment gate
+
+`scripts/preflight` validates package state, recorded ownership/modes,
+production settings without displaying values, the pinned Monero wallet-RPC
+version/options, the exact Tor mapping, unit collisions/copies, loopback ports,
+and harmless runtime health. Install mode expects unused ports/unit names;
+runtime mode expects active web and wallet-RPC services. Neither mode writes a
+file, changes a service, calls the payment poller, or mutates wallet/database
+state.
+
+The complete STAGING, PRODUCTION, ROLLBACK, and OPERATOR APPROVAL gates are in
+`docs/deploy-xmr.md`. No live-host action was performed in Task 7.
+
 ## Next task
 
-Proceed to Task 7: write the complete deployment, secret, wallet, Tor, preflight,
-and rollback runbook. Do not enable the timer or sweeping yet.
+Proceed to Task 8: execute the approved stagenet deployment and real payment
+matrix. Do not enable production, fulfillment, or sweeping from mocked results.

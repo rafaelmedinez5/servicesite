@@ -1,10 +1,11 @@
 # Servicesite architecture
 
-Status: Tasks 0 through 6. The validated wallet transport, minimal catalog
+Status: Tasks 0 through 7. The validated wallet transport, minimal catalog
 persistence, canonical invoice domain, fresh SQLite schema, and private web
 checkout/status boundary are implemented. The protected reconciliation boundary
 is implemented but not scheduled or production-verified. Sanitized deployment
-units exist; admin and live deployment remain separate tasks.
+units and a read-only deployment preflight exist; admin and live deployment
+remain separate tasks.
 
 ## Runtime components
 
@@ -92,8 +93,21 @@ log directories for each identity.
 Gunicorn validates the configured loopback bind before opening its listener and
 does not produce access logs containing private status-token URLs. The poll
 client disables proxies for its loopback call and keeps the internal token out of
-arguments and output. Wallet runtime validation is blocked until Task 7 installs
-and verifies a selected Monero binary.
+arguments and output. Wallet runtime validation remains a target-host operator
+gate.
+
+## Task 7 operational boundary
+
+The deployment runbook pins and verifies a selected official Monero release,
+separates mutable wallet state from root-owned binaries, keeps secrets in
+separately owned `0600` files, creates a new Tor identity, initializes only a
+fresh database, and preserves the legacy service during rollback.
+
+The preflight has separate install and runtime expectations. It reads metadata
+and validated configuration without displaying values, captures external command
+output, compares reviewed unit files, probes only the two loopback ports, and
+uses only fixed web health plus wallet `get_height`. It cannot create an invoice,
+poll reconciliation, transfer/sweep XMR, alter a file, or operate a service.
 
 ## Task boundaries
 
@@ -104,4 +118,5 @@ and verifies a selected Monero binary.
 - Admin authentication and catalog CRUD remain a separate application task.
 - Task 5: poll/confirm/sweep orchestration (implemented; staged verification pending).
 - Task 6: sanitized systemd units, poll launcher, and install/rollback commands.
-- Tasks 7-10: complete runbook, staging, cutover, and reconciliation.
+- Task 7: complete runbook plus read-only, redacting preflight.
+- Tasks 8-10: staging, cutover, and reconciliation.

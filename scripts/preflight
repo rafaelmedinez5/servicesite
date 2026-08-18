@@ -1,0 +1,8 @@
+#!/bin/sh
+set -eu
+
+script_dir=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+app_dir=$(dirname -- "$script_dir")
+install_root=$(dirname -- "$app_dir")
+
+exec "$install_root/.venv/bin/python" -m app.preflight "$@"

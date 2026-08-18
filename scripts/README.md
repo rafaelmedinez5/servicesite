@@ -15,3 +15,10 @@ file directly.
 replaces their commands with `/bin/true` before calling `systemd-analyze verify`.
 This separates parser/hardening errors from expected missing target-host binaries.
 It does not install, reload, enable, or start a unit.
+
+`preflight` runs the Task 7 read-only deployment checks. `--phase install`
+expects the selected loopback ports and unit names to be unused. `--phase
+runtime` expects the reviewed units, active wallet/web processes, fixed web
+health response, and an authenticated wallet `get_height`. Both phases capture
+external output and emit only fixed PASS/FAIL details. They never call the XMR
+poll endpoint or mutate files, services, invoices, databases, or wallet state.

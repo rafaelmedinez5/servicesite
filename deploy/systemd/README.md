@@ -11,8 +11,10 @@ Task 6 provides four new, non-legacy units:
 
 These files contain no credentials, wallet paths, daemon endpoint, cold address,
 or internal token. The wallet service passes only the officially documented
-`--config-file` option; Task 7 must install a selected Monero release and create
-the external configuration after its supported options are verified locally.
+`--config-file` option. Task 7 pins an official Monero release and requires the
+target operator to verify its signature, hash, version, and supported options
+before creating the protected external configuration.
 
 The units have not been copied, enabled, or started. Follow
-`docs/systemd-install.md`; every live-host mutation is an operator action.
+`docs/systemd-install.md`; every live-host mutation is an operator action. The
+complete gates and read-only preflight are in `docs/deploy-xmr.md`.
