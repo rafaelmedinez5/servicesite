@@ -392,6 +392,13 @@ def run_preflight(
             checks.append(Check(f"identity {name}", False, "dedicated user or group is missing"))
 
     try:
+        root_identity = identity_resolver("root")
+        checks.append(Check("identity root", True, "system root identity exists"))
+    except (KeyError, OSError):
+        root_identity = None
+        checks.append(Check("identity root", False, "system root identity is missing"))
+
+    try:
         package_audit = _run_captured(("dpkg", "--audit"), runner=runner)
         packages_ok = package_audit.returncode == 0 and not package_audit.stdout.strip()
     except (OSError, subprocess.SubprocessError):
@@ -455,7 +462,10 @@ def run_preflight(
 
     if "xmrwallet" in identities:
         wallet_identity = identities["xmrwallet"]
-        immutable_identity = Identity(uid=0, gid=wallet_identity.gid)
+        immutable_identity = Identity(
+            uid=root_identity.uid if root_identity is not None else -1,
+            gid=wallet_identity.gid,
+        )
         checks.append(
             _directory_check(
                 "wallet root", paths.wallet_root, immutable_identity, allowed_modes={0o750}
