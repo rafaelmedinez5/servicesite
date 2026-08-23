@@ -34,8 +34,10 @@ The catalog model supports:
 The first release uses one administrator account. First use creates the
 password through a one-time form and stores only its generated hash in SQLite.
 Password changes require the current password and rotate a credential version
-that invalidates all admin sessions. Admin routes use fixed-expiry sessions,
-CSRF protection, a SQLite-backed login rate limit, and private/no-store
+that invalidates all admin sessions. An optional six-digit recovery PIN is read
+from external configuration and provides an alternative login after password
+setup. Password and PIN attempts share one SQLite-backed global rate limit.
+Admin routes use fixed-expiry sessions, CSRF protection, and private/no-store
 responses. Routine admin views omit bearer tokens, wallet addresses, and
 transaction identifiers.
 

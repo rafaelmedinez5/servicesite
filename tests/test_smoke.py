@@ -129,6 +129,7 @@ def test_xmr_configuration_defaults_are_safe(monkeypatch):
 
 def test_settings_repr_hides_secrets(monkeypatch):
     _set_valid_production_xmr_environment(monkeypatch)
+    monkeypatch.setenv("ADMIN_RECOVERY_PIN", "384729")
     settings = Settings.from_env()
 
     rendered = repr(settings)
@@ -137,6 +138,23 @@ def test_settings_repr_hides_secrets(monkeypatch):
     assert "t" * 32 not in rendered
     assert "rpc-test-user" not in rendered
     assert "c" * 32 not in rendered
+    assert "384729" not in rendered
+
+
+@pytest.mark.parametrize("invalid_pin", ["12345", "1234567", "12a456", "１２３４５６"])
+def test_admin_recovery_pin_requires_exactly_six_ascii_digits(
+    monkeypatch, invalid_pin
+):
+    monkeypatch.setenv("ADMIN_RECOVERY_PIN", invalid_pin)
+
+    with pytest.raises(RuntimeError, match="ADMIN_RECOVERY_PIN"):
+        Settings.from_env()
+
+
+def test_admin_recovery_pin_is_optional(monkeypatch):
+    monkeypatch.delenv("ADMIN_RECOVERY_PIN", raising=False)
+
+    assert Settings.from_env().admin_recovery_pin is None
 def test_production_allows_first_run_without_admin_password_hash(monkeypatch):
     _set_valid_production_xmr_environment(monkeypatch)
     monkeypatch.delenv("ADMIN_PASSWORD_HASH", raising=False)

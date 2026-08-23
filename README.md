@@ -134,10 +134,12 @@ The complete STAGING, PRODUCTION, ROLLBACK, and OPERATOR APPROVAL gates are in
 empty credential table presents a one-time password setup form; the resulting
 Werkzeug hash is stored in the protected SQLite database. The security page
 changes the password only after verifying the current password and invalidates
-all existing admin sessions. Login attempts are bounded by a SQLite-backed
-global rate limit, admin responses are private/no-store, all state-changing
-forms require CSRF, catalog records are archived instead of deleted, and
-fulfillment is rejected until payment is settled. See `docs/admin.md`.
+all existing admin sessions. An optional six-digit recovery PIN from external
+configuration provides a second login path after password setup; password and
+PIN failures share the same SQLite-backed global rate limit. Admin responses
+are private/no-store, all state-changing forms require CSRF, catalog records are
+archived instead of deleted, and fulfillment is rejected until payment is
+settled. See `docs/admin.md`.
 
 ## Next task
 

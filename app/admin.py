@@ -41,7 +41,7 @@ _ADMIN_SESSION_KEY = "_servicesite_admin"
 def protect_admin_routes():
     g.no_store = True
     g.private_response = True
-    if request.endpoint == "admin.login":
+    if request.endpoint in {"admin.login", "admin.pin_login"}:
         return None
     candidate = session.get(_ADMIN_SESSION_KEY)
     username = current_app.config["ADMIN_USERNAME"]
@@ -77,6 +77,7 @@ def login():
             "admin/login.html",
             setup_required=setup_required,
             configured_username=current_app.config["ADMIN_USERNAME"],
+            pin_enabled=_pin_enabled(),
         )
 
     try:
@@ -90,6 +91,7 @@ def login():
             "admin/login.html",
             setup_required=setup_required,
             configured_username=current_app.config["ADMIN_USERNAME"],
+            pin_enabled=_pin_enabled(),
             error="The form expired. Try again.",
         ), 400
 
@@ -101,6 +103,7 @@ def login():
         return render_template(
             "admin/login.html",
             setup_required=False,
+            pin_enabled=_pin_enabled(),
             error="Administrator access is temporarily unavailable.",
         ), 503
 
@@ -113,12 +116,14 @@ def login():
         return render_template(
             "admin/login.html",
             setup_required=False,
+            pin_enabled=_pin_enabled(),
             error="Login is temporarily unavailable.",
         ), 503
     if not allowed:
         return render_template(
             "admin/login.html",
             setup_required=False,
+            pin_enabled=_pin_enabled(),
             error="Too many attempts. Wait 15 minutes before trying again.",
         ), 429
 
@@ -136,10 +141,16 @@ def login():
         try:
             repository.record_admin_login_failure(now=now)
         except (PersistenceError, sqlite3.Error):
-            return render_template("admin/login.html", error="Login is temporarily unavailable."), 503
+            return render_template(
+                "admin/login.html",
+                setup_required=False,
+                pin_enabled=_pin_enabled(),
+                error="Login is temporarily unavailable.",
+            ), 503
         return render_template(
             "admin/login.html",
             setup_required=False,
+            pin_enabled=_pin_enabled(),
             error="Invalid administrator credentials.",
         ), 401
 
@@ -149,7 +160,81 @@ def login():
         return render_template(
             "admin/login.html",
             setup_required=False,
+            pin_enabled=_pin_enabled(),
             error="Login is temporarily unavailable.",
+        ), 503
+    _start_admin_session(configured_username, credential.version)
+    return redirect(url_for("admin.dashboard"), code=303)
+
+
+@admin.route("/pin-login", methods=["GET", "POST"])
+def pin_login():
+    configured_pin = current_app.config.get("ADMIN_RECOVERY_PIN")
+    if not isinstance(configured_pin, str):
+        abort(404)
+
+    repository = _repository()
+    try:
+        credential = repository.get_admin_credential()
+    except (PersistenceError, sqlite3.Error):
+        return render_template(
+            "admin/pin_login.html",
+            error="PIN login is temporarily unavailable.",
+        ), 503
+    if credential is None:
+        return redirect(url_for("admin.login"), code=303)
+    if request.method == "GET":
+        return render_template("admin/pin_login.html")
+
+    try:
+        require_csrf(request.form.get("csrf_token"))
+    except FormSecurityError:
+        return render_template(
+            "admin/pin_login.html", error="The form expired. Try again."
+        ), 400
+
+    now = _now()
+    try:
+        allowed = repository.admin_login_allowed(now=now)
+    except (PersistenceError, sqlite3.Error):
+        return render_template(
+            "admin/pin_login.html", error="PIN login is temporarily unavailable."
+        ), 503
+    if not allowed:
+        return render_template(
+            "admin/pin_login.html",
+            error="Too many attempts. Wait 15 minutes before trying again.",
+        ), 429
+
+    candidate_username = request.form.get("username", "")
+    candidate_pin = request.form.get("pin", "")
+    configured_username = current_app.config["ADMIN_USERNAME"]
+    username_matches = (
+        isinstance(candidate_username, str)
+        and len(candidate_username) <= 64
+        and secrets.compare_digest(candidate_username, configured_username)
+    )
+    pin_matches = (
+        isinstance(candidate_pin, str)
+        and len(candidate_pin) == 6
+        and secrets.compare_digest(candidate_pin, configured_pin)
+    )
+    if not (username_matches and pin_matches):
+        try:
+            repository.record_admin_login_failure(now=now)
+        except (PersistenceError, sqlite3.Error):
+            return render_template(
+                "admin/pin_login.html", error="PIN login is temporarily unavailable."
+            ), 503
+        return render_template(
+            "admin/pin_login.html", error="Invalid administrator credentials."
+        ), 401
+
+    try:
+        repository.clear_admin_login_failures()
+    except (PersistenceError, sqlite3.Error):
+        return render_template(
+            "admin/pin_login.html", error="PIN login is temporarily unavailable."
         ), 503
     _start_admin_session(configured_username, credential.version)
     return redirect(url_for("admin.dashboard"), code=303)
@@ -393,6 +478,7 @@ def _setup_admin_credential(repository: ServicesiteRepository, *, now: datetime)
             "admin/login.html",
             setup_required=True,
             configured_username=current_app.config["ADMIN_USERNAME"],
+            pin_enabled=False,
             error=error,
         ), 400
     try:
@@ -404,6 +490,7 @@ def _setup_admin_credential(repository: ServicesiteRepository, *, now: datetime)
             "admin/login.html",
             setup_required=True,
             configured_username=current_app.config["ADMIN_USERNAME"],
+            pin_enabled=False,
             error="Administrator setup is temporarily unavailable.",
         ), 503
     if not created:
@@ -445,6 +532,10 @@ def _start_admin_session(username: str, credential_version: int) -> None:
         "credential_version": credential_version,
     }
     session.permanent = True
+
+
+def _pin_enabled() -> bool:
+    return isinstance(current_app.config.get("ADMIN_RECOVERY_PIN"), str)
 
 
 def register_admin(app) -> None:

@@ -39,5 +39,8 @@
         <button type="submit">Sign in</button>
       {% endif %}
     </form>
+    {% if not setup_required and pin_enabled %}
+      <p><a href="{{ url_for('admin.pin_login') }}">Sign in with recovery PIN</a></p>
+    {% endif %}
   </section>
 {% endblock %}

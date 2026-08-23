@@ -1,0 +1,26 @@
+{% set private_page = true %}
+{% extends "base.html" %}
+
+{% block title %}Administrator PIN login | Servicesite{% endblock %}
+
+{% block content %}
+  <section class="card admin-login" aria-labelledby="pin-login-title">
+    <p class="eyebrow">Restricted administration</p>
+    <h1 id="pin-login-title">Recovery PIN login</h1>
+    <p>Use the administrator username and six-digit recovery PIN.</p>
+    {% if error %}<p class="form-error" role="alert">{{ error }}</p>{% endif %}
+    <form class="admin-form" method="post">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <label>
+        <span>Username</span>
+        <input name="username" type="text" autocomplete="username" maxlength="64" required>
+      </label>
+      <label>
+        <span>Recovery PIN</span>
+        <input name="pin" type="password" inputmode="numeric" pattern="[0-9]{6}" autocomplete="off" minlength="6" maxlength="6" required>
+      </label>
+      <button type="submit">Sign in with PIN</button>
+    </form>
+    <p><a href="{{ url_for('admin.login') }}">Return to password login</a></p>
+  </section>
+{% endblock %}

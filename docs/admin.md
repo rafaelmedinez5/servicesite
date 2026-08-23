@@ -27,6 +27,8 @@ an authorized security engagement by itself.
   database;
 - password changes require the current password and invalidate all admin
   sessions;
+- an optional six-digit `ADMIN_RECOVERY_PIN` provides an alternative login only
+  after password setup and requires the configured username;
 - the plaintext password is never stored in Git or shell history;
 - sessions expire after `ADMIN_SESSION_HOURS` and are not extended on requests;
 - production cookies are Secure, HttpOnly, and SameSite Strict;
@@ -39,6 +41,20 @@ an authorized security engagement by itself.
 The global limit is intentional because Tor forwards onion requests from a
 loopback source. It can cause a temporary administrator lockout during a focused
 attack; do not weaken it without replacing it with a stronger boundary.
+
+## Optional recovery PIN
+
+Set `ADMIN_RECOVERY_PIN` to exactly six ASCII digits in the protected external
+environment file and restart the web service. Leave it absent or empty to
+disable PIN login. The password login page shows the recovery link only when the
+PIN is enabled and the normal password has already been initialized.
+
+A six-digit PIN is much weaker than the administrator password. The recovery
+form therefore requires the configured username and shares the same global
+five-attempt, fifteen-minute block with password login. The PIN is never
+rendered or logged, but it is stored as a secret in the mode-`0600` environment
+file. A PIN-authenticated session still needs the current password to change the
+password.
 
 ## First-time password setup
 
@@ -64,8 +80,9 @@ including the session that submitted the change.
    exactly `ok`.
 3. Stop `servicesite-web.service`; wallet-RPC may remain active.
 4. Pull the reviewed application revision and install locked dependencies.
-5. Configure `ADMIN_USERNAME` and `ADMIN_SESSION_HOURS`; no password or password
-   hash belongs in the environment file.
+5. Configure `ADMIN_USERNAME` and `ADMIN_SESSION_HOURS`. Optionally configure
+   `ADMIN_RECOVERY_PIN`; no password or password hash belongs in the environment
+   file.
 6. Run `SQLiteDatabase.initialize()` using the command in `deploy-xmr.md`.
 7. Start the web service, run runtime preflight, and complete the one-time setup
    through Tor before sharing the onion hostname.

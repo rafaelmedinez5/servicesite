@@ -100,6 +100,7 @@ class Settings:
     app_port: int
     database_path: str
     admin_username: str
+    admin_recovery_pin: str | None = field(repr=False)
     admin_session_hours: int
     xmr_wallet_rpc_url: str
     xmr_wallet_rpc_user: str = field(repr=False)
@@ -143,6 +144,13 @@ class Settings:
         admin_username = os.getenv("ADMIN_USERNAME", "admin").strip()
         if not admin_username or len(admin_username) > 64:
             raise RuntimeError("ADMIN_USERNAME must contain 1 through 64 characters")
+        raw_admin_recovery_pin = os.getenv("ADMIN_RECOVERY_PIN", "").strip()
+        if raw_admin_recovery_pin and (
+            len(raw_admin_recovery_pin) != 6
+            or any(character < "0" or character > "9" for character in raw_admin_recovery_pin)
+        ):
+            raise RuntimeError("ADMIN_RECOVERY_PIN must contain exactly 6 ASCII digits")
+        admin_recovery_pin = raw_admin_recovery_pin or None
         admin_session_hours = _parse_int(
             "ADMIN_SESSION_HOURS",
             os.getenv("ADMIN_SESSION_HOURS", "12").strip(),
@@ -201,6 +209,7 @@ class Settings:
             ),
             database_path=database_path,
             admin_username=admin_username,
+            admin_recovery_pin=admin_recovery_pin,
             admin_session_hours=admin_session_hours,
             xmr_wallet_rpc_url=xmr_wallet_rpc_url,
             xmr_wallet_rpc_user=xmr_wallet_rpc_user,

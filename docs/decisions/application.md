@@ -32,6 +32,9 @@ Status: application and Task 4 pricing decisions confirmed on 2026-08-17.
   only its generated Werkzeug hash is stored in the protected SQLite database.
 - Changing the password requires the current password and invalidates every
   existing administrator session.
+- An optional six-digit recovery PIN may provide an alternative login after
+  password setup; it requires the configured username and shares the password
+  login rate limit.
 - Admin routes require authenticated sessions, CSRF protection, login rate
   limiting, and session expiry.
 - Purchases can be filtered by category, service, date, payment status, and

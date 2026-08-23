@@ -207,7 +207,8 @@ must select:
 - `DB_PATH=/opt/servicesite/instance/servicesite.db`;
 - the selected `ADMIN_USERNAME` and an `ADMIN_SESSION_HOURS` value from 1
   through 24; the first password is created after migration through the
-  one-time admin setup page and its hash is stored in SQLite;
+  one-time admin setup page and its hash is stored in SQLite; an optional
+  `ADMIN_RECOVERY_PIN` must contain exactly six ASCII digits when enabled;
 - `XMR_WALLET_RPC_URL=http://127.0.0.1:28088/json_rpc`;
 - 10 confirmations and a 7,200-second invoice TTL;
 - `XMR_SWEEP_ENABLED=false`; and

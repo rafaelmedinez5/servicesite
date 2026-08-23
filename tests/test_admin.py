@@ -42,6 +42,7 @@ def admin_context(tmp_path, monkeypatch):
             "SERVICESITE_REPOSITORY": repository,
             "SERVICESITE_NOW_FACTORY": lambda: NOW,
             "ADMIN_USERNAME": "operator",
+            "ADMIN_RECOVERY_PIN": "384729",
             "ADMIN_SESSION_HOURS": 4,
         }
     )
@@ -266,6 +267,71 @@ def test_login_logout_and_session_cookie(admin_context):
     assert "Operations overview" in dashboard.get_data(as_text=True)
     assert logout.status_code == 303
     assert client.get("/admin").headers["Location"].endswith("/admin/login")
+
+
+def test_recovery_pin_login_requires_username_csrf_and_shared_rate_limit(
+    admin_context,
+):
+    _app, client, _repository = admin_context
+    login = client.get("/admin/login")
+    pin_page = client.get("/admin/pin-login")
+
+    assert "Sign in with recovery PIN" in login.get_data(as_text=True)
+    assert pin_page.status_code == 200
+    assert client.post(
+        "/admin/pin-login", data={"username": "operator", "pin": "384729"}
+    ).status_code == 400
+
+    token = _csrf(pin_page)
+    wrong = client.post(
+        "/admin/pin-login",
+        data={"csrf_token": token, "username": "operator", "pin": "000000"},
+    )
+    correct = client.post(
+        "/admin/pin-login",
+        data={"csrf_token": token, "username": "operator", "pin": "384729"},
+    )
+
+    assert wrong.status_code == 401
+    assert correct.status_code == 303
+    assert correct.headers["Location"].endswith("/admin")
+    assert client.get("/admin").status_code == 200
+
+
+def test_password_failures_also_block_recovery_pin(admin_context):
+    _app, client, _repository = admin_context
+    password_token = _csrf(client.get("/admin/login"))
+    for _ in range(5):
+        response = client.post(
+            "/admin/login",
+            data={
+                "csrf_token": password_token,
+                "username": "operator",
+                "password": "wrong",
+            },
+        )
+        assert response.status_code == 401
+
+    pin_token = _csrf(client.get("/admin/pin-login"))
+    blocked = client.post(
+        "/admin/pin-login",
+        data={
+            "csrf_token": pin_token,
+            "username": "operator",
+            "pin": "384729",
+        },
+    )
+
+    assert blocked.status_code == 429
+
+
+def test_recovery_pin_route_is_disabled_when_unconfigured(
+    uninitialized_admin_context,
+):
+    _app, client, _repository = uninitialized_admin_context
+
+    assert client.get("/admin/pin-login").status_code == 404
+    assert "recovery PIN" not in client.get("/admin/login").get_data(as_text=True)
 
 
 def test_password_change_requires_current_password_and_invalidates_sessions(
