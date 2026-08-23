@@ -1,7 +1,10 @@
 from __future__ import annotations
 
+from datetime import timedelta
+
 from flask import Flask
 
+from app.admin import register_admin
 from app.config import Settings
 from app.internal import register_internal
 from app.persistence import SQLiteDatabase, ServicesiteRepository
@@ -18,6 +21,9 @@ def create_app(test_config: dict | None = None) -> Flask:
         APP_HOST=settings.app_host,
         APP_PORT=settings.app_port,
         DB_PATH=settings.database_path,
+        ADMIN_USERNAME=settings.admin_username,
+        ADMIN_PASSWORD_HASH=settings.admin_password_hash,
+        ADMIN_SESSION_HOURS=settings.admin_session_hours,
         XMR_WALLET_RPC_URL=settings.xmr_wallet_rpc_url,
         XMR_WALLET_RPC_USER=settings.xmr_wallet_rpc_user,
         XMR_WALLET_RPC_PASS=settings.xmr_wallet_rpc_password,
@@ -48,6 +54,10 @@ def create_app(test_config: dict | None = None) -> Flask:
         SESSION_COOKIE_HTTPONLY=True,
         SESSION_COOKIE_SAMESITE="Strict",
         SESSION_COOKIE_SECURE=app.config["ENVIRONMENT"] == "production",
+        PERMANENT_SESSION_LIFETIME=timedelta(
+            hours=app.config["ADMIN_SESSION_HOURS"]
+        ),
+        SESSION_REFRESH_EACH_REQUEST=False,
     )
 
     app.extensions["servicesite_repository"] = app.config.get(
@@ -72,6 +82,7 @@ def create_app(test_config: dict | None = None) -> Flask:
         ]
 
     register_web(app)
+    register_admin(app)
     register_internal(app)
 
     @app.get("/health")

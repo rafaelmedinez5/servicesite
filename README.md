@@ -7,8 +7,9 @@ Tasks 0 through 7 establish the application boundary, source inventory, strict
 configuration contract, isolated XMR wallet-RPC transport, fresh SQLite schema,
 canonical invoice domain, private server-rendered checkout/status flow, and the
 protected payment reconciliation boundary, sanitized deployment templates, and
-a gated deployment/preflight/rollback runbook. Admin authentication and live
-deployment remain deferred.
+a gated deployment/preflight/rollback runbook. The single-administrator catalog,
+purchase, and manual-fulfillment workflow is implemented. Stagenet payment
+verification and production cutover remain deferred.
 
 ## Confirmed direction
 
@@ -28,6 +29,7 @@ deployment remain deferred.
 ```text
 app/
   __init__.py             Flask application factory and Task 0 routes
+  admin.py                authenticated catalog, purchase, and fulfillment routes
   catalog.py              validated minimal category/service records
   config.py               typed startup and XMR configuration validation
   persistence.py          fresh SQLite schema and transactional repositories
@@ -44,6 +46,7 @@ app/
 deploy/systemd/           sanitized web, poll, timer, and wallet-RPC units
 docs/
   architecture.md
+  admin.md
   decisions/application.md
   decisions/systemd.md
   decisions/xmr-migration.md
@@ -124,6 +127,15 @@ state.
 
 The complete STAGING, PRODUCTION, ROLLBACK, and OPERATOR APPROVAL gates are in
 `docs/deploy-xmr.md`. No live-host action was performed in Task 7.
+
+## Administration
+
+`/admin/login` provides the server-rendered single-administrator workflow. The
+password hash exists only in external configuration. Login attempts are bounded
+by a SQLite-backed global rate limit, admin responses are private/no-store, all
+state-changing forms require CSRF, catalog records are archived instead of
+deleted, and fulfillment is rejected until payment is settled. See
+`docs/admin.md`.
 
 ## Next task
 

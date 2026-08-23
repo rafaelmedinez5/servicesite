@@ -1,0 +1,20 @@
+{% set private_page = true %}
+{% extends "base.html" %}
+
+{% block title %}Administration | Servicesite{% endblock %}
+
+{% block content %}
+  {% include "admin/_nav.html" %}
+  <section class="admin-heading">
+    <p class="eyebrow">Administration</p>
+    <h1>Operations overview</h1>
+    <p class="lede">Catalog changes affect future checkouts only. Payment and fulfillment remain separate.</p>
+  </section>
+  <div class="admin-stats">
+    <article class="card"><span>Purchases</span><strong>{{ purchase_count }}</strong></article>
+    <article class="card"><span>Not settled</span><strong>{{ unsettled_count }}</strong></article>
+    <article class="card"><span>Awaiting fulfillment</span><strong>{{ fulfillment_count }}</strong></article>
+    <article class="card"><span>Active categories</span><strong>{{ category_count }}</strong></article>
+    <article class="card"><span>Active services</span><strong>{{ service_count }}</strong></article>
+  </div>
+{% endblock %}

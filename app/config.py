@@ -20,6 +20,7 @@ PLACEHOLDER_SECRET_VALUES = {
     "replace_with_coingecko_api_key",
     "replace_with_rpc_password",
     "replace_with_rpc_username",
+    "replace_with_a_generated_password_hash",
 }
 
 
@@ -98,6 +99,9 @@ class Settings:
     app_host: str
     app_port: int
     database_path: str
+    admin_username: str
+    admin_password_hash: str = field(repr=False)
+    admin_session_hours: int
     xmr_wallet_rpc_url: str
     xmr_wallet_rpc_user: str = field(repr=False)
     xmr_wallet_rpc_password: str = field(repr=False)
@@ -137,6 +141,19 @@ class Settings:
         if not database_path:
             raise RuntimeError("DB_PATH is required")
 
+        admin_username = os.getenv("ADMIN_USERNAME", "admin").strip()
+        if not admin_username or len(admin_username) > 64:
+            raise RuntimeError("ADMIN_USERNAME must contain 1 through 64 characters")
+        admin_password_hash = os.getenv(
+            "ADMIN_PASSWORD_HASH", "replace_with_a_generated_password_hash"
+        ).strip()
+        admin_session_hours = _parse_int(
+            "ADMIN_SESSION_HOURS",
+            os.getenv("ADMIN_SESSION_HOURS", "12").strip(),
+            minimum=1,
+            maximum=24,
+        )
+
         xmr_wallet_rpc_url = os.getenv(
             "XMR_WALLET_RPC_URL", "http://127.0.0.1:28088/json_rpc"
         ).strip()
@@ -159,6 +176,13 @@ class Settings:
 
         if environment == "production":
             _require_production_secret("SECRET_KEY", secret_key, minimum_length=32)
+            _require_production_secret(
+                "ADMIN_PASSWORD_HASH", admin_password_hash, minimum_length=32
+            )
+            if not admin_password_hash.startswith(("scrypt:", "pbkdf2:")):
+                raise RuntimeError(
+                    "Production ADMIN_PASSWORD_HASH must be a Werkzeug password hash"
+                )
             _require_production_secret(
                 "XMR_WALLET_RPC_USER", xmr_wallet_rpc_user, minimum_length=1
             )
@@ -187,6 +211,9 @@ class Settings:
                 "APP_PORT", os.getenv("APP_PORT", "5100").strip(), minimum=1, maximum=65535
             ),
             database_path=database_path,
+            admin_username=admin_username,
+            admin_password_hash=admin_password_hash,
+            admin_session_hours=admin_session_hours,
             xmr_wallet_rpc_url=xmr_wallet_rpc_url,
             xmr_wallet_rpc_user=xmr_wallet_rpc_user,
             xmr_wallet_rpc_password=xmr_wallet_rpc_password,

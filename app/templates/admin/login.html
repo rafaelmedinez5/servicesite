@@ -1,0 +1,25 @@
+{% set private_page = true %}
+{% extends "base.html" %}
+
+{% block title %}Administrator login | Servicesite{% endblock %}
+
+{% block content %}
+  <section class="card admin-login" aria-labelledby="login-title">
+    <p class="eyebrow">Restricted administration</p>
+    <h1 id="login-title">Administrator login</h1>
+    <p>Use the single administrator account configured on this server.</p>
+    {% if error %}<p class="form-error" role="alert">{{ error }}</p>{% endif %}
+    <form class="admin-form" method="post" action="{{ url_for('admin.login') }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <label>
+        <span>Username</span>
+        <input name="username" type="text" autocomplete="username" maxlength="64" required>
+      </label>
+      <label>
+        <span>Password</span>
+        <input name="password" type="password" autocomplete="current-password" maxlength="1024" required>
+      </label>
+      <button type="submit">Sign in</button>
+    </form>
+  </section>
+{% endblock %}

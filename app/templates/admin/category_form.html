@@ -1,0 +1,24 @@
+{% set private_page = true %}
+{% extends "base.html" %}
+
+{% block title %}{{ "Edit" if category else "New" }} category | Servicesite{% endblock %}
+
+{% block content %}
+  {% include "admin/_nav.html" %}
+  <section class="admin-heading">
+    <p class="eyebrow">Catalog category</p>
+    <h1>{{ "Edit category" if category else "Create category" }}</h1>
+  </section>
+  <section class="card admin-form-card">
+    {% if error %}<p class="form-error" role="alert">{{ error }}</p>{% endif %}
+    <form class="admin-form" method="post">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <label><span>Name</span><input name="name" maxlength="200" value="{{ category.name if category else '' }}" required></label>
+      <label><span>Slug</span><input name="slug" maxlength="120" pattern="[a-z0-9]+(?:-[a-z0-9]+)*" value="{{ category.slug if category else '' }}" required><small>Lowercase letters, digits, and hyphens.</small></label>
+      <label><span>Description</span><textarea name="description" maxlength="10000" rows="6">{{ category.description if category else '' }}</textarea></label>
+      <label><span>Sort order</span><input name="sort_order" type="number" min="-1000000" max="1000000" value="{{ category.sort_order if category else 0 }}" required></label>
+      <label class="check-row"><input name="published" type="checkbox" {% if category and category.published %}checked{% endif %}><span>Published publicly</span></label>
+      <div class="button-row"><button type="submit">Save category</button><a class="button secondary" href="{{ url_for('admin.categories') }}">Cancel</a></div>
+    </form>
+  </section>
+{% endblock %}

@@ -1,0 +1,35 @@
+{% set private_page = true %}
+{% extends "base.html" %}
+
+{% block title %}Purchases | Servicesite{% endblock %}
+
+{% block content %}
+  {% include "admin/_nav.html" %}
+  <section class="admin-heading"><p class="eyebrow">Operations</p><h1>Purchases</h1><p>Payment identifiers and bearer status tokens are intentionally omitted.</p></section>
+  <form class="card filter-form" method="get">
+    <label><span>Category</span><select name="category_id"><option value="">All</option>{% for category in categories %}<option value="{{ category.id }}" {% if selected.get('category_id') == category.id %}selected{% endif %}>{{ category.name }}</option>{% endfor %}</select></label>
+    <label><span>Service</span><select name="service_id"><option value="">All</option>{% for item in services %}<option value="{{ item.service.id }}" {% if selected.get('service_id') == item.service.id %}selected{% endif %}>{{ item.service.name }}</option>{% endfor %}</select></label>
+    <label><span>Payment</span><select name="payment_status"><option value="">All</option>{% for status in payment_statuses %}<option value="{{ status.value }}" {% if selected.get('payment_status') == status.value %}selected{% endif %}>{{ status.value|replace('_', ' ') }}</option>{% endfor %}</select></label>
+    <label><span>Fulfillment</span><select name="fulfillment_status"><option value="">All</option>{% for status in fulfillment_statuses %}<option value="{{ status.value }}" {% if selected.get('fulfillment_status') == status.value %}selected{% endif %}>{{ status.value }}</option>{% endfor %}</select></label>
+    <label><span>From (UTC)</span><input type="date" name="date_from" value="{{ selected.get('date_from', '') }}"></label>
+    <label><span>Through (UTC)</span><input type="date" name="date_to" value="{{ selected.get('date_to', '') }}"></label>
+    <div class="button-row"><button type="submit">Apply filters</button><a class="button secondary" href="{{ url_for('admin.purchases') }}">Clear</a></div>
+  </form>
+  <div class="table-wrap card">
+    <table>
+      <thead><tr><th>Purchase</th><th>Service</th><th>USD</th><th>Payment</th><th>Fulfillment</th><th>Created</th></tr></thead>
+      <tbody>
+        {% for purchase in purchases %}
+          <tr>
+            <td><a href="{{ url_for('admin.purchase_detail', invoice_id=purchase.invoice_id) }}"><span class="monospace">{{ purchase.invoice_id[:12] }}…</span></a></td>
+            <td>{{ purchase.service_name }}<small>{{ purchase.category_name }}</small></td>
+            <td>{{ purchase.price_usd_cents|usd }}</td>
+            <td>{{ purchase.payment_status.value|replace('_', ' ') }}</td>
+            <td>{{ purchase.fulfillment_status.value }}</td>
+            <td>{{ purchase.created_at|display_datetime }}</td>
+          </tr>
+        {% else %}<tr><td colspan="6">No purchases match these filters.</td></tr>{% endfor %}
+      </tbody>
+    </table>
+  </div>
+{% endblock %}

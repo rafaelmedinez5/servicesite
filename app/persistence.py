@@ -5,11 +5,12 @@ import secrets
 import sqlite3
 from contextlib import contextmanager
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
+from enum import Enum
 from pathlib import Path
 from typing import Iterator
 
-from app.catalog import CategoryRecord, PurchasableService, ServiceRecord
+from app.catalog import AdminServiceRecord, CategoryRecord, PurchasableService, ServiceRecord
 from app.payments.invoice import (
     Invoice,
     InvoiceValidationError,
@@ -19,7 +20,7 @@ from app.payments.invoice import (
 from app.payments.xmr_wallet_rpc import MAX_ATOMIC_UNITS
 
 
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 3
 
 
 class PersistenceError(RuntimeError):
@@ -48,6 +49,36 @@ class CatalogChangedError(PersistenceError):
 
 class InvoicePersistenceError(PersistenceError):
     """An invoice could not be stored without violating an invariant."""
+
+
+class FulfillmentNotAllowedError(PersistenceError):
+    """A purchase cannot be fulfilled before payment settlement."""
+
+
+class FulfillmentStatus(str, Enum):
+    UNFULFILLED = "unfulfilled"
+    FULFILLED = "fulfilled"
+
+
+@dataclass(frozen=True)
+class AdminPurchaseRecord:
+    invoice_id: str
+    service_id: str
+    service_name: str
+    category_id: str
+    category_name: str
+    price_usd_cents: int
+    expected_atomic: int
+    observed_atomic: int
+    required_confirmations: int
+    observed_confirmations: int
+    payment_status: PaymentStatus
+    fulfillment_status: FulfillmentStatus
+    fulfillment_note: str
+    created_at: datetime
+    expires_at: datetime
+    settled_at: datetime | None
+    fulfilled_at: datetime | None
 
 
 @dataclass(frozen=True)
@@ -101,11 +132,13 @@ class SQLiteDatabase:
                         "INSERT INTO schema_meta(key, value) VALUES ('schema_version', ?)",
                         (str(SCHEMA_VERSION),),
                     )
-                elif previous_version not in {"1", str(SCHEMA_VERSION)}:
+                elif previous_version not in {"1", "2", str(SCHEMA_VERSION)}:
                     raise SchemaVersionError("database schema version is unsupported")
 
+                if previous_version in {"1", "2"}:
+                    _ensure_fulfillment_columns(connection)
                 connection.executescript(_SCHEMA_SQL)
-                if previous_version == "1":
+                if previous_version in {"1", "2"}:
                     connection.execute(
                         "UPDATE schema_meta SET value=? WHERE key='schema_version'",
                         (str(SCHEMA_VERSION),),
@@ -198,6 +231,146 @@ class ServicesiteRepository:
                 )
         except sqlite3.IntegrityError as exc:
             raise PersistenceError("service could not be stored") from exc
+
+    def list_categories(self, *, include_archived: bool = True) -> list[CategoryRecord]:
+        connection = self.database.connect()
+        try:
+            where = "" if include_archived else "WHERE archived=0"
+            rows = connection.execute(
+                f"SELECT * FROM categories {where} "
+                "ORDER BY archived, sort_order, name COLLATE NOCASE"
+            ).fetchall()
+            return [_row_to_category(row) for row in rows]
+        finally:
+            connection.close()
+
+    def get_category(self, category_id: str) -> CategoryRecord | None:
+        connection = self.database.connect()
+        try:
+            row = connection.execute(
+                "SELECT * FROM categories WHERE id=?", (category_id,)
+            ).fetchone()
+            return _row_to_category(row) if row is not None else None
+        finally:
+            connection.close()
+
+    def update_category(self, category: CategoryRecord) -> None:
+        if not isinstance(category, CategoryRecord):
+            raise TypeError("category must be a validated CategoryRecord")
+        try:
+            with self.database.transaction(immediate=True) as connection:
+                result = connection.execute(
+                    """
+                    UPDATE categories
+                    SET name=?, slug=?, description=?, published=?, sort_order=?, updated_at=?
+                    WHERE id=? AND archived=0
+                    """,
+                    (
+                        category.name,
+                        category.slug,
+                        category.description,
+                        int(category.published),
+                        category.sort_order,
+                        _serialize_datetime(category.updated_at),
+                        category.id,
+                    ),
+                )
+                if result.rowcount != 1:
+                    raise PersistenceError("category was not found or is archived")
+        except sqlite3.IntegrityError as exc:
+            raise PersistenceError("category could not be updated") from exc
+
+    def archive_category(self, category_id: str, *, now: datetime) -> None:
+        _require_aware_datetime(now, "category archive time")
+        with self.database.transaction(immediate=True) as connection:
+            result = connection.execute(
+                """
+                UPDATE categories
+                SET published=0, archived=1, updated_at=?
+                WHERE id=? AND archived=0
+                """,
+                (_serialize_datetime(now), category_id),
+            )
+            if result.rowcount != 1:
+                raise PersistenceError("category was not found or is already archived")
+
+    def list_services(self, *, include_archived: bool = True) -> list[AdminServiceRecord]:
+        connection = self.database.connect()
+        try:
+            where = "" if include_archived else "WHERE s.archived=0"
+            rows = connection.execute(
+                f"""
+                SELECT s.*, c.name AS category_name
+                FROM services AS s
+                JOIN categories AS c ON c.id=s.category_id
+                {where}
+                ORDER BY s.archived, c.sort_order, c.name COLLATE NOCASE,
+                         s.sort_order, s.name COLLATE NOCASE
+                """
+            ).fetchall()
+            return [
+                AdminServiceRecord(
+                    service=_row_to_service(row), category_name=row["category_name"]
+                )
+                for row in rows
+            ]
+        finally:
+            connection.close()
+
+    def get_service(self, service_id: str) -> ServiceRecord | None:
+        connection = self.database.connect()
+        try:
+            row = connection.execute(
+                "SELECT * FROM services WHERE id=?", (service_id,)
+            ).fetchone()
+            return _row_to_service(row) if row is not None else None
+        finally:
+            connection.close()
+
+    def update_service(self, service: ServiceRecord) -> None:
+        if not isinstance(service, ServiceRecord):
+            raise TypeError("service must be a validated ServiceRecord")
+        try:
+            with self.database.transaction(immediate=True) as connection:
+                result = connection.execute(
+                    """
+                    UPDATE services
+                    SET category_id=?, name=?, slug=?, description=?,
+                        price_usd_cents=?, duration_label=?, published=?,
+                        sort_order=?, version=version+1, updated_at=?
+                    WHERE id=? AND archived=0
+                    """,
+                    (
+                        service.category_id,
+                        service.name,
+                        service.slug,
+                        service.description,
+                        service.price_usd_cents,
+                        service.duration_label,
+                        int(service.published),
+                        service.sort_order,
+                        _serialize_datetime(service.updated_at),
+                        service.id,
+                    ),
+                )
+                if result.rowcount != 1:
+                    raise PersistenceError("service was not found or is archived")
+        except sqlite3.IntegrityError as exc:
+            raise PersistenceError("service could not be updated") from exc
+
+    def archive_service(self, service_id: str, *, now: datetime) -> None:
+        _require_aware_datetime(now, "service archive time")
+        with self.database.transaction(immediate=True) as connection:
+            result = connection.execute(
+                """
+                UPDATE services
+                SET published=0, archived=1, version=version+1, updated_at=?
+                WHERE id=? AND archived=0
+                """,
+                (_serialize_datetime(now), service_id),
+            )
+            if result.rowcount != 1:
+                raise PersistenceError("service was not found or is already archived")
 
     def update_service_price(
         self, service_id: str, *, price_usd_cents: int, now: datetime
@@ -316,6 +489,158 @@ class ServicesiteRepository:
             return int(connection.execute("SELECT COUNT(*) FROM invoices").fetchone()[0])
         finally:
             connection.close()
+
+    def list_admin_purchases(
+        self,
+        *,
+        category_id: str | None = None,
+        service_id: str | None = None,
+        payment_status: PaymentStatus | None = None,
+        fulfillment_status: FulfillmentStatus | None = None,
+        created_from: datetime | None = None,
+        created_before: datetime | None = None,
+        limit: int = 500,
+    ) -> list[AdminPurchaseRecord]:
+        if created_from is not None:
+            _require_aware_datetime(created_from, "purchase filter start")
+        if created_before is not None:
+            _require_aware_datetime(created_before, "purchase filter end")
+        if isinstance(limit, bool) or not isinstance(limit, int) or not 1 <= limit <= 500:
+            raise PersistenceError("purchase result limit is invalid")
+
+        clauses: list[str] = []
+        parameters: list[object] = []
+        for column, value in (("category_id", category_id), ("service_id", service_id)):
+            if value:
+                clauses.append(f"{column}=?")
+                parameters.append(value)
+        if payment_status is not None:
+            clauses.append("status=?")
+            parameters.append(payment_status.value)
+        if fulfillment_status is not None:
+            clauses.append("fulfillment_status=?")
+            parameters.append(fulfillment_status.value)
+        if created_from is not None:
+            clauses.append("created_at>=?")
+            parameters.append(_serialize_datetime(created_from))
+        if created_before is not None:
+            clauses.append("created_at<?")
+            parameters.append(_serialize_datetime(created_before))
+        where = f"WHERE {' AND '.join(clauses)}" if clauses else ""
+        parameters.append(limit)
+
+        connection = self.database.connect()
+        try:
+            rows = connection.execute(
+                f"""
+                SELECT * FROM invoices
+                {where}
+                ORDER BY created_at DESC, id DESC
+                LIMIT ?
+                """,
+                parameters,
+            ).fetchall()
+            return [_row_to_admin_purchase(row) for row in rows]
+        finally:
+            connection.close()
+
+    def get_admin_purchase(self, invoice_id: str) -> AdminPurchaseRecord | None:
+        connection = self.database.connect()
+        try:
+            row = connection.execute(
+                "SELECT * FROM invoices WHERE id=?", (invoice_id,)
+            ).fetchone()
+            return _row_to_admin_purchase(row) if row is not None else None
+        finally:
+            connection.close()
+
+    def mark_purchase_fulfilled(
+        self, invoice_id: str, *, note: str, now: datetime
+    ) -> AdminPurchaseRecord:
+        _require_aware_datetime(now, "fulfillment time")
+        if not isinstance(note, str) or len(note.strip()) > 2_000:
+            raise PersistenceError("fulfillment note is too long")
+        normalized_note = note.strip()
+        with self.database.transaction(immediate=True) as connection:
+            row = connection.execute(
+                "SELECT * FROM invoices WHERE id=?", (invoice_id,)
+            ).fetchone()
+            if row is None:
+                raise InvoiceNotFoundError("invoice was not found")
+            if PaymentStatus(row["status"]) is not PaymentStatus.SETTLED:
+                raise FulfillmentNotAllowedError(
+                    "purchase payment must be settled before fulfillment"
+                )
+            if FulfillmentStatus(row["fulfillment_status"]) is FulfillmentStatus.FULFILLED:
+                return _row_to_admin_purchase(row)
+            connection.execute(
+                """
+                UPDATE invoices
+                SET fulfillment_status='fulfilled', fulfillment_note=?, fulfilled_at=?
+                WHERE id=? AND status='settled' AND fulfillment_status='unfulfilled'
+                """,
+                (normalized_note, _serialize_datetime(now), invoice_id),
+            )
+            updated = connection.execute(
+                "SELECT * FROM invoices WHERE id=?", (invoice_id,)
+            ).fetchone()
+            return _row_to_admin_purchase(updated)
+
+    def admin_login_allowed(self, *, now: datetime) -> bool:
+        _require_aware_datetime(now, "login attempt time")
+        connection = self.database.connect()
+        try:
+            row = connection.execute(
+                "SELECT blocked_until FROM admin_login_guard WHERE id=1"
+            ).fetchone()
+            return (
+                row is None
+                or row["blocked_until"] is None
+                or _parse_datetime(row["blocked_until"]) <= now
+            )
+        finally:
+            connection.close()
+
+    def record_admin_login_failure(
+        self,
+        *,
+        now: datetime,
+        maximum_attempts: int = 5,
+        window: timedelta = timedelta(minutes=15),
+        block_for: timedelta = timedelta(minutes=15),
+    ) -> None:
+        _require_aware_datetime(now, "login failure time")
+        with self.database.transaction(immediate=True) as connection:
+            row = connection.execute(
+                "SELECT * FROM admin_login_guard WHERE id=1"
+            ).fetchone()
+            if row is None or _parse_datetime(row["window_started_at"]) + window <= now:
+                window_started_at = now
+                failure_count = 1
+            else:
+                window_started_at = _parse_datetime(row["window_started_at"])
+                failure_count = int(row["failure_count"]) + 1
+            blocked_until = now + block_for if failure_count >= maximum_attempts else None
+            connection.execute(
+                """
+                INSERT INTO admin_login_guard(
+                    id, window_started_at, failure_count, blocked_until
+                ) VALUES (1, ?, ?, ?)
+                ON CONFLICT(id) DO UPDATE SET
+                    window_started_at=excluded.window_started_at,
+                    failure_count=excluded.failure_count,
+                    blocked_until=excluded.blocked_until
+                """,
+                (
+                    _serialize_datetime(window_started_at),
+                    failure_count,
+                    _serialize_optional_datetime(blocked_until),
+                ),
+            )
+
+    def clear_admin_login_failures(self) -> None:
+        with self.database.transaction(immediate=True) as connection:
+            connection.execute("DELETE FROM admin_login_guard WHERE id=1")
 
     def list_open_invoices(self) -> list[Invoice]:
         connection = self.database.connect()
@@ -662,6 +987,60 @@ def _row_to_purchasable_service(row: sqlite3.Row) -> PurchasableService:
     )
 
 
+def _row_to_category(row: sqlite3.Row) -> CategoryRecord:
+    return CategoryRecord(
+        id=row["id"],
+        name=row["name"],
+        slug=row["slug"],
+        description=row["description"],
+        published=bool(row["published"]),
+        archived=bool(row["archived"]),
+        sort_order=int(row["sort_order"]),
+        created_at=_parse_datetime(row["created_at"]),
+        updated_at=_parse_datetime(row["updated_at"]),
+    )
+
+
+def _row_to_service(row: sqlite3.Row) -> ServiceRecord:
+    return ServiceRecord(
+        id=row["id"],
+        category_id=row["category_id"],
+        name=row["name"],
+        slug=row["slug"],
+        description=row["description"],
+        price_usd_cents=int(row["price_usd_cents"]),
+        duration_label=row["duration_label"],
+        published=bool(row["published"]),
+        archived=bool(row["archived"]),
+        sort_order=int(row["sort_order"]),
+        version=int(row["version"]),
+        created_at=_parse_datetime(row["created_at"]),
+        updated_at=_parse_datetime(row["updated_at"]),
+    )
+
+
+def _row_to_admin_purchase(row: sqlite3.Row) -> AdminPurchaseRecord:
+    return AdminPurchaseRecord(
+        invoice_id=row["id"],
+        service_id=row["service_id"],
+        service_name=row["service_name_snapshot"],
+        category_id=row["category_id"],
+        category_name=row["category_name_snapshot"],
+        price_usd_cents=int(row["price_usd_cents"]),
+        expected_atomic=int(row["expected_atomic"]),
+        observed_atomic=int(row["observed_atomic"]),
+        required_confirmations=int(row["required_confirmations"]),
+        observed_confirmations=int(row["observed_confirmations"]),
+        payment_status=PaymentStatus(row["status"]),
+        fulfillment_status=FulfillmentStatus(row["fulfillment_status"]),
+        fulfillment_note=row["fulfillment_note"],
+        created_at=_parse_datetime(row["created_at"]),
+        expires_at=_parse_datetime(row["expires_at"]),
+        settled_at=_parse_optional_datetime(row["settled_at"]),
+        fulfilled_at=_parse_optional_datetime(row["fulfilled_at"]),
+    )
+
+
 def _require_invoice(connection: sqlite3.Connection, invoice_id: str) -> Invoice:
     row = connection.execute(
         "SELECT * FROM invoices WHERE id=?", (invoice_id,)
@@ -782,6 +1161,25 @@ def _require_token(value: str, label: str) -> None:
         raise InvoiceValidationError(f"{label} is invalid")
 
 
+def _ensure_fulfillment_columns(connection: sqlite3.Connection) -> None:
+    columns = {
+        row["name"] for row in connection.execute("PRAGMA table_info(invoices)")
+    }
+    additions = {
+        "fulfillment_status": (
+            "ALTER TABLE invoices ADD COLUMN fulfillment_status TEXT NOT NULL "
+            "DEFAULT 'unfulfilled' CHECK (fulfillment_status IN ('unfulfilled', 'fulfilled'))"
+        ),
+        "fulfillment_note": (
+            "ALTER TABLE invoices ADD COLUMN fulfillment_note TEXT NOT NULL DEFAULT ''"
+        ),
+        "fulfilled_at": "ALTER TABLE invoices ADD COLUMN fulfilled_at TEXT",
+    }
+    for name, statement in additions.items():
+        if name not in columns:
+            connection.execute(statement)
+
+
 _SCHEMA_SQL = """
 CREATE TABLE IF NOT EXISTS categories (
     id TEXT PRIMARY KEY,
@@ -849,10 +1247,22 @@ CREATE TABLE IF NOT EXISTS invoices (
     expires_at TEXT NOT NULL,
     expired_at TEXT,
     settled_at TEXT,
+    fulfillment_status TEXT NOT NULL DEFAULT 'unfulfilled' CHECK (
+        fulfillment_status IN ('unfulfilled', 'fulfilled')
+    ),
+    fulfillment_note TEXT NOT NULL DEFAULT '',
+    fulfilled_at TEXT,
     updated_at TEXT NOT NULL,
     UNIQUE (xmr_account_index, xmr_address_index),
     CHECK ((status = 'expired') = (expired_at IS NOT NULL)),
     CHECK ((status = 'settled') = (settled_at IS NOT NULL))
+);
+
+CREATE TABLE IF NOT EXISTS admin_login_guard (
+    id INTEGER PRIMARY KEY CHECK (id = 1),
+    window_started_at TEXT NOT NULL,
+    failure_count INTEGER NOT NULL CHECK (failure_count >= 0),
+    blocked_until TEXT
 );
 
 CREATE TABLE IF NOT EXISTS invoice_poll_claims (
@@ -876,4 +1286,6 @@ CREATE INDEX IF NOT EXISTS idx_invoices_open
     ON invoices(status, expires_at);
 CREATE INDEX IF NOT EXISTS idx_invoices_service
     ON invoices(service_id, created_at);
+CREATE INDEX IF NOT EXISTS idx_invoices_admin
+    ON invoices(fulfillment_status, status, created_at);
 """

@@ -1,0 +1,36 @@
+{% set private_page = true %}
+{% extends "base.html" %}
+
+{% block title %}Services | Servicesite{% endblock %}
+
+{% block content %}
+  {% include "admin/_nav.html" %}
+  <div class="admin-title-row">
+    <div><p class="eyebrow">Catalog</p><h1>Services</h1></div>
+    <a class="button" href="{{ url_for('admin.service_new') }}">New service</a>
+  </div>
+  <div class="admin-list">
+    {% for item in services %}
+      {% set service = item.service %}
+      <article class="card admin-list-item">
+        <div>
+          <p class="record-meta">{{ item.category_name }} · {{ "Archived" if service.archived else ("Published" if service.published else "Draft") }} · version {{ service.version }}</p>
+          <h2>{{ service.name }}</h2>
+          <p>{{ service.description }}</p>
+          <p><strong>{{ service.price_usd_cents|usd }}</strong>{% if service.duration_label %} · {{ service.duration_label }}{% endif %}</p>
+        </div>
+        <div class="button-row">
+          {% if not service.archived %}
+            <a class="button secondary" href="{{ url_for('admin.service_edit', service_id=service.id) }}">Edit</a>
+            <form method="post" action="{{ url_for('admin.service_archive', service_id=service.id) }}">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <button class="button danger" type="submit">Archive</button>
+            </form>
+          {% endif %}
+        </div>
+      </article>
+    {% else %}
+      <section class="card empty-state"><h2>No services yet</h2><p>Create a category, then add a service.</p></section>
+    {% endfor %}
+  </div>
+{% endblock %}

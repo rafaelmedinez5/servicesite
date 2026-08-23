@@ -109,3 +109,8 @@ class PurchasableService:
     category_description: str
     price_usd_cents: int
 
+
+@dataclass(frozen=True)
+class AdminServiceRecord:
+    service: ServiceRecord
+    category_name: str

@@ -24,6 +24,7 @@ from app.payments.xmr_wallet_rpc import XmrSubaddress
 from app.persistence import (
     CatalogChangedError,
     DatabaseNotFreshError,
+    FulfillmentStatus,
     InvoicePersistenceError,
     SQLiteDatabase,
     ServicesiteRepository,
@@ -168,6 +169,7 @@ def test_fresh_schema_initialization_is_idempotent_and_uses_wal(tmp_path):
         "invoices",
         "invoice_poll_claims",
         "invoice_sweep_attempts",
+        "admin_login_guard",
     }
     assert journal_mode.lower() == "wal"
     assert stat.S_IMODE(database_path.stat().st_mode) == 0o600
@@ -211,8 +213,56 @@ def test_schema_version_one_is_upgraded_with_reconciliation_tables(tmp_path):
     finally:
         connection.close()
 
-    assert version == "2"
+    assert version == "3"
     assert {"invoice_poll_claims", "invoice_sweep_attempts"} <= tables
+
+
+def test_schema_version_two_is_upgraded_with_fulfillment_columns(tmp_path):
+    database = SQLiteDatabase(tmp_path / "upgrade-v2.db")
+    database.initialize()
+    repository = ServicesiteRepository(database)
+    repository.insert_category(_category())
+    repository.insert_service(_service())
+    invoice = _creator(repository, FakeWallet()).create_invoice(
+        "service-assessment", _quote()
+    )
+    connection = database.connect()
+    try:
+        connection.execute("DROP TABLE admin_login_guard")
+        connection.execute("DROP INDEX idx_invoices_admin")
+        connection.execute("ALTER TABLE invoices DROP COLUMN fulfilled_at")
+        connection.execute("ALTER TABLE invoices DROP COLUMN fulfillment_note")
+        connection.execute("ALTER TABLE invoices DROP COLUMN fulfillment_status")
+        connection.execute(
+            "UPDATE schema_meta SET value='2' WHERE key='schema_version'"
+        )
+        connection.commit()
+    finally:
+        connection.close()
+
+    database.initialize()
+    connection = database.connect()
+    try:
+        version = connection.execute(
+            "SELECT value FROM schema_meta WHERE key='schema_version'"
+        ).fetchone()[0]
+        columns = {
+            row["name"] for row in connection.execute("PRAGMA table_info(invoices)")
+        }
+        guard_exists = connection.execute(
+            "SELECT 1 FROM sqlite_master WHERE type='table' AND name='admin_login_guard'"
+        ).fetchone()
+    finally:
+        connection.close()
+
+    assert version == "3"
+    assert {"fulfillment_status", "fulfillment_note", "fulfilled_at"} <= columns
+    assert guard_exists is not None
+    assert repository.get_invoice(invoice.id) == invoice
+    assert (
+        repository.get_admin_purchase(invoice.id).fulfillment_status
+        is FulfillmentStatus.UNFULFILLED
+    )
 
 
 def test_each_invoice_gets_a_unique_persisted_subaddress(repository_context):

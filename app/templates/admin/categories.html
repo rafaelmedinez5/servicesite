@@ -1,0 +1,35 @@
+{% set private_page = true %}
+{% extends "base.html" %}
+
+{% block title %}Categories | Servicesite{% endblock %}
+
+{% block content %}
+  {% include "admin/_nav.html" %}
+  <div class="admin-title-row">
+    <div><p class="eyebrow">Catalog</p><h1>Categories</h1></div>
+    <a class="button" href="{{ url_for('admin.category_new') }}">New category</a>
+  </div>
+  <div class="admin-list">
+    {% for category in categories %}
+      <article class="card admin-list-item">
+        <div>
+          <p class="record-meta">{{ "Archived" if category.archived else ("Published" if category.published else "Draft") }} · order {{ category.sort_order }}</p>
+          <h2>{{ category.name }}</h2>
+          <p>{{ category.description or "No description." }}</p>
+          <p class="monospace">{{ category.slug }}</p>
+        </div>
+        <div class="button-row">
+          {% if not category.archived %}
+            <a class="button secondary" href="{{ url_for('admin.category_edit', category_id=category.id) }}">Edit</a>
+            <form method="post" action="{{ url_for('admin.category_archive', category_id=category.id) }}">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <button class="button danger" type="submit">Archive</button>
+            </form>
+          {% endif %}
+        </div>
+      </article>
+    {% else %}
+      <section class="card empty-state"><h2>No categories yet</h2><p>Create one before adding a service.</p></section>
+    {% endfor %}
+  </div>
+{% endblock %}

@@ -1,0 +1,10 @@
+<nav class="admin-nav" aria-label="Administration">
+  <a href="{{ url_for('admin.dashboard') }}">Overview</a>
+  <a href="{{ url_for('admin.categories') }}">Categories</a>
+  <a href="{{ url_for('admin.services') }}">Services</a>
+  <a href="{{ url_for('admin.purchases') }}">Purchases</a>
+  <form method="post" action="{{ url_for('admin.logout') }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <button class="button secondary compact-button" type="submit">Sign out</button>
+  </form>
+</nav>

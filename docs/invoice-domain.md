@@ -5,12 +5,13 @@ reconciliation layer; no production database or wallet was accessed.
 
 ## Fresh database boundary
 
-`SQLiteDatabase.initialize()` creates schema version 2 with WAL mode and applies
+`SQLiteDatabase.initialize()` creates schema version 3 with WAL mode and applies
 mode `0600` to the database file. Initialization is idempotent for a recognized
 `servicesite` database. If a database already contains tables but has no
 `servicesite` schema marker, initialization refuses it instead of treating a
-legacy database as compatible. A recognized schema version 1 database is
-upgraded in place by adding only the Task 5 coordination tables.
+legacy database as compatible. Recognized schema versions 1 and 2 are upgraded
+in place; version 3 adds fulfillment fields and the admin login guard without
+altering payment amounts, addresses, tokens, or transaction identifiers.
 
 The production parent directory must already exist with operator-reviewed
 ownership and permissions. The application does not copy or inspect the legacy
@@ -45,6 +46,7 @@ Stores:
 - deposit and sweep transaction identifiers;
 - the sweep policy locked for that invoice;
 - payment status, customer-safe status note, and lifecycle timestamps.
+- separate fulfillment status, optional internal note, and fulfillment time.
 
 The database enforces unique status tokens, unique addresses, and unique
 `(wallet account index, subaddress index)` pairs. Catalog rows referenced by
@@ -125,10 +127,13 @@ Sweep attempts are serialized and persisted before the wallet call. Confirmed
 invoices cannot expire while waiting for or reconciling a sweep. Full operational
 and recovery details are in `xmr-reconciliation.md`.
 
-## Deferred behavior
+## Admin and fulfillment boundary
 
-- admin authentication and catalog forms;
-- manual fulfillment state and admin purchase workflow;
-- production database initialization and backups.
+Admin catalog edits affect only future invoices because each purchase keeps its
+immutable snapshots. Category and service removal is archival, not deletion.
+The admin purchase list omits status bearer tokens, deposit addresses, and
+transaction identifiers. A transactional guard permits fulfillment only when
+the payment state is `settled`; fulfillment never changes payment state.
 
-These remain separate approval/test checkpoints.
+Production database initialization, online backups, and schema upgrades remain
+operator actions described in the deployment runbook.

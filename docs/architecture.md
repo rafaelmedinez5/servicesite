@@ -1,11 +1,12 @@
 # Servicesite architecture
 
-Status: Tasks 0 through 7. The validated wallet transport, minimal catalog
+Status: Tasks 0 through 7 plus the admin checkpoint. The validated wallet transport, minimal catalog
 persistence, canonical invoice domain, fresh SQLite schema, and private web
 checkout/status boundary are implemented. The protected reconciliation boundary
 is implemented but not scheduled or production-verified. Sanitized deployment
-units and a read-only deployment preflight exist; admin and live deployment
-remain separate tasks.
+units and a read-only deployment preflight exist. Single-admin catalog,
+purchase visibility, and fulfillment are implemented; stagenet payment
+verification remains a separate task.
 
 ## Runtime components
 
@@ -20,8 +21,8 @@ remain separate tasks.
 
 ## Catalog and admin direction
 
-The admin panel will use ordinary server-rendered forms without JavaScript.
-The initial catalog model will support:
+The admin panel uses ordinary server-rendered forms without JavaScript.
+The catalog model supports:
 
 - categories with name, slug, description, publication state, and sort order;
 - services assigned to categories with name, slug, description, USD price,
@@ -31,8 +32,10 @@ The initial catalog model will support:
 - separate payment and manual-fulfillment states.
 
 The first release uses one administrator account. The password is represented
-only by a generated hash outside Git. Admin routes require session authentication,
-CSRF protection, login rate limiting, and session expiry.
+only by a generated hash outside Git. Admin routes use fixed-expiry sessions,
+CSRF protection, a SQLite-backed login rate limit, and private/no-store
+responses. Routine admin views omit bearer tokens, wallet addresses, and
+transaction identifiers.
 
 ## Payment separation
 
@@ -115,7 +118,7 @@ poll reconciliation, transfer/sweep XMR, alter a file, or operate a service.
 - Task 2: wallet-rpc transport and complete XMR configuration validation.
 - Task 3: minimal catalog/invoice persistence and canonical invoice domain.
 - Task 4: public catalog, checkout, QR, and private status views.
-- Admin authentication and catalog CRUD remain a separate application task.
+- Admin authentication, catalog management, purchase filters, and guarded manual fulfillment are implemented.
 - Task 5: poll/confirm/sweep orchestration (implemented; staged verification pending).
 - Task 6: sanitized systemd units, poll launcher, and install/rollback commands.
 - Task 7: complete runbook plus read-only, redacting preflight.

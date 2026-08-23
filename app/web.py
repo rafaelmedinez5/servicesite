@@ -39,7 +39,7 @@ from app.payments.xmr_wallet_rpc import (
     XmrWalletRpcError,
     atomic_to_xmr_str,
 )
-from app.persistence import PersistenceError, ServicesiteRepository
+from app.persistence import FulfillmentStatus, PersistenceError, ServicesiteRepository
 from app.web_security import (
     FormSecurityError,
     consume_checkout_nonce,
@@ -179,11 +179,21 @@ def checkout_qr(invoice_id: str, status_token: str):
 @public.get("/status/<invoice_id>/<status_token>")
 def status(invoice_id: str, status_token: str):
     invoice = _private_invoice(invoice_id, status_token)
+    try:
+        purchase = _repository().get_admin_purchase(invoice.id)
+    except (PersistenceError, sqlite3.Error):
+        abort(503)
     return render_template(
         "status.html",
         invoice=invoice,
         xmr_amount=atomic_to_xmr_str(invoice.expected_atomic),
-        customer_state=customer_payment_state(invoice),
+        customer_state=customer_payment_state(
+            invoice,
+            fulfilled=(
+                purchase is not None
+                and purchase.fulfillment_status is FulfillmentStatus.FULFILLED
+            ),
+        ),
     )
 
 
@@ -228,7 +238,9 @@ def build_monero_uri(invoice: Invoice) -> str:
     return f"monero:{quote(invoice.xmr_address, safe='')}?{urlencode({'tx_amount': amount})}"
 
 
-def customer_payment_state(invoice: Invoice) -> CustomerPaymentState:
+def customer_payment_state(
+    invoice: Invoice, *, fulfilled: bool = False
+) -> CustomerPaymentState:
     not_fulfilled = "Service fulfillment has not started."
     if invoice.status is PaymentStatus.AWAITING_PAYMENT and invoice.observed_atomic > 0:
         remaining = max(invoice.expected_atomic - invoice.observed_atomic, 0)
@@ -282,7 +294,11 @@ def customer_payment_state(invoice: Invoice) -> CustomerPaymentState:
             confirmation_text=(
                 f"{invoice.required_confirmations} of {invoice.required_confirmations} confirmations"
             ),
-            fulfillment_text="The purchase is eligible for manual fulfillment review.",
+            fulfillment_text=(
+                "Service fulfillment has been marked complete."
+                if fulfilled
+                else "The purchase is eligible for manual fulfillment review."
+            ),
         )
     return CustomerPaymentState(
         title="Payment window expired",

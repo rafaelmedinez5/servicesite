@@ -205,6 +205,8 @@ must select:
 - `ENVIRONMENT=production`;
 - `APP_HOST=127.0.0.1` and `APP_PORT=5100`;
 - `DB_PATH=/opt/servicesite/instance/servicesite.db`;
+- a generated Werkzeug `ADMIN_PASSWORD_HASH`, the selected `ADMIN_USERNAME`,
+  and an `ADMIN_SESSION_HOURS` value from 1 through 24;
 - `XMR_WALLET_RPC_URL=http://127.0.0.1:28088/json_rpc`;
 - 10 confirmations and a 7,200-second invoice TTL;
 - `XMR_SWEEP_ENABLED=false`; and
@@ -281,6 +283,11 @@ stat -c '%a %U:%G %n' /opt/servicesite/instance/servicesite.db
 
 The database must be mode `0600`, owned by `servicesite`, and use the current
 schema. Stop if initialization reports existing unrecognized tables.
+
+After deploying a revision with a newer recognized schema, stop the web service,
+take and verify an online backup, then rerun the same initialization command.
+The recognized migration preserves existing invoices. Start the web service
+only after the command succeeds; never edit schema tables manually.
 
 Create backups with SQLite's online backup operation; never copy a live WAL
 database with plain `cp`.
