@@ -28,7 +28,10 @@ Status: application and Task 4 pricing decisions confirmed on 2026-08-17.
 ## Administration
 
 - The first release has one administrator account.
-- Only a generated password hash may be stored in external configuration.
+- First use creates the password through a one-time server-rendered setup form;
+  only its generated Werkzeug hash is stored in the protected SQLite database.
+- Changing the password requires the current password and invalidates every
+  existing administrator session.
 - Admin routes require authenticated sessions, CSRF protection, login rate
   limiting, and session expiry.
 - Purchases can be filtered by category, service, date, payment status, and

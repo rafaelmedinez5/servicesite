@@ -22,7 +22,6 @@ def create_app(test_config: dict | None = None) -> Flask:
         APP_PORT=settings.app_port,
         DB_PATH=settings.database_path,
         ADMIN_USERNAME=settings.admin_username,
-        ADMIN_PASSWORD_HASH=settings.admin_password_hash,
         ADMIN_SESSION_HOURS=settings.admin_session_hours,
         XMR_WALLET_RPC_URL=settings.xmr_wallet_rpc_url,
         XMR_WALLET_RPC_USER=settings.xmr_wallet_rpc_user,

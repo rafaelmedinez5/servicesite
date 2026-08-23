@@ -31,8 +31,10 @@ The catalog model supports:
 - immutable service/category/price snapshots on purchases;
 - separate payment and manual-fulfillment states.
 
-The first release uses one administrator account. The password is represented
-only by a generated hash outside Git. Admin routes use fixed-expiry sessions,
+The first release uses one administrator account. First use creates the
+password through a one-time form and stores only its generated hash in SQLite.
+Password changes require the current password and rotate a credential version
+that invalidates all admin sessions. Admin routes use fixed-expiry sessions,
 CSRF protection, a SQLite-backed login rate limit, and private/no-store
 responses. Routine admin views omit bearer tokens, wallet addresses, and
 transaction identifiers.

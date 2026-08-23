@@ -60,7 +60,6 @@ def _make_paths(tmp_path: Path) -> PreflightPaths:
                 "ENVIRONMENT=production",
                 f"SECRET_KEY={APPLICATION_SECRET}",
                 "ADMIN_USERNAME=admin",
-                f"ADMIN_PASSWORD_HASH=scrypt:{'a' * 64}",
                 "ADMIN_SESSION_HOURS=12",
                 "APP_HOST=127.0.0.1",
                 "APP_PORT=5100",

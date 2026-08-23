@@ -100,7 +100,6 @@ class Settings:
     app_port: int
     database_path: str
     admin_username: str
-    admin_password_hash: str = field(repr=False)
     admin_session_hours: int
     xmr_wallet_rpc_url: str
     xmr_wallet_rpc_user: str = field(repr=False)
@@ -144,9 +143,6 @@ class Settings:
         admin_username = os.getenv("ADMIN_USERNAME", "admin").strip()
         if not admin_username or len(admin_username) > 64:
             raise RuntimeError("ADMIN_USERNAME must contain 1 through 64 characters")
-        admin_password_hash = os.getenv(
-            "ADMIN_PASSWORD_HASH", "replace_with_a_generated_password_hash"
-        ).strip()
         admin_session_hours = _parse_int(
             "ADMIN_SESSION_HOURS",
             os.getenv("ADMIN_SESSION_HOURS", "12").strip(),
@@ -177,13 +173,6 @@ class Settings:
         if environment == "production":
             _require_production_secret("SECRET_KEY", secret_key, minimum_length=32)
             _require_production_secret(
-                "ADMIN_PASSWORD_HASH", admin_password_hash, minimum_length=32
-            )
-            if not admin_password_hash.startswith(("scrypt:", "pbkdf2:")):
-                raise RuntimeError(
-                    "Production ADMIN_PASSWORD_HASH must be a Werkzeug password hash"
-                )
-            _require_production_secret(
                 "XMR_WALLET_RPC_USER", xmr_wallet_rpc_user, minimum_length=1
             )
             _require_production_secret(
@@ -212,7 +201,6 @@ class Settings:
             ),
             database_path=database_path,
             admin_username=admin_username,
-            admin_password_hash=admin_password_hash,
             admin_session_hours=admin_session_hours,
             xmr_wallet_rpc_url=xmr_wallet_rpc_url,
             xmr_wallet_rpc_user=xmr_wallet_rpc_user,

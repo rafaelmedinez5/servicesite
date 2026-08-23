@@ -1,25 +1,43 @@
 {% set private_page = true %}
 {% extends "base.html" %}
 
-{% block title %}Administrator login | Servicesite{% endblock %}
+{% block title %}{{ "Administrator setup" if setup_required else "Administrator login" }} | Servicesite{% endblock %}
 
 {% block content %}
   <section class="card admin-login" aria-labelledby="login-title">
     <p class="eyebrow">Restricted administration</p>
-    <h1 id="login-title">Administrator login</h1>
-    <p>Use the single administrator account configured on this server.</p>
+    {% if setup_required %}
+      <h1 id="login-title">Create the administrator password</h1>
+      <p>This one-time setup creates the password for <strong>{{ configured_username }}</strong>. Complete it before sharing this onion address.</p>
+    {% else %}
+      <h1 id="login-title">Administrator login</h1>
+      <p>Use the single administrator account configured on this server.</p>
+    {% endif %}
     {% if error %}<p class="form-error" role="alert">{{ error }}</p>{% endif %}
     <form class="admin-form" method="post" action="{{ url_for('admin.login') }}">
       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-      <label>
-        <span>Username</span>
-        <input name="username" type="text" autocomplete="username" maxlength="64" required>
-      </label>
-      <label>
-        <span>Password</span>
-        <input name="password" type="password" autocomplete="current-password" maxlength="1024" required>
-      </label>
-      <button type="submit">Sign in</button>
+      {% if setup_required %}
+        <label>
+          <span>New password</span>
+          <input name="new_password" type="password" autocomplete="new-password" minlength="16" maxlength="1024" required>
+          <small>Use at least 16 characters.</small>
+        </label>
+        <label>
+          <span>Confirm new password</span>
+          <input name="confirm_password" type="password" autocomplete="new-password" minlength="16" maxlength="1024" required>
+        </label>
+        <button type="submit">Create administrator password</button>
+      {% else %}
+        <label>
+          <span>Username</span>
+          <input name="username" type="text" autocomplete="username" maxlength="64" required>
+        </label>
+        <label>
+          <span>Password</span>
+          <input name="password" type="password" autocomplete="current-password" maxlength="1024" required>
+        </label>
+        <button type="submit">Sign in</button>
+      {% endif %}
     </form>
   </section>
 {% endblock %}

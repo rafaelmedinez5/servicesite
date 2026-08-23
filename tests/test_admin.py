@@ -5,7 +5,7 @@ from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 
 import pytest
-from werkzeug.security import generate_password_hash
+from werkzeug.security import check_password_hash, generate_password_hash
 
 from app import create_app
 from app.catalog import CategoryRecord, ServiceRecord
@@ -32,6 +32,9 @@ def admin_context(tmp_path, monkeypatch):
     database = SQLiteDatabase(tmp_path / "admin.db")
     database.initialize()
     repository = ServicesiteRepository(database)
+    repository.create_admin_credential(
+        generate_password_hash("correct horse battery staple"), now=NOW
+    )
     app = create_app(
         {
             "TESTING": True,
@@ -39,7 +42,26 @@ def admin_context(tmp_path, monkeypatch):
             "SERVICESITE_REPOSITORY": repository,
             "SERVICESITE_NOW_FACTORY": lambda: NOW,
             "ADMIN_USERNAME": "operator",
-            "ADMIN_PASSWORD_HASH": generate_password_hash("correct horse battery staple"),
+            "ADMIN_SESSION_HOURS": 4,
+        }
+    )
+    return app, app.test_client(), repository
+
+
+@pytest.fixture
+def uninitialized_admin_context(tmp_path, monkeypatch):
+    monkeypatch.setenv("ENVIRONMENT", "test")
+    monkeypatch.setenv("SECRET_KEY", "test-admin-session-secret")
+    database = SQLiteDatabase(tmp_path / "uninitialized-admin.db")
+    database.initialize()
+    repository = ServicesiteRepository(database)
+    app = create_app(
+        {
+            "TESTING": True,
+            "DB_PATH": str(tmp_path / "uninitialized-admin.db"),
+            "SERVICESITE_REPOSITORY": repository,
+            "SERVICESITE_NOW_FACTORY": lambda: NOW,
+            "ADMIN_USERNAME": "operator",
             "ADMIN_SESSION_HOURS": 4,
         }
     )
@@ -137,6 +159,78 @@ def test_admin_routes_require_login_and_private_headers(admin_context):
         assert "script-src 'none'" in item.headers["Content-Security-Policy"]
 
 
+def test_first_visit_sets_hashed_password_once_and_signs_in(uninitialized_admin_context):
+    _app, client, repository = uninitialized_admin_context
+    setup = client.get("/admin/login")
+    body = setup.get_data(as_text=True)
+
+    assert setup.status_code == 200
+    assert "Create the administrator password" in body
+    assert "operator" in body
+
+    response = client.post(
+        "/admin/login",
+        data={
+            "csrf_token": _csrf(setup),
+            "new_password": "first password is long enough",
+            "confirm_password": "first password is long enough",
+        },
+    )
+    credential = repository.get_admin_credential()
+
+    assert response.status_code == 303
+    assert response.headers["Location"].endswith("/admin")
+    assert credential is not None
+    assert "first password is long enough" not in credential.password_hash
+    assert credential.password_hash.startswith("scrypt:")
+    assert check_password_hash(
+        credential.password_hash, "first password is long enough"
+    )
+    assert client.get("/admin").status_code == 200
+
+    client.post("/admin/logout", data={"csrf_token": _csrf(client.get("/admin"))})
+    login = client.get("/admin/login")
+    assert "Administrator login" in login.get_data(as_text=True)
+    assert "Create the administrator password" not in login.get_data(as_text=True)
+
+
+def test_first_password_setup_validates_length_and_confirmation(
+    uninitialized_admin_context,
+):
+    _app, client, repository = uninitialized_admin_context
+    missing_csrf = client.post(
+        "/admin/login",
+        data={
+            "new_password": "first password is long enough",
+            "confirm_password": "first password is long enough",
+        },
+    )
+    token = _csrf(client.get("/admin/login"))
+
+    short = client.post(
+        "/admin/login",
+        data={
+            "csrf_token": token,
+            "new_password": "too short",
+            "confirm_password": "too short",
+        },
+    )
+    mismatch = client.post(
+        "/admin/login",
+        data={
+            "csrf_token": token,
+            "new_password": "long password number one",
+            "confirm_password": "long password number two",
+        },
+    )
+
+    assert missing_csrf.status_code == 400
+    assert "Create the administrator password" in missing_csrf.get_data(as_text=True)
+    assert short.status_code == 400
+    assert mismatch.status_code == 400
+    assert repository.get_admin_credential() is None
+
+
 def test_login_requires_csrf_and_rate_limits_failures(admin_context):
     _app, client, _repository = admin_context
 
@@ -172,6 +266,74 @@ def test_login_logout_and_session_cookie(admin_context):
     assert "Operations overview" in dashboard.get_data(as_text=True)
     assert logout.status_code == 303
     assert client.get("/admin").headers["Location"].endswith("/admin/login")
+
+
+def test_password_change_requires_current_password_and_invalidates_sessions(
+    admin_context,
+):
+    app, client, repository = admin_context
+    other_client = app.test_client()
+    _login(client)
+    _login(other_client)
+    password_page = client.get("/admin/password")
+
+    wrong_current = client.post(
+        "/admin/password",
+        data={
+            "csrf_token": _csrf(password_page),
+            "current_password": "wrong current password",
+            "new_password": "replacement password is long",
+            "confirm_password": "replacement password is long",
+        },
+    )
+    unchanged = repository.get_admin_credential()
+
+    assert wrong_current.status_code == 400
+    assert unchanged is not None and unchanged.version == 1
+    assert check_password_hash(
+        unchanged.password_hash, "correct horse battery staple"
+    )
+
+    changed = client.post(
+        "/admin/password",
+        data={
+            "csrf_token": _csrf(client.get("/admin/password")),
+            "current_password": "correct horse battery staple",
+            "new_password": "replacement password is long",
+            "confirm_password": "replacement password is long",
+        },
+    )
+    credential = repository.get_admin_credential()
+
+    assert changed.status_code == 303
+    assert changed.headers["Location"].endswith("/admin/login")
+    assert credential is not None and credential.version == 2
+    assert check_password_hash(
+        credential.password_hash, "replacement password is long"
+    )
+    assert client.get("/admin").headers["Location"].endswith("/admin/login")
+    assert other_client.get("/admin").headers["Location"].endswith("/admin/login")
+
+    token = _csrf(client.get("/admin/login"))
+    old_login = client.post(
+        "/admin/login",
+        data={
+            "csrf_token": token,
+            "username": "operator",
+            "password": "correct horse battery staple",
+        },
+    )
+    new_login = client.post(
+        "/admin/login",
+        data={
+            "csrf_token": token,
+            "username": "operator",
+            "password": "replacement password is long",
+        },
+    )
+
+    assert old_login.status_code == 401
+    assert new_login.status_code == 303
 
 
 def test_admin_creates_edits_and_archives_catalog_without_float_money(admin_context):

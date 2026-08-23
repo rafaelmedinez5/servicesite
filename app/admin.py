@@ -18,7 +18,7 @@ from flask import (
     session,
     url_for,
 )
-from werkzeug.security import check_password_hash
+from werkzeug.security import check_password_hash, generate_password_hash
 
 from app.catalog import CatalogValidationError, CategoryRecord, ServiceRecord
 from app.payments.invoice import PaymentStatus
@@ -45,7 +45,19 @@ def protect_admin_routes():
         return None
     candidate = session.get(_ADMIN_SESSION_KEY)
     username = current_app.config["ADMIN_USERNAME"]
-    if not isinstance(candidate, str) or not secrets.compare_digest(candidate, username):
+    try:
+        credential = _repository().get_admin_credential()
+    except (PersistenceError, sqlite3.Error):
+        abort(503)
+    authenticated = (
+        credential is not None
+        and isinstance(candidate, dict)
+        and isinstance(candidate.get("username"), str)
+        and secrets.compare_digest(candidate["username"], username)
+        and candidate.get("credential_version") == credential.version
+    )
+    if not authenticated:
+        session.clear()
         return redirect(url_for("admin.login"), code=303)
     return None
 
@@ -53,52 +65,93 @@ def protect_admin_routes():
 @admin.route("/login", methods=["GET", "POST"])
 def login():
     if request.method == "GET":
-        return render_template("admin/login.html")
+        try:
+            setup_required = _repository().get_admin_credential() is None
+        except (PersistenceError, sqlite3.Error):
+            return render_template(
+                "admin/login.html",
+                setup_required=False,
+                error="Administrator access is temporarily unavailable.",
+            ), 503
+        return render_template(
+            "admin/login.html",
+            setup_required=setup_required,
+            configured_username=current_app.config["ADMIN_USERNAME"],
+        )
 
     try:
         require_csrf(request.form.get("csrf_token"))
     except FormSecurityError:
-        return render_template("admin/login.html", error="The form expired. Try again."), 400
+        try:
+            setup_required = _repository().get_admin_credential() is None
+        except (PersistenceError, sqlite3.Error):
+            setup_required = False
+        return render_template(
+            "admin/login.html",
+            setup_required=setup_required,
+            configured_username=current_app.config["ADMIN_USERNAME"],
+            error="The form expired. Try again.",
+        ), 400
 
     now = _now()
     repository = _repository()
     try:
+        credential = repository.get_admin_credential()
+    except (PersistenceError, sqlite3.Error):
+        return render_template(
+            "admin/login.html",
+            setup_required=False,
+            error="Administrator access is temporarily unavailable.",
+        ), 503
+
+    if credential is None:
+        return _setup_admin_credential(repository, now=now)
+
+    try:
         allowed = repository.admin_login_allowed(now=now)
     except (PersistenceError, sqlite3.Error):
-        return render_template("admin/login.html", error="Login is temporarily unavailable."), 503
+        return render_template(
+            "admin/login.html",
+            setup_required=False,
+            error="Login is temporarily unavailable.",
+        ), 503
     if not allowed:
         return render_template(
             "admin/login.html",
+            setup_required=False,
             error="Too many attempts. Wait 15 minutes before trying again.",
         ), 429
 
     candidate_username = request.form.get("username", "")
     candidate_password = request.form.get("password", "")
     configured_username = current_app.config["ADMIN_USERNAME"]
-    configured_hash = current_app.config["ADMIN_PASSWORD_HASH"]
     username_matches = (
         isinstance(candidate_username, str)
         and len(candidate_username) <= 64
         and secrets.compare_digest(candidate_username, configured_username)
     )
-    password_matches = False
-    if isinstance(candidate_password, str) and len(candidate_password) <= 1_024:
-        try:
-            password_matches = check_password_hash(configured_hash, candidate_password)
-        except (ValueError, TypeError):
-            password_matches = False
+    password_matches = _password_matches(credential.password_hash, candidate_password)
 
     if not (username_matches and password_matches):
         try:
             repository.record_admin_login_failure(now=now)
         except (PersistenceError, sqlite3.Error):
             return render_template("admin/login.html", error="Login is temporarily unavailable."), 503
-        return render_template("admin/login.html", error="Invalid administrator credentials."), 401
+        return render_template(
+            "admin/login.html",
+            setup_required=False,
+            error="Invalid administrator credentials.",
+        ), 401
 
-    repository.clear_admin_login_failures()
-    session.clear()
-    session[_ADMIN_SESSION_KEY] = configured_username
-    session.permanent = True
+    try:
+        repository.clear_admin_login_failures()
+    except (PersistenceError, sqlite3.Error):
+        return render_template(
+            "admin/login.html",
+            setup_required=False,
+            error="Login is temporarily unavailable.",
+        ), 503
+    _start_admin_session(configured_username, credential.version)
     return redirect(url_for("admin.dashboard"), code=303)
 
 
@@ -134,6 +187,56 @@ def dashboard():
         category_count=sum(not item.archived for item in categories),
         service_count=sum(not item.service.archived for item in services),
     )
+
+
+@admin.route("/password", methods=["GET", "POST"])
+def password():
+    if request.method == "GET":
+        return render_template("admin/password.html")
+
+    _require_admin_csrf()
+    current_password = request.form.get("current_password", "")
+    new_password = request.form.get("new_password", "")
+    confirmation = request.form.get("confirm_password", "")
+    try:
+        credential = _repository().get_admin_credential()
+    except (PersistenceError, sqlite3.Error):
+        return render_template(
+            "admin/password.html", error="The password could not be changed."
+        ), 503
+    if credential is None:
+        session.clear()
+        return redirect(url_for("admin.login"), code=303)
+    if not _password_matches(credential.password_hash, current_password):
+        return render_template(
+            "admin/password.html", error="The current password is incorrect."
+        ), 400
+    error = _new_password_error(new_password, confirmation)
+    if error is not None:
+        return render_template("admin/password.html", error=error), 400
+    if _password_matches(credential.password_hash, new_password):
+        return render_template(
+            "admin/password.html",
+            error="The new password must be different from the current password.",
+        ), 400
+
+    try:
+        changed = _repository().replace_admin_password_hash(
+            expected_hash=credential.password_hash,
+            new_hash=generate_password_hash(new_password),
+            now=_now(),
+        )
+    except (PersistenceError, sqlite3.Error, ValueError):
+        return render_template(
+            "admin/password.html", error="The password could not be changed."
+        ), 503
+    if not changed:
+        session.clear()
+        return redirect(url_for("admin.login"), code=303)
+
+    session.clear()
+    flash("Password changed. Sign in again with the new password.", "success")
+    return redirect(url_for("admin.login"), code=303)
 
 
 @admin.get("/categories")
@@ -279,6 +382,69 @@ def purchase_fulfill(invoice_id: str):
     else:
         flash("Purchase marked fulfilled.", "success")
     return redirect(url_for("admin.purchase_detail", invoice_id=invoice_id), code=303)
+
+
+def _setup_admin_credential(repository: ServicesiteRepository, *, now: datetime):
+    password = request.form.get("new_password", "")
+    confirmation = request.form.get("confirm_password", "")
+    error = _new_password_error(password, confirmation)
+    if error is not None:
+        return render_template(
+            "admin/login.html",
+            setup_required=True,
+            configured_username=current_app.config["ADMIN_USERNAME"],
+            error=error,
+        ), 400
+    try:
+        created = repository.create_admin_credential(
+            generate_password_hash(password), now=now
+        )
+    except (PersistenceError, sqlite3.Error, ValueError):
+        return render_template(
+            "admin/login.html",
+            setup_required=True,
+            configured_username=current_app.config["ADMIN_USERNAME"],
+            error="Administrator setup is temporarily unavailable.",
+        ), 503
+    if not created:
+        return redirect(url_for("admin.login"), code=303)
+
+    try:
+        repository.clear_admin_login_failures()
+    except (PersistenceError, sqlite3.Error):
+        pass
+    _start_admin_session(current_app.config["ADMIN_USERNAME"], 1)
+    return redirect(url_for("admin.dashboard"), code=303)
+
+
+def _new_password_error(password: str, confirmation: str) -> str | None:
+    if not isinstance(password, str) or not isinstance(confirmation, str):
+        return "The password is invalid."
+    if len(password) < 16:
+        return "Use at least 16 characters for the password."
+    if len(password) > 1_024 or len(confirmation) > 1_024:
+        return "The password is too long."
+    if not secrets.compare_digest(password, confirmation):
+        return "The passwords did not match."
+    return None
+
+
+def _password_matches(password_hash: str, candidate: str) -> bool:
+    if not isinstance(candidate, str) or len(candidate) > 1_024:
+        return False
+    try:
+        return check_password_hash(password_hash, candidate)
+    except (ValueError, TypeError):
+        return False
+
+
+def _start_admin_session(username: str, credential_version: int) -> None:
+    session.clear()
+    session[_ADMIN_SESSION_KEY] = {
+        "username": username,
+        "credential_version": credential_version,
+    }
+    session.permanent = True
 
 
 def register_admin(app) -> None:

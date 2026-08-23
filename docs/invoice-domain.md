@@ -5,12 +5,13 @@ reconciliation layer; no production database or wallet was accessed.
 
 ## Fresh database boundary
 
-`SQLiteDatabase.initialize()` creates schema version 3 with WAL mode and applies
+`SQLiteDatabase.initialize()` creates schema version 4 with WAL mode and applies
 mode `0600` to the database file. Initialization is idempotent for a recognized
 `servicesite` database. If a database already contains tables but has no
 `servicesite` schema marker, initialization refuses it instead of treating a
-legacy database as compatible. Recognized schema versions 1 and 2 are upgraded
-in place; version 3 adds fulfillment fields and the admin login guard without
+legacy database as compatible. Recognized schema versions 1 through 3 are
+upgraded in place; version 3 adds fulfillment fields and the admin login guard,
+and version 4 adds the singleton administrator credential table without
 altering payment amounts, addresses, tokens, or transaction identifiers.
 
 The production parent directory must already exist with operator-reviewed
@@ -57,6 +58,13 @@ invoices cannot be deleted; later admin workflows archive them.
 Short-lived poll claims serialize one invoice across overlapping poll runs.
 Sweep attempts persist a strong attempt token, start/update timestamps, and the
 uncertain-response flag. These rows contain no wallet credentials or addresses.
+
+### `admin_credentials` and `admin_login_guard`
+
+The singleton credential row stores only a generated Werkzeug password hash,
+credential version, and timestamps. The version increments on password change
+so every older admin session becomes invalid. The separate login guard stores
+only the global failure window and temporary block state.
 
 ## Canonical creation path
 

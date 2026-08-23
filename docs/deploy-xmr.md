@@ -205,8 +205,9 @@ must select:
 - `ENVIRONMENT=production`;
 - `APP_HOST=127.0.0.1` and `APP_PORT=5100`;
 - `DB_PATH=/opt/servicesite/instance/servicesite.db`;
-- a generated Werkzeug `ADMIN_PASSWORD_HASH`, the selected `ADMIN_USERNAME`,
-  and an `ADMIN_SESSION_HOURS` value from 1 through 24;
+- the selected `ADMIN_USERNAME` and an `ADMIN_SESSION_HOURS` value from 1
+  through 24; the first password is created after migration through the
+  one-time admin setup page and its hash is stored in SQLite;
 - `XMR_WALLET_RPC_URL=http://127.0.0.1:28088/json_rpc`;
 - 10 confirmations and a 7,200-second invoice TTL;
 - `XMR_SWEEP_ENABLED=false`; and

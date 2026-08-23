@@ -4,7 +4,7 @@ import os
 import secrets
 import sqlite3
 from contextlib import contextmanager
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from enum import Enum
 from pathlib import Path
@@ -20,7 +20,7 @@ from app.payments.invoice import (
 from app.payments.xmr_wallet_rpc import MAX_ATOMIC_UNITS
 
 
-SCHEMA_VERSION = 3
+SCHEMA_VERSION = 4
 
 
 class PersistenceError(RuntimeError):
@@ -58,6 +58,14 @@ class FulfillmentNotAllowedError(PersistenceError):
 class FulfillmentStatus(str, Enum):
     UNFULFILLED = "unfulfilled"
     FULFILLED = "fulfilled"
+
+
+@dataclass(frozen=True)
+class AdminCredential:
+    password_hash: str = field(repr=False)
+    version: int
+    created_at: datetime
+    updated_at: datetime
 
 
 @dataclass(frozen=True)
@@ -132,13 +140,13 @@ class SQLiteDatabase:
                         "INSERT INTO schema_meta(key, value) VALUES ('schema_version', ?)",
                         (str(SCHEMA_VERSION),),
                     )
-                elif previous_version not in {"1", "2", str(SCHEMA_VERSION)}:
+                elif previous_version not in {"1", "2", "3", str(SCHEMA_VERSION)}:
                     raise SchemaVersionError("database schema version is unsupported")
 
                 if previous_version in {"1", "2"}:
                     _ensure_fulfillment_columns(connection)
                 connection.executescript(_SCHEMA_SQL)
-                if previous_version in {"1", "2"}:
+                if previous_version in {"1", "2", "3"}:
                     connection.execute(
                         "UPDATE schema_meta SET value=? WHERE key='schema_version'",
                         (str(SCHEMA_VERSION),),
@@ -642,6 +650,55 @@ class ServicesiteRepository:
         with self.database.transaction(immediate=True) as connection:
             connection.execute("DELETE FROM admin_login_guard WHERE id=1")
 
+    def get_admin_credential(self) -> AdminCredential | None:
+        connection = self.database.connect()
+        try:
+            row = connection.execute(
+                "SELECT password_hash, credential_version, created_at, updated_at "
+                "FROM admin_credentials WHERE id=1"
+            ).fetchone()
+            return _row_to_admin_credential(row) if row is not None else None
+        finally:
+            connection.close()
+
+    def create_admin_credential(self, password_hash: str, *, now: datetime) -> bool:
+        _validate_admin_password_hash(password_hash)
+        _require_aware_datetime(now, "admin credential creation time")
+        serialized_now = _serialize_datetime(now)
+        with self.database.transaction(immediate=True) as connection:
+            cursor = connection.execute(
+                """
+                INSERT OR IGNORE INTO admin_credentials(
+                    id, password_hash, credential_version, created_at, updated_at
+                ) VALUES (1, ?, 1, ?, ?)
+                """,
+                (password_hash, serialized_now, serialized_now),
+            )
+            return cursor.rowcount == 1
+
+    def replace_admin_password_hash(
+        self,
+        *,
+        expected_hash: str,
+        new_hash: str,
+        now: datetime,
+    ) -> bool:
+        _validate_admin_password_hash(expected_hash)
+        _validate_admin_password_hash(new_hash)
+        _require_aware_datetime(now, "admin password change time")
+        with self.database.transaction(immediate=True) as connection:
+            cursor = connection.execute(
+                """
+                UPDATE admin_credentials
+                SET password_hash=?,
+                    credential_version=credential_version + 1,
+                    updated_at=?
+                WHERE id=1 AND password_hash=?
+                """,
+                (new_hash, _serialize_datetime(now), expected_hash),
+            )
+            return cursor.rowcount == 1
+
     def list_open_invoices(self) -> list[Invoice]:
         connection = self.database.connect()
         try:
@@ -1041,6 +1098,15 @@ def _row_to_admin_purchase(row: sqlite3.Row) -> AdminPurchaseRecord:
     )
 
 
+def _row_to_admin_credential(row: sqlite3.Row) -> AdminCredential:
+    return AdminCredential(
+        password_hash=row["password_hash"],
+        version=int(row["credential_version"]),
+        created_at=_parse_datetime(row["created_at"]),
+        updated_at=_parse_datetime(row["updated_at"]),
+    )
+
+
 def _require_invoice(connection: sqlite3.Connection, invoice_id: str) -> Invoice:
     row = connection.execute(
         "SELECT * FROM invoices WHERE id=?", (invoice_id,)
@@ -1161,6 +1227,15 @@ def _require_token(value: str, label: str) -> None:
         raise InvoiceValidationError(f"{label} is invalid")
 
 
+def _validate_admin_password_hash(value: str) -> None:
+    if (
+        not isinstance(value, str)
+        or not 32 <= len(value) <= 1_024
+        or not value.startswith(("scrypt:", "pbkdf2:"))
+    ):
+        raise PersistenceError("admin password hash is invalid")
+
+
 def _ensure_fulfillment_columns(connection: sqlite3.Connection) -> None:
     columns = {
         row["name"] for row in connection.execute("PRAGMA table_info(invoices)")
@@ -1263,6 +1338,14 @@ CREATE TABLE IF NOT EXISTS admin_login_guard (
     window_started_at TEXT NOT NULL,
     failure_count INTEGER NOT NULL CHECK (failure_count >= 0),
     blocked_until TEXT
+);
+
+CREATE TABLE IF NOT EXISTS admin_credentials (
+    id INTEGER PRIMARY KEY CHECK (id = 1),
+    password_hash TEXT NOT NULL,
+    credential_version INTEGER NOT NULL CHECK (credential_version > 0),
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS invoice_poll_claims (

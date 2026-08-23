@@ -64,7 +64,6 @@ def _set_valid_production_xmr_environment(monkeypatch):
     monkeypatch.setenv("ENVIRONMENT", "production")
     monkeypatch.setenv("SECRET_KEY", "s" * 32)
     monkeypatch.setenv("ADMIN_USERNAME", "admin")
-    monkeypatch.setenv("ADMIN_PASSWORD_HASH", "scrypt:" + ("a" * 64))
     monkeypatch.setenv("XMR_WALLET_RPC_URL", "http://127.0.0.1:28088/json_rpc")
     monkeypatch.setenv("XMR_WALLET_RPC_USER", "rpc-test-user")
     monkeypatch.setenv("XMR_WALLET_RPC_PASS", "p" * 16)
@@ -138,15 +137,13 @@ def test_settings_repr_hides_secrets(monkeypatch):
     assert "t" * 32 not in rendered
     assert "rpc-test-user" not in rendered
     assert "c" * 32 not in rendered
-    assert "scrypt:" + ("a" * 64) not in rendered
-
-
-def test_production_requires_generated_admin_password_hash(monkeypatch):
+def test_production_allows_first_run_without_admin_password_hash(monkeypatch):
     _set_valid_production_xmr_environment(monkeypatch)
-    monkeypatch.setenv("ADMIN_PASSWORD_HASH", "replace_with_a_generated_password_hash")
+    monkeypatch.delenv("ADMIN_PASSWORD_HASH", raising=False)
 
-    with pytest.raises(RuntimeError, match="ADMIN_PASSWORD_HASH"):
-        Settings.from_env()
+    settings = Settings.from_env()
+
+    assert settings.admin_username == "admin"
 
 
 def test_production_requires_coingecko_api_key(monkeypatch):

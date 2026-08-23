@@ -22,7 +22,11 @@ an authorized security engagement by itself.
 
 ## Authentication controls
 
-- only a Werkzeug password hash is stored in `/etc/servicesite/servicesite.env`;
+- an empty credential table exposes the one-time setup form at `/admin/login`;
+- the setup form stores only a generated Werkzeug hash in the protected SQLite
+  database;
+- password changes require the current password and invalidate all admin
+  sessions;
 - the plaintext password is never stored in Git or shell history;
 - sessions expire after `ADMIN_SESSION_HOURS` and are not extended on requests;
 - production cookies are Secure, HttpOnly, and SameSite Strict;
@@ -36,31 +40,35 @@ The global limit is intentional because Tor forwards onion requests from a
 loopback source. It can cause a temporary administrator lockout during a focused
 attack; do not weaken it without replacing it with a stronger boundary.
 
-## Generate the external password hash
+## First-time password setup
 
-Run the hash generator locally on the target console. `getpass` prevents the
-plaintext from being echoed or placed in shell history:
+After the schema migration, visit `/admin/login` through Tor while the onion
+hostname is still private. When no administrator credential exists, the page
+asks for a new password and confirmation. A successful submission hashes the
+password with Werkzeug, stores only the hash in SQLite, and signs in the
+administrator. The setup form disappears immediately and cannot be reused.
 
-```bash
-runuser -u servicesite -- /opt/servicesite/.venv/bin/python -c 'from getpass import getpass; from werkzeug.security import generate_password_hash; first=getpass("New admin password: "); second=getpass("Confirm admin password: "); raise SystemExit("Passwords did not match" if first != second else print(generate_password_hash(first)))'
-```
-
-Copy only the resulting `scrypt:...` hash into the protected environment file as
-`ADMIN_PASSWORD_HASH`. Do not paste the hash or password into chat. Keep
+Anyone who can reach an uninitialized setup page can claim the administrator
+account. Complete setup before sharing the onion hostname. Keep
 `ADMIN_USERNAME` at the locally selected value and set `ADMIN_SESSION_HOURS`
-between 1 and 24.
+between 1 and 24 in the external environment.
 
-## Upgrade an existing schema-version-2 database
+The Security link in the administrator navigation changes the password. It
+requires the current password and signs out every active administrator session,
+including the session that submitted the change.
+
+## Upgrade an existing schema-version-2 or schema-version-3 database
 
 1. Keep the payment timer disabled.
 2. Take an online SQLite backup and verify `PRAGMA integrity_check` returns
    exactly `ok`.
 3. Stop `servicesite-web.service`; wallet-RPC may remain active.
 4. Pull the reviewed application revision and install locked dependencies.
-5. Add the three admin settings to the protected environment without printing
-   the file.
+5. Configure `ADMIN_USERNAME` and `ADMIN_SESSION_HOURS`; no password or password
+   hash belongs in the environment file.
 6. Run `SQLiteDatabase.initialize()` using the command in `deploy-xmr.md`.
-7. Start the web service, run runtime preflight, and sign in through Tor.
+7. Start the web service, run runtime preflight, and complete the one-time setup
+   through Tor before sharing the onion hostname.
 
 Do not create or fulfill a real purchase until stagenet payment verification is
 complete. Keep the polling timer disabled until the Task 8 acceptance matrix is

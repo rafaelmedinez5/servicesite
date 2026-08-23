@@ -170,6 +170,7 @@ def test_fresh_schema_initialization_is_idempotent_and_uses_wal(tmp_path):
         "invoice_poll_claims",
         "invoice_sweep_attempts",
         "admin_login_guard",
+        "admin_credentials",
     }
     assert journal_mode.lower() == "wal"
     assert stat.S_IMODE(database_path.stat().st_mode) == 0o600
@@ -213,7 +214,7 @@ def test_schema_version_one_is_upgraded_with_reconciliation_tables(tmp_path):
     finally:
         connection.close()
 
-    assert version == "3"
+    assert version == "4"
     assert {"invoice_poll_claims", "invoice_sweep_attempts"} <= tables
 
 
@@ -229,6 +230,7 @@ def test_schema_version_two_is_upgraded_with_fulfillment_columns(tmp_path):
     connection = database.connect()
     try:
         connection.execute("DROP TABLE admin_login_guard")
+        connection.execute("DROP TABLE admin_credentials")
         connection.execute("DROP INDEX idx_invoices_admin")
         connection.execute("ALTER TABLE invoices DROP COLUMN fulfilled_at")
         connection.execute("ALTER TABLE invoices DROP COLUMN fulfillment_note")
@@ -255,7 +257,7 @@ def test_schema_version_two_is_upgraded_with_fulfillment_columns(tmp_path):
     finally:
         connection.close()
 
-    assert version == "3"
+    assert version == "4"
     assert {"fulfillment_status", "fulfillment_note", "fulfilled_at"} <= columns
     assert guard_exists is not None
     assert repository.get_invoice(invoice.id) == invoice
@@ -263,6 +265,37 @@ def test_schema_version_two_is_upgraded_with_fulfillment_columns(tmp_path):
         repository.get_admin_purchase(invoice.id).fulfillment_status
         is FulfillmentStatus.UNFULFILLED
     )
+
+
+def test_schema_version_three_is_upgraded_with_admin_credentials(tmp_path):
+    database = SQLiteDatabase(tmp_path / "upgrade-v3.db")
+    database.initialize()
+    connection = database.connect()
+    try:
+        connection.execute("DROP TABLE admin_credentials")
+        connection.execute(
+            "UPDATE schema_meta SET value='3' WHERE key='schema_version'"
+        )
+        connection.commit()
+    finally:
+        connection.close()
+
+    database.initialize()
+    repository = ServicesiteRepository(database)
+    connection = database.connect()
+    try:
+        version = connection.execute(
+            "SELECT value FROM schema_meta WHERE key='schema_version'"
+        ).fetchone()[0]
+        credential_table = connection.execute(
+            "SELECT 1 FROM sqlite_master WHERE type='table' AND name='admin_credentials'"
+        ).fetchone()
+    finally:
+        connection.close()
+
+    assert version == "4"
+    assert credential_table is not None
+    assert repository.get_admin_credential() is None
 
 
 def test_each_invoice_gets_a_unique_persisted_subaddress(repository_context):

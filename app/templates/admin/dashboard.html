@@ -17,4 +17,10 @@
     <article class="card"><span>Active categories</span><strong>{{ category_count }}</strong></article>
     <article class="card"><span>Active services</span><strong>{{ service_count }}</strong></article>
   </div>
+  <section class="card admin-form-card">
+    <p class="eyebrow">Account security</p>
+    <h2>Administrator password</h2>
+    <p>Changing the password requires the current password and signs out every active administrator session.</p>
+    <a class="button secondary" href="{{ url_for('admin.password') }}">Change password</a>
+  </section>
 {% endblock %}
