@@ -160,18 +160,18 @@ def checkout(invoice_id: str, status_token: str):
     )
 
 
-@public.get("/checkout/<invoice_id>/<status_token>/qr.svg")
+@public.get("/checkout/<invoice_id>/<status_token>/qr.png")
 def checkout_qr(invoice_id: str, status_token: str):
     invoice = _private_invoice(invoice_id, status_token)
     qr = segno.make(build_monero_uri(invoice), micro=False, error="m")
     output = io.BytesIO()
-    qr.save(output, kind="svg", scale=5, border=2, xmldecl=False, svgns=True)
+    qr.save(output, kind="png", scale=5, border=2, dark="#000", light="#fff")
     return Response(
         output.getvalue(),
         200,
         {
-            "Content-Type": "image/svg+xml; charset=utf-8",
-            "Content-Disposition": 'inline; filename="monero-payment.svg"',
+            "Content-Type": "image/png",
+            "Content-Disposition": 'inline; filename="monero-payment.png"',
         },
     )
 
