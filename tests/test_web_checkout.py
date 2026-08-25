@@ -144,7 +144,7 @@ def _private_urls(invoice):
     base = f"/checkout/{invoice.id}/{invoice.status_token}"
     return {
         "checkout": base,
-        "qr": f"{base}/qr.svg",
+        "qr": f"{base}/qr.png",
         "status": f"/status/{invoice.id}/{invoice.status_token}",
     }
 
@@ -249,13 +249,13 @@ def test_checkout_contains_numeric_monero_uri_and_customer_safe_fields(web_conte
     assert "sweep_txid" not in body
 
 
-def test_qr_is_svg_for_payment_uri_and_does_not_embed_status_token(web_context):
+def test_qr_is_png_for_payment_uri_and_does_not_embed_status_token(web_context):
     invoice, _ = _create_invoice(web_context)
     response = web_context.client.get(_private_urls(invoice)["qr"])
 
     assert response.status_code == 200
-    assert response.mimetype == "image/svg+xml"
-    assert response.get_data().lstrip().startswith(b"<svg")
+    assert response.mimetype == "image/png"
+    assert response.get_data().startswith(b"\x89PNG\r\n\x1a\n")
     assert invoice.status_token.encode() not in response.get_data()
 
 
