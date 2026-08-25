@@ -10,7 +10,7 @@ database, CoinGecko key, payment, or polling job was accessed.
 | `GET` | `/` | Published service catalog and order forms | Public |
 | `POST` | `/checkout` | Validate form, obtain quote, create one invoice | CSRF plus single-use form nonce |
 | `GET` | `/checkout/<invoice_id>/<status_token>` | Locked amount, unique address, expiry, and links | Invoice bearer token |
-| `GET` | `/checkout/<invoice_id>/<status_token>/qr.svg` | Monero payment QR | Invoice bearer token |
+| `GET` | `/checkout/<invoice_id>/<status_token>/qr.png` | Monero payment QR | Invoice bearer token |
 | `GET` | `/status/<invoice_id>/<status_token>` | Customer-safe payment state | Invoice bearer token |
 | `GET` | `/health` | Process health response | Public loopback health check |
 
@@ -46,8 +46,9 @@ There is no hard-coded or cached indefinite fallback.
 
 ## Monero URI and customer state
 
-The QR encodes `monero:<unique-address>?tx_amount=<numeric-decimal>`. The amount
-comes from integer atomic units and contains no `XMR` suffix.
+The PNG QR encodes `monero:<unique-address>?tx_amount=<numeric-decimal>`. PNG is
+used instead of SVG so the QR remains visible at Tor Browser's Safest security
+level. The amount comes from integer atomic units and contains no `XMR` suffix.
 
 Customer pages expose the service snapshot, locked amount, expiry, invoice ID,
 unique payment address where required, confirmation progress, and simplified
