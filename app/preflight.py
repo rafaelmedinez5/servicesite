@@ -139,6 +139,14 @@ def _wallet_is_healthy(settings: Settings) -> bool:
             )
         )
         client.get_height()
+        if settings.xmr_sweep_enabled:
+            validation = client.validate_address(settings.xmr_cold_address)
+            if (
+                not validation.valid
+                or validation.integrated
+                or validation.nettype != "mainnet"
+            ):
+                return False
         return True
     except Exception:
         return False
@@ -247,7 +255,10 @@ def _load_validated_settings(path: Path) -> tuple[Check, Settings | None]:
             and settings.xmr_wallet_rpc_url == "http://127.0.0.1:28088/json_rpc"
             and settings.xmr_min_confirmations == 10
             and settings.xmr_invoice_ttl_seconds == 7200
-            and not settings.xmr_sweep_enabled
+            and (
+                not settings.xmr_sweep_enabled
+                or settings.xmr_sweep_account_index == settings.xmr_account_index
+            )
             and not settings.allow_public_xmr_wallet_rpc
         )
         if not expected:
@@ -585,9 +596,9 @@ def run_preflight(
             Check(
                 "wallet-RPC health",
                 wallet_healthy,
-                "authenticated get_height succeeded without displaying wallet data"
+                "authenticated wallet and enabled sweep-destination checks succeeded"
                 if wallet_healthy
-                else "authenticated get_height failed or configuration is invalid",
+                else "authenticated wallet check or sweep destination validation failed",
             )
         )
 
