@@ -412,6 +412,16 @@ a fresh production backup, and separate operator approval. Before mainnet:
 
 Never grant a service before its invoice reaches `settled`.
 
+### Production sweep activation
+
+The application contains a gated per-invoice `sweep_all` workflow, but changing
+the environment flag is a separate fund-moving approval. Follow the controlled
+activation procedure in `docs/xmr-reconciliation.md`. Runtime preflight validates
+an enabled cold destination as a literal, non-integrated mainnet address through
+the authenticated loopback wallet-RPC without displaying it. Keep the poll timer
+disabled until a minimal new invoice sweeps successfully and receipt is verified
+independently in the cold wallet.
+
 ## ROLLBACK gate
 
 Rollback protects money and evidence; it does not erase the failed deployment.
