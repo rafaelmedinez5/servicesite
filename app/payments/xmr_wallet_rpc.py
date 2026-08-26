@@ -248,6 +248,20 @@ class XmrWalletRpcClient:
         _require_non_negative_int(height, "wallet height", protocol_error=True)
         return height
 
+    def refresh(self) -> None:
+        """Synchronously refresh wallet state before reading transfer history."""
+
+        result = self.rpc_call("refresh")
+        _require_non_negative_int(
+            result.get("blocks_fetched"),
+            "refresh blocks fetched",
+            protocol_error=True,
+        )
+        if not isinstance(result.get("received_money"), bool):
+            raise XmrWalletRpcProtocolError(
+                "refresh returned no valid received-money flag"
+            )
+
     def get_transfers_in(self, account_index: int) -> list[dict[str, Any]]:
         _require_non_negative_int(account_index, "account index")
         result = self.rpc_call("get_transfers", {"in": True, "account_index": account_index})
