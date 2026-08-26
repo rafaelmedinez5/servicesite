@@ -97,6 +97,14 @@ class XmrSubaddress:
 
 
 @dataclass(frozen=True)
+class XmrAddressValidation:
+    valid: bool
+    integrated: bool
+    subaddress: bool
+    nettype: str
+
+
+@dataclass(frozen=True)
 class WalletRpcConfig:
     url: str
     username: str = field(repr=False)
@@ -247,6 +255,36 @@ class XmrWalletRpcClient:
         height = self.rpc_call("get_height").get("height")
         _require_non_negative_int(height, "wallet height", protocol_error=True)
         return height
+
+    def validate_address(self, address: str) -> XmrAddressValidation:
+        """Validate a literal destination against the wallet's current network."""
+
+        if not isinstance(address, str) or not address.strip():
+            raise ValueError("address is required")
+        result = self.rpc_call(
+            "validate_address",
+            {
+                "address": address.strip(),
+                "any_net_type": False,
+                "allow_openalias": False,
+            },
+        )
+        for key in ("valid", "integrated", "subaddress"):
+            if not isinstance(result.get(key), bool):
+                raise XmrWalletRpcProtocolError(
+                    "validate_address returned malformed flags"
+                )
+        nettype = result.get("nettype")
+        if nettype not in {"mainnet", "stagenet", "testnet"}:
+            raise XmrWalletRpcProtocolError(
+                "validate_address returned an invalid network"
+            )
+        return XmrAddressValidation(
+            valid=result["valid"],
+            integrated=result["integrated"],
+            subaddress=result["subaddress"],
+            nettype=nettype,
+        )
 
     def refresh(self) -> None:
         """Synchronously refresh wallet state before reading transfer history."""
