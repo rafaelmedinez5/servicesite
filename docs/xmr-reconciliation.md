@@ -83,6 +83,30 @@ an explicit operator decision. Back up the database before changing this policy,
 monitor all `sweeping_to_cold` errors, and stop automated polling for manual
 reconciliation if an attempt is ambiguous.
 
+## Controlled sweep activation
+
+Sweeping is a policy locked into each invoice when checkout is created. Changing
+`XMR_SWEEP_ENABLED` affects only new invoices; an invoice created while sweeping
+was disabled may settle without a sweep. The production activation sequence is:
+
+1. Disable the poll timer and take a verified SQLite backup.
+2. Put a literal cold-wallet address in the external environment file without
+   printing it or placing it in shell history. OpenAlias is not accepted.
+3. Set `XMR_SWEEP_ENABLED=true` and keep `XMR_SWEEP_ACCOUNT_INDEX` equal to
+   `XMR_ACCOUNT_INDEX`.
+4. Run runtime preflight while the old web process is still loaded. wallet-RPC
+   validates the destination against its current network; only a valid,
+   non-integrated mainnet standard address or subaddress passes. Output never
+   includes the address.
+5. Restart the web service, create a minimal new invoice, and perform one
+   operator-approved mainnet payment with the timer still disabled.
+6. After the required deposit confirmations, run one manual poll. Verify the
+   invoice has one stored sweep transaction ID and independently confirm receipt
+   in the cold wallet before enabling the timer.
+
+If destination validation fails, do not restart the web process. Restore
+`XMR_SWEEP_ENABLED=false`, investigate locally, and keep the timer disabled.
+
 ## Sanitized observability
 
 The endpoint returns only counters: open, processed, locked, expired, partial,
