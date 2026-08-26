@@ -13,6 +13,7 @@ from app.preflight import (
     render_report,
     run_preflight,
 )
+from app.payments.xmr_wallet_rpc import XmrAddressValidation
 
 
 APPLICATION_SECRET = "application-secret-used-only-by-preflight-tests"
@@ -190,6 +191,128 @@ def test_runtime_preflight_checks_only_harmless_health_operations(tmp_path):
     flattened = "\n".join(" ".join(command) for command in runner.commands)
     for forbidden in (" start ", " stop ", " restart ", " enable ", " disable ", "daemon-reload"):
         assert forbidden not in f" {flattened} "
+
+
+def test_runtime_preflight_accepts_only_valid_mainnet_sweep_destination(
+    tmp_path, monkeypatch
+):
+    paths = _make_paths(tmp_path)
+    environment = paths.environment_file.read_text().replace(
+        "XMR_SWEEP_ENABLED=false",
+        "XMR_SWEEP_ENABLED=true\n"
+        "XMR_COLD_ADDRESS=test-only-private-cold-destination",
+    )
+    paths.environment_file.write_text(environment)
+    paths.installed_unit_directory.mkdir()
+    for unit in EXPECTED_UNITS:
+        source = paths.source_unit_directory / unit
+        installed = paths.installed_unit_directory / unit
+        installed.write_bytes(source.read_bytes())
+        installed.chmod(0o644)
+    observed = {"address": None}
+
+    class FakeWalletClient:
+        def __init__(self, _config):
+            pass
+
+        def get_height(self):
+            return 123
+
+        def validate_address(self, address):
+            observed["address"] = address
+            return XmrAddressValidation(
+                valid=True,
+                integrated=False,
+                subaddress=False,
+                nettype="mainnet",
+            )
+
+    monkeypatch.setattr("app.preflight.XmrWalletRpcClient", FakeWalletClient)
+    checks = run_preflight(
+        paths,
+        phase="runtime",
+        identity_resolver=_identity,
+        runner=FakeRunner(),
+        port_probe=lambda _host, _port: True,
+        web_probe=lambda: True,
+    )
+    output = io.StringIO()
+
+    assert render_report(checks, output)
+    assert observed["address"] == "test-only-private-cold-destination"
+    assert observed["address"] not in output.getvalue()
+
+
+def test_runtime_preflight_rejects_integrated_sweep_destination(
+    tmp_path, monkeypatch
+):
+    paths = _make_paths(tmp_path)
+    environment = paths.environment_file.read_text().replace(
+        "XMR_SWEEP_ENABLED=false",
+        "XMR_SWEEP_ENABLED=true\n"
+        "XMR_COLD_ADDRESS=test-only-private-cold-destination",
+    )
+    paths.environment_file.write_text(environment)
+    paths.installed_unit_directory.mkdir()
+    for unit in EXPECTED_UNITS:
+        source = paths.source_unit_directory / unit
+        installed = paths.installed_unit_directory / unit
+        installed.write_bytes(source.read_bytes())
+        installed.chmod(0o644)
+
+    class FakeWalletClient:
+        def __init__(self, _config):
+            pass
+
+        def get_height(self):
+            return 123
+
+        def validate_address(self, _address):
+            return XmrAddressValidation(
+                valid=True,
+                integrated=True,
+                subaddress=False,
+                nettype="mainnet",
+            )
+
+    monkeypatch.setattr("app.preflight.XmrWalletRpcClient", FakeWalletClient)
+    checks = run_preflight(
+        paths,
+        phase="runtime",
+        identity_resolver=_identity,
+        runner=FakeRunner(),
+        port_probe=lambda _host, _port: True,
+        web_probe=lambda: True,
+    )
+
+    wallet_check = next(check for check in checks if check.name == "wallet-RPC health")
+    assert not wallet_check.passed
+    assert "test-only-private-cold-destination" not in wallet_check.detail
+
+
+def test_preflight_rejects_mismatched_sweep_account(tmp_path):
+    paths = _make_paths(tmp_path)
+    environment = paths.environment_file.read_text().replace(
+        "XMR_SWEEP_ENABLED=false",
+        "XMR_SWEEP_ENABLED=true\n"
+        "XMR_COLD_ADDRESS=test-only-private-cold-destination\n"
+        "XMR_SWEEP_ACCOUNT_INDEX=1",
+    )
+    paths.environment_file.write_text(environment)
+
+    checks = run_preflight(
+        paths,
+        phase="install",
+        identity_resolver=_identity,
+        runner=FakeRunner(),
+        port_probe=lambda _host, _port: False,
+    )
+
+    settings_check = next(
+        check for check in checks if check.name == "application environment"
+    )
+    assert not settings_check.passed
+    assert "test-only-private-cold-destination" not in settings_check.detail
 
 
 def test_preflight_rejects_private_file_with_group_access(tmp_path):
