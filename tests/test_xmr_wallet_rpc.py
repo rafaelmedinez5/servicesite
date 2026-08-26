@@ -236,6 +236,37 @@ def test_subaddress_result_is_parsed_with_both_indexes():
     }
 
 
+def test_refresh_is_synchronous_and_validates_result():
+    session = FakeSession(
+        [FakeResponse({"result": {"blocks_fetched": 12, "received_money": True}})]
+    )
+    client = XmrWalletRpcClient(rpc_config(), session=session)
+
+    assert client.refresh() is None
+    assert session.calls[0]["json"]["method"] == "refresh"
+    assert session.calls[0]["json"]["params"] == {}
+
+
+@pytest.mark.parametrize(
+    "result",
+    [
+        {"blocks_fetched": -1, "received_money": False},
+        {"blocks_fetched": "12", "received_money": False},
+        {"blocks_fetched": 12, "received_money": 1},
+        {"blocks_fetched": 12},
+    ],
+)
+def test_refresh_rejects_malformed_result(result):
+    client = XmrWalletRpcClient(
+        rpc_config(),
+        session=FakeSession([FakeResponse({"result": result})]),
+        sleeper=lambda _: None,
+    )
+
+    with pytest.raises(XmrWalletRpcProtocolError):
+        client.refresh()
+
+
 def test_transfer_and_sweep_methods_preserve_required_parameters():
     session = FakeSession(
         [
