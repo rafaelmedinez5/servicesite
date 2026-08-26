@@ -9,6 +9,7 @@ from requests.auth import HTTPDigestAuth
 from app.payments.xmr_wallet_rpc import (
     MAX_ATOMIC_UNITS,
     WalletRpcConfig,
+    XmrAddressValidation,
     XmrAmountError,
     XmrWalletRpcClient,
     XmrWalletRpcHttpError,
@@ -265,6 +266,53 @@ def test_refresh_rejects_malformed_result(result):
 
     with pytest.raises(XmrWalletRpcProtocolError):
         client.refresh()
+
+
+def test_validate_address_is_network_restricted_and_parsed():
+    session = FakeSession(
+        [
+            FakeResponse(
+                {
+                    "result": {
+                        "valid": True,
+                        "integrated": False,
+                        "subaddress": True,
+                        "nettype": "mainnet",
+                    }
+                }
+            )
+        ]
+    )
+    client = XmrWalletRpcClient(rpc_config(), session=session)
+
+    assert client.validate_address("test-only-cold-address") == XmrAddressValidation(
+        valid=True,
+        integrated=False,
+        subaddress=True,
+        nettype="mainnet",
+    )
+    assert session.calls[0]["json"]["params"] == {
+        "address": "test-only-cold-address",
+        "any_net_type": False,
+        "allow_openalias": False,
+    }
+
+
+@pytest.mark.parametrize(
+    "result",
+    [
+        {"valid": 1, "integrated": False, "subaddress": False, "nettype": "mainnet"},
+        {"valid": True, "integrated": None, "subaddress": False, "nettype": "mainnet"},
+        {"valid": True, "integrated": False, "subaddress": False, "nettype": "other"},
+    ],
+)
+def test_validate_address_rejects_malformed_result(result):
+    client = XmrWalletRpcClient(
+        rpc_config(), session=FakeSession([FakeResponse({"result": result})])
+    )
+
+    with pytest.raises(XmrWalletRpcProtocolError):
+        client.validate_address("test-only-cold-address")
 
 
 def test_transfer_and_sweep_methods_preserve_required_parameters():
