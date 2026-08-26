@@ -42,13 +42,22 @@ class CreationWallet:
 
 
 class FakeReconciliationWallet:
-    def __init__(self, *, incoming=None, outgoing=None, sweep_outcomes=None):
+    def __init__(
+        self, *, refresh_outcome=None, incoming=None, outgoing=None, sweep_outcomes=None
+    ):
+        self.refresh_outcome = refresh_outcome
         self.incoming = incoming if incoming is not None else []
         self.outgoing = outgoing if outgoing is not None else []
         self.sweep_outcomes = list(sweep_outcomes or [])
+        self.refresh_calls = 0
         self.incoming_calls = []
         self.outgoing_calls = []
         self.sweep_calls = []
+
+    def refresh(self):
+        self.refresh_calls += 1
+        if isinstance(self.refresh_outcome, Exception):
+            raise self.refresh_outcome
 
     def get_transfers_in(self, account_index):
         self.incoming_calls.append(account_index)
@@ -321,6 +330,49 @@ def test_rpc_unavailable_leaves_invoice_unchanged(reconciliation_context):
         _service(reconciliation_context, wallet).poll()
 
     assert reconciliation_context.repository.get_invoice(invoice.id) == invoice
+
+
+def test_refresh_outage_past_expiry_leaves_invoice_unchanged(
+    reconciliation_context,
+):
+    invoice = _invoice(reconciliation_context)
+    wallet = FakeReconciliationWallet(
+        refresh_outcome=XmrWalletRpcTransportError("test-only refresh outage")
+    )
+
+    with pytest.raises(XmrReconciliationUnavailable):
+        _service(
+            reconciliation_context,
+            wallet,
+            now=invoice.expires_at + timedelta(minutes=1),
+        ).poll()
+
+    assert wallet.refresh_calls == 1
+    assert wallet.incoming_calls == []
+    assert reconciliation_context.repository.get_invoice(invoice.id) == invoice
+
+
+def test_late_confirmed_payment_settles_after_successful_refresh(
+    reconciliation_context,
+):
+    invoice = _invoice(reconciliation_context, sweep_required=False)
+    wallet = FakeReconciliationWallet(
+        incoming=[_incoming(invoice, confirmations=10)]
+    )
+
+    summary = _service(
+        reconciliation_context,
+        wallet,
+        now=invoice.expires_at + timedelta(minutes=1),
+    ).poll()
+    stored = reconciliation_context.repository.get_invoice(invoice.id)
+
+    assert wallet.refresh_calls == 1
+    assert wallet.incoming_calls == [7]
+    assert summary.settled == 1
+    assert summary.expired == 0
+    assert stored.status is PaymentStatus.SETTLED
+    assert stored.expired_at is None
 
 
 def test_confirmed_sweep_invoice_waits_without_expiring_when_sweep_gate_is_off(
