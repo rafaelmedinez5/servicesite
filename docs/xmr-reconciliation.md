@@ -20,11 +20,12 @@ wallet refresh.
 
 ## Observation and state rules
 
-Each poll reads only open invoice states and fetches incoming transfers for the
-configured wallet account. An invoice accepts a transfer only when both its
-account index and unique subaddress index match. Amounts are summed as integer
-atomic units. The stored confirmation value represents the lowest confirmation
-count among the transfers needed to cover the locked expected amount.
+Each poll reads only open invoice states, synchronously refreshes the wallet,
+and then fetches incoming transfers for the configured wallet account. An
+invoice accepts a transfer only when both its account index and unique
+subaddress index match. Amounts are summed as integer atomic units. The stored
+confirmation value represents the lowest confirmation count among the transfers
+needed to cover the locked expected amount.
 
 - zero payment remains awaiting until expiry;
 - a partial payment never settles;
@@ -36,9 +37,13 @@ count among the transfers needed to cover the locked expected amount.
   directly;
 - fulfillment remains unavailable until payment status is `settled`.
 
-Wallet-history outage or malformed history aborts the poll before observations
-are changed. Per-invoice SQLite leases keep overlapping processes from working
-the same invoice; expired leases recover after a crashed poller.
+A wallet refresh failure, wallet-history outage, or malformed history aborts the
+poll before observations or expiry state are changed. Cached history is never
+used as proof that an invoice received no payment. After connectivity recovers,
+a confirmed payment visible in the refreshed history can settle even when the
+invoice's original expiry time has passed. Per-invoice SQLite leases keep
+overlapping processes from working the same invoice; expired leases recover
+after a crashed poller.
 
 ## Sweep protocol
 
@@ -89,8 +94,9 @@ destinations, credentials, RPC response bodies, or remote error messages.
 ## Verification boundary
 
 Automated tests cover zero/partial/exact/overpayment, confirmation coverage,
-expiry, account-plus-subaddress matching, wallet outage, disabled sweep, success,
-explicit rejection and retry, stored transaction IDs, response loss, malformed
-success, outgoing reconciliation, delayed retry, concurrent poll exclusion, and
+expiry, account-plus-subaddress matching, refresh and wallet-history outages,
+late confirmed payment recovery, disabled sweep, success, explicit rejection
+and retry, stored transaction IDs, response loss, malformed success, outgoing
+reconciliation, delayed retry, concurrent poll exclusion, and
 loopback-plus-token enforcement. These fakes prove application behavior only;
 they do not prove wallet version compatibility or production fund safety.
