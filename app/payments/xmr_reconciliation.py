@@ -32,6 +32,8 @@ class XmrSweepUncertainError(XmrReconciliationError):
 
 
 class ReconciliationWallet(Protocol):
+    def refresh(self) -> None: ...
+
     def get_transfers_in(self, account_index: int) -> list[dict[str, Any]]: ...
 
     def get_transfers_out(self, account_index: int) -> list[dict[str, Any]]: ...
@@ -154,11 +156,12 @@ class XmrReconciliationService:
             return summary
 
         try:
+            self.wallet.refresh()
             raw_transfers = self.wallet.get_transfers_in(self.config.account_index)
             transfers = [_parse_incoming_transfer(item) for item in raw_transfers]
         except (XmrWalletRpcError, XmrTransferDataError) as exc:
             raise XmrReconciliationUnavailable(
-                "incoming wallet history is unavailable"
+                "refreshed incoming wallet history is unavailable"
             ) from exc
 
         for listed_invoice in invoices:
