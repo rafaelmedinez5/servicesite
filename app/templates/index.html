@@ -77,15 +77,10 @@
                 </div>
                 <div class="service-action">
                   <div>
-                    <span>Starting at</span>
+                    <span>Price</span>
                     <p class="price">{{ service.price_usd_cents|usd }}</p>
                   </div>
-                  <form method="post" action="{{ url_for('public.create_checkout') }}">
-                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                    <input type="hidden" name="checkout_nonce" value="{{ checkout_nonce }}">
-                    <input type="hidden" name="service_id" value="{{ service.service_id }}">
-                    <button type="submit">Create XMR invoice <span aria-hidden="true">&#8594;</span></button>
-                  </form>
+                  <a class="button" href="{{ url_for('public.service_detail', service_slug=service.service_slug) }}">View service <span aria-hidden="true">&#8594;</span></a>
                 </div>
               </article>
             {% endfor %}

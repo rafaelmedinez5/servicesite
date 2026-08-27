@@ -404,6 +404,38 @@ class ServicesiteRepository:
         finally:
             connection.close()
 
+    def get_purchasable_service_by_slug(
+        self, service_slug: str
+    ) -> PurchasableService | None:
+        connection = self.database.connect()
+        try:
+            row = connection.execute(
+                """
+                SELECT
+                    s.id AS service_id,
+                    s.slug AS service_slug,
+                    s.version AS service_version,
+                    s.name AS service_name,
+                    s.description AS service_description,
+                    s.duration_label,
+                    s.price_usd_cents,
+                    c.id AS category_id,
+                    c.name AS category_name,
+                    c.description AS category_description
+                FROM services AS s
+                JOIN categories AS c ON c.id=s.category_id
+                WHERE s.slug=?
+                  AND s.published=1 AND s.archived=0
+                  AND c.published=1 AND c.archived=0
+                """,
+                (service_slug,),
+            ).fetchone()
+            if row is None:
+                return None
+            return _row_to_purchasable_service(row)
+        finally:
+            connection.close()
+
     def list_purchasable_services(self) -> list[PurchasableService]:
         connection = self.database.connect()
         try:
@@ -411,6 +443,7 @@ class ServicesiteRepository:
                 """
                 SELECT
                     s.id AS service_id,
+                    s.slug AS service_slug,
                     s.version AS service_version,
                     s.name AS service_name,
                     s.description AS service_description,
@@ -1009,6 +1042,7 @@ def _fetch_purchasable_service(
         """
         SELECT
             s.id AS service_id,
+            s.slug AS service_slug,
             s.version AS service_version,
             s.name AS service_name,
             s.description AS service_description,
@@ -1033,6 +1067,7 @@ def _fetch_purchasable_service(
 def _row_to_purchasable_service(row: sqlite3.Row) -> PurchasableService:
     return PurchasableService(
         service_id=row["service_id"],
+        service_slug=row["service_slug"],
         service_version=int(row["service_version"]),
         service_name=row["service_name"],
         service_description=row["service_description"],

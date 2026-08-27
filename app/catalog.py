@@ -100,6 +100,7 @@ class ServiceRecord:
 @dataclass(frozen=True)
 class PurchasableService:
     service_id: str
+    service_slug: str
     service_version: int
     service_name: str
     service_description: str
