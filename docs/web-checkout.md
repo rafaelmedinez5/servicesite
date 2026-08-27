@@ -8,8 +8,12 @@ database, CoinGecko key, payment, or polling job was accessed.
 | Method | Route | Purpose | Access |
 | --- | --- | --- | --- |
 | `GET` | `/` | Published service catalog and service-detail links | Public |
-| `GET` | `/services/<service_slug>` | Published service information and order form | Public |
-| `POST` | `/checkout` | Validate form, obtain quote, create one invoice | CSRF plus single-use form nonce |
+| `GET` | `/services/<service_slug>` | Published service information and account handoff/order form | Public |
+| `GET, POST` | `/register` | Create a customer username and password | Public form; CSRF on submit |
+| `GET, POST` | `/login` | Start a customer session | Public form; CSRF and per-account rate limit |
+| `GET` | `/account` | Show the signed-in customer account | Customer session |
+| `POST` | `/logout` | End the customer session | Customer session plus CSRF |
+| `POST` | `/checkout` | Validate form, obtain quote, create one invoice | Customer session, CSRF, and single-use form nonce |
 | `GET` | `/checkout/<invoice_id>/<status_token>` | Locked amount, unique address, expiry, and links | Invoice bearer token |
 | `GET` | `/checkout/<invoice_id>/<status_token>/qr.png` | Monero payment QR | Invoice bearer token |
 | `GET` | `/status/<invoice_id>/<status_token>` | Customer-safe payment state | Invoice bearer token |
@@ -35,8 +39,12 @@ There is no hard-coded or cached indefinite fallback.
 ## Form and route security
 
 - The signed Flask session carries a strong CSRF token.
-- Each published service-detail response issues a separate, single-use checkout
-  nonce. The catalog does not issue checkout tokens or create invoices directly.
+- Published service details remain public, but only a signed-in customer sees
+  the purchase form. Anonymous requests receive login and registration links,
+  and a direct anonymous checkout POST is rejected before rate or wallet access.
+- Each signed-in service-detail response issues a separate, single-use checkout
+  nonce. The catalog and anonymous detail pages do not issue checkout tokens or
+  create invoices directly.
   Replaying a successful detail-page form cannot create a second invoice.
 - Unknown, unpublished, archived, or category-hidden service slugs return the
   same generic 404 response and do not reveal catalog state.

@@ -20,7 +20,7 @@ from app.payments.invoice import (
 from app.payments.xmr_wallet_rpc import MAX_ATOMIC_UNITS
 
 
-SCHEMA_VERSION = 4
+SCHEMA_VERSION = 5
 
 
 class PersistenceError(RuntimeError):
@@ -64,6 +64,16 @@ class FulfillmentStatus(str, Enum):
 class AdminCredential:
     password_hash: str = field(repr=False)
     version: int
+    created_at: datetime
+    updated_at: datetime
+
+
+@dataclass(frozen=True)
+class CustomerAccount:
+    id: str
+    username: str
+    password_hash: str = field(repr=False)
+    credential_version: int
     created_at: datetime
     updated_at: datetime
 
@@ -140,13 +150,19 @@ class SQLiteDatabase:
                         "INSERT INTO schema_meta(key, value) VALUES ('schema_version', ?)",
                         (str(SCHEMA_VERSION),),
                     )
-                elif previous_version not in {"1", "2", "3", str(SCHEMA_VERSION)}:
+                elif previous_version not in {
+                    "1",
+                    "2",
+                    "3",
+                    "4",
+                    str(SCHEMA_VERSION),
+                }:
                     raise SchemaVersionError("database schema version is unsupported")
 
                 if previous_version in {"1", "2"}:
                     _ensure_fulfillment_columns(connection)
                 connection.executescript(_SCHEMA_SQL)
-                if previous_version in {"1", "2", "3"}:
+                if previous_version in {"1", "2", "3", "4"}:
                     connection.execute(
                         "UPDATE schema_meta SET value=? WHERE key='schema_version'",
                         (str(SCHEMA_VERSION),),
@@ -683,6 +699,125 @@ class ServicesiteRepository:
         with self.database.transaction(immediate=True) as connection:
             connection.execute("DELETE FROM admin_login_guard WHERE id=1")
 
+    def create_customer_account(
+        self,
+        *,
+        customer_id: str,
+        username: str,
+        password_hash: str,
+        now: datetime,
+    ) -> CustomerAccount | None:
+        _validate_customer_id(customer_id)
+        _validate_customer_username(username)
+        _validate_customer_password_hash(password_hash)
+        _require_aware_datetime(now, "customer account creation time")
+        serialized_now = _serialize_datetime(now)
+        with self.database.transaction(immediate=True) as connection:
+            cursor = connection.execute(
+                """
+                INSERT OR IGNORE INTO customer_accounts(
+                    id, username, password_hash, credential_version, created_at, updated_at
+                ) VALUES (?, ?, ?, 1, ?, ?)
+                """,
+                (customer_id, username, password_hash, serialized_now, serialized_now),
+            )
+            if cursor.rowcount != 1:
+                return None
+            row = connection.execute(
+                "SELECT * FROM customer_accounts WHERE id=?", (customer_id,)
+            ).fetchone()
+            return _row_to_customer_account(row)
+
+    def get_customer_account_by_id(self, customer_id: str) -> CustomerAccount | None:
+        if not isinstance(customer_id, str) or not 16 <= len(customer_id) <= 64:
+            return None
+        connection = self.database.connect()
+        try:
+            row = connection.execute(
+                "SELECT * FROM customer_accounts WHERE id=?", (customer_id,)
+            ).fetchone()
+            return _row_to_customer_account(row) if row is not None else None
+        finally:
+            connection.close()
+
+    def get_customer_account_by_username(self, username: str) -> CustomerAccount | None:
+        if not isinstance(username, str) or not 3 <= len(username) <= 32:
+            return None
+        connection = self.database.connect()
+        try:
+            row = connection.execute(
+                "SELECT * FROM customer_accounts WHERE username=? COLLATE NOCASE",
+                (username,),
+            ).fetchone()
+            return _row_to_customer_account(row) if row is not None else None
+        finally:
+            connection.close()
+
+    def customer_login_allowed(self, customer_id: str, *, now: datetime) -> bool:
+        _validate_customer_id(customer_id)
+        _require_aware_datetime(now, "customer login attempt time")
+        connection = self.database.connect()
+        try:
+            row = connection.execute(
+                "SELECT blocked_until FROM customer_login_guard WHERE customer_id=?",
+                (customer_id,),
+            ).fetchone()
+            return (
+                row is None
+                or row["blocked_until"] is None
+                or _parse_datetime(row["blocked_until"]) <= now
+            )
+        finally:
+            connection.close()
+
+    def record_customer_login_failure(
+        self,
+        customer_id: str,
+        *,
+        now: datetime,
+        maximum_attempts: int = 5,
+        window: timedelta = timedelta(minutes=15),
+        block_for: timedelta = timedelta(minutes=15),
+    ) -> None:
+        _validate_customer_id(customer_id)
+        _require_aware_datetime(now, "customer login failure time")
+        with self.database.transaction(immediate=True) as connection:
+            row = connection.execute(
+                "SELECT * FROM customer_login_guard WHERE customer_id=?",
+                (customer_id,),
+            ).fetchone()
+            if row is None or _parse_datetime(row["window_started_at"]) + window <= now:
+                window_started_at = now
+                failure_count = 1
+            else:
+                window_started_at = _parse_datetime(row["window_started_at"])
+                failure_count = int(row["failure_count"]) + 1
+            blocked_until = now + block_for if failure_count >= maximum_attempts else None
+            connection.execute(
+                """
+                INSERT INTO customer_login_guard(
+                    customer_id, window_started_at, failure_count, blocked_until
+                ) VALUES (?, ?, ?, ?)
+                ON CONFLICT(customer_id) DO UPDATE SET
+                    window_started_at=excluded.window_started_at,
+                    failure_count=excluded.failure_count,
+                    blocked_until=excluded.blocked_until
+                """,
+                (
+                    customer_id,
+                    _serialize_datetime(window_started_at),
+                    failure_count,
+                    _serialize_optional_datetime(blocked_until),
+                ),
+            )
+
+    def clear_customer_login_failures(self, customer_id: str) -> None:
+        _validate_customer_id(customer_id)
+        with self.database.transaction(immediate=True) as connection:
+            connection.execute(
+                "DELETE FROM customer_login_guard WHERE customer_id=?", (customer_id,)
+            )
+
     def get_admin_credential(self) -> AdminCredential | None:
         connection = self.database.connect()
         try:
@@ -1142,6 +1277,17 @@ def _row_to_admin_credential(row: sqlite3.Row) -> AdminCredential:
     )
 
 
+def _row_to_customer_account(row: sqlite3.Row) -> CustomerAccount:
+    return CustomerAccount(
+        id=row["id"],
+        username=row["username"],
+        password_hash=row["password_hash"],
+        credential_version=int(row["credential_version"]),
+        created_at=_parse_datetime(row["created_at"]),
+        updated_at=_parse_datetime(row["updated_at"]),
+    )
+
+
 def _require_invoice(connection: sqlite3.Connection, invoice_id: str) -> Invoice:
     row = connection.execute(
         "SELECT * FROM invoices WHERE id=?", (invoice_id,)
@@ -1271,6 +1417,33 @@ def _validate_admin_password_hash(value: str) -> None:
         raise PersistenceError("admin password hash is invalid")
 
 
+def _validate_customer_id(value: str) -> None:
+    if not isinstance(value, str) or not 16 <= len(value) <= 64:
+        raise PersistenceError("customer ID is invalid")
+
+
+def _validate_customer_username(value: str) -> None:
+    allowed = set("abcdefghijklmnopqrstuvwxyz0123456789._-")
+    if (
+        not isinstance(value, str)
+        or not 3 <= len(value) <= 32
+        or value != value.lower()
+        or value[0] not in allowed - {".", "_", "-"}
+        or value[-1] not in allowed - {".", "_", "-"}
+        or any(character not in allowed for character in value)
+    ):
+        raise PersistenceError("customer username is invalid")
+
+
+def _validate_customer_password_hash(value: str) -> None:
+    if (
+        not isinstance(value, str)
+        or not 32 <= len(value) <= 1_024
+        or not value.startswith(("scrypt:", "pbkdf2:"))
+    ):
+        raise PersistenceError("customer password hash is invalid")
+
+
 def _ensure_fulfillment_columns(connection: sqlite3.Connection) -> None:
     columns = {
         row["name"] for row in connection.execute("PRAGMA table_info(invoices)")
@@ -1381,6 +1554,23 @@ CREATE TABLE IF NOT EXISTS admin_credentials (
     credential_version INTEGER NOT NULL CHECK (credential_version > 0),
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS customer_accounts (
+    id TEXT PRIMARY KEY,
+    username TEXT NOT NULL UNIQUE COLLATE NOCASE,
+    password_hash TEXT NOT NULL,
+    credential_version INTEGER NOT NULL CHECK (credential_version > 0),
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    CHECK (length(username) BETWEEN 3 AND 32)
+);
+
+CREATE TABLE IF NOT EXISTS customer_login_guard (
+    customer_id TEXT PRIMARY KEY REFERENCES customer_accounts(id) ON DELETE CASCADE,
+    window_started_at TEXT NOT NULL,
+    failure_count INTEGER NOT NULL CHECK (failure_count >= 0),
+    blocked_until TEXT
 );
 
 CREATE TABLE IF NOT EXISTS invoice_poll_claims (

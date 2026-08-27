@@ -5,14 +5,15 @@ reconciliation layer; no production database or wallet was accessed.
 
 ## Fresh database boundary
 
-`SQLiteDatabase.initialize()` creates schema version 4 with WAL mode and applies
+`SQLiteDatabase.initialize()` creates schema version 5 with WAL mode and applies
 mode `0600` to the database file. Initialization is idempotent for a recognized
 `servicesite` database. If a database already contains tables but has no
 `servicesite` schema marker, initialization refuses it instead of treating a
-legacy database as compatible. Recognized schema versions 1 through 3 are
+legacy database as compatible. Recognized schema versions 1 through 4 are
 upgraded in place; version 3 adds fulfillment fields and the admin login guard,
-and version 4 adds the singleton administrator credential table without
-altering payment amounts, addresses, tokens, or transaction identifiers.
+version 4 adds the singleton administrator credential table, and version 5 adds
+customer accounts and per-account login guards without altering payment
+amounts, addresses, tokens, or transaction identifiers.
 
 The production parent directory must already exist with operator-reviewed
 ownership and permissions. The application does not copy or inspect the legacy
@@ -65,6 +66,13 @@ The singleton credential row stores only a generated Werkzeug password hash,
 credential version, and timestamps. The version increments on password change
 so every older admin session becomes invalid. The separate login guard stores
 only the global failure window and temporary block state.
+
+### `customer_accounts` and `customer_login_guard`
+
+Customer rows store a strong opaque ID, normalized unique username, generated
+password hash, credential version, and timestamps. Plaintext passwords are
+never persisted. The separate guard stores only the failed-login window and
+temporary block for one existing customer account.
 
 ## Canonical creation path
 

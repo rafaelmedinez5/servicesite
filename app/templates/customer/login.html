@@ -1,0 +1,39 @@
+{% set private_page = true %}
+{% extends "base.html" %}
+
+{% block title %}Log in | Servicesite{% endblock %}
+
+{% block content %}
+  <section class="auth-layout" aria-labelledby="login-title">
+    <div class="auth-intro">
+      <p class="eyebrow"><span class="eyebrow-line" aria-hidden="true"></span>Customer access</p>
+      <h1 id="login-title">Welcome back.</h1>
+      <p class="lede">Sign in before creating a Monero invoice. Service details remain available to browse without an account.</p>
+      <ul class="auth-assurances">
+        <li><span aria-hidden="true">01</span>Account sessions expire automatically.</li>
+        <li><span aria-hidden="true">02</span>Repeated failed logins are temporarily blocked.</li>
+        <li><span aria-hidden="true">03</span>Checkout still uses a private, single-use invoice request.</li>
+      </ul>
+    </div>
+
+    <div class="card auth-card">
+      <p class="terminal-label">Customer login</p>
+      <h2>Enter your credentials</h2>
+      {% if error %}<p class="form-error" role="alert">{{ error }}</p>{% endif %}
+      <form class="admin-form" method="post" action="{{ url_for('customer.login') }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        {% if next_path %}<input type="hidden" name="next" value="{{ next_path }}">{% endif %}
+        <label>
+          Username
+          <input name="username" value="{{ username or '' }}" maxlength="32" autocomplete="username" autocapitalize="none" spellcheck="false" required autofocus>
+        </label>
+        <label>
+          Password
+          <input type="password" name="password" maxlength="1024" autocomplete="current-password" required>
+        </label>
+        <button type="submit">Log in <span aria-hidden="true">&#8594;</span></button>
+      </form>
+      <p class="auth-switch">Need an account? <a href="{{ url_for('customer.register', next=next_path) if next_path else url_for('customer.register') }}">Create one</a></p>
+    </div>
+  </section>
+{% endblock %}

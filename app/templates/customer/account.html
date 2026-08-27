@@ -1,0 +1,31 @@
+{% set private_page = true %}
+{% extends "base.html" %}
+
+{% block title %}Your account | Servicesite{% endblock %}
+
+{% block content %}
+  <section class="account-layout" aria-labelledby="account-title">
+    <div>
+      <p class="eyebrow"><span class="eyebrow-line" aria-hidden="true"></span>Customer account</p>
+      <h1 id="account-title">Signed in as @{{ g.customer.username }}</h1>
+      <p class="lede">Your account is ready for secure checkout. Browse the catalog and choose a service when you are ready.</p>
+      <div class="hero-actions">
+        <a class="button" href="{{ url_for('public.index') }}#services">Browse services <span aria-hidden="true">&#8594;</span></a>
+        <form method="post" action="{{ url_for('customer.logout') }}">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <button class="button secondary" type="submit">Log out</button>
+        </form>
+      </div>
+    </div>
+    <aside class="card account-card" aria-labelledby="account-security-title">
+      <p class="terminal-label">Account security</p>
+      <h2 id="account-security-title">Your session is protected.</h2>
+      <dl class="account-facts">
+        <div><dt>Username</dt><dd>@{{ g.customer.username }}</dd></div>
+        <div><dt>Session</dt><dd>Automatic expiry enabled</dd></div>
+        <div><dt>Checkout</dt><dd>Sign-in required</dd></div>
+      </dl>
+      <p class="account-note">Password recovery is not available yet. Store your credentials in a password manager.</p>
+    </aside>
+  </section>
+{% endblock %}

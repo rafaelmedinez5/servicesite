@@ -108,13 +108,17 @@ def service_detail(service_slug: str):
     return render_template(
         "service_detail.html",
         service=service,
-        checkout_nonce=issue_checkout_nonce(),
+        checkout_nonce=issue_checkout_nonce() if g.customer is not None else None,
     )
 
 
 @public.post("/checkout")
 def create_checkout():
     _mark_private()
+    if g.customer is None:
+        return redirect(
+            url_for("customer.login", next=url_for("public.index")), code=303
+        )
     try:
         require_csrf(request.form.get("csrf_token"))
         service_id = request.form.get("service_id", "")

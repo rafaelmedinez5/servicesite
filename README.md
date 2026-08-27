@@ -1,7 +1,8 @@
 # servicesite
 
-Server-rendered Flask service catalog with XMR-only checkout, an authenticated
-admin-managed catalog, purchase visibility, and manual fulfillment.
+Server-rendered Flask service catalog with customer accounts, account-gated
+XMR-only checkout, an authenticated admin-managed catalog, purchase visibility,
+and manual fulfillment.
 
 Tasks 0 through 7 establish the application boundary, source inventory, strict
 configuration contract, isolated XMR wallet-RPC transport, fresh SQLite schema,
@@ -30,6 +31,7 @@ verification and production cutover remain deferred.
 app/
   __init__.py             Flask application factory and Task 0 routes
   admin.py                authenticated catalog, purchase, and fulfillment routes
+  customer_auth.py        customer registration, login, logout, and session loading
   catalog.py              validated minimal category/service records
   config.py               typed startup and XMR configuration validation
   persistence.py          fresh SQLite schema and transactional repositories
@@ -44,6 +46,7 @@ app/
   static/css/style.css    local CSS
   templates/index.html    public service catalog
   templates/service_detail.html  individual service information and purchase form
+  templates/customer/     customer registration, login, and account views
 deploy/systemd/           sanitized web, poll, timer, and wallet-RPC units
 docs/
   architecture.md
@@ -55,6 +58,7 @@ docs/
   invoice-domain.md
   systemd-install.md
   web-checkout.md
+  customer-accounts.md
   xmr-reconciliation.md
   xmr-source-inventory.md
   xmr-wallet-rpc.md
