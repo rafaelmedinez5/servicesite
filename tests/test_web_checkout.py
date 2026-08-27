@@ -158,6 +158,10 @@ def test_public_catalog_renders_only_published_services(web_context):
     body = response.get_data(as_text=True)
 
     assert response.status_code == 200
+    assert "Find the gaps before they become incidents." in body
+    assert 'id="services"' in body
+    assert 'href="#process"' in body
+    assert "Create XMR invoice" in body
     assert "Security Assessment" in body
     assert "service-hidden" not in body
     assert "<script" not in body.lower()

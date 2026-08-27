@@ -3,50 +3,125 @@
 {% block title %}Services | Servicesite{% endblock %}
 
 {% block content %}
-  <section class="hero" aria-labelledby="page-title">
-    <p class="eyebrow">Authorized security services</p>
-    <h1 id="page-title">Choose the engagement that fits your scope.</h1>
-    <p class="lede">
-      Prices are defined in USD. At checkout, the exact amount is converted to XMR,
-      locked for the displayed payment window, and assigned to a unique address.
-    </p>
+  <section class="hero home-hero" aria-labelledby="page-title">
+    <div class="hero-copy">
+      <p class="eyebrow"><span class="eyebrow-line" aria-hidden="true"></span>Authorized security services</p>
+      <h1 id="page-title">Find the gaps before they become incidents.</h1>
+      <p class="lede">
+        Focused red-team, blue-team, and security analysis engagements for organizations
+        that need clear findings and practical next steps.
+      </p>
+      <div class="hero-actions">
+        <a class="button" href="#services">Browse services <span aria-hidden="true">&#8594;</span></a>
+        <a class="text-link" href="#process">How engagements work</a>
+      </div>
+    </div>
+
+    <aside class="protocol-card" aria-labelledby="protocol-title">
+      <div class="protocol-heading">
+        <p class="terminal-label">Engagement protocol</p>
+        <span aria-hidden="true">04 steps</span>
+      </div>
+      <h2 id="protocol-title">A controlled path from selection to testing.</h2>
+      <ol class="protocol-list">
+        <li><span>01</span><p><strong>Choose a service</strong>Review the engagement that matches your needs.</p></li>
+        <li><span>02</span><p><strong>Create an invoice</strong>Your USD price is converted and locked in XMR.</p></li>
+        <li><span>03</span><p><strong>Track payment</strong>Follow confirmation progress on a private status page.</p></li>
+        <li><span>04</span><p><strong>Authorize scope</strong>Testing begins only after written scope approval.</p></li>
+      </ol>
+    </aside>
+  </section>
+
+  <section class="assurance-strip" aria-label="Checkout assurances">
+    <p><span aria-hidden="true">01</span><strong>Monero only</strong>Private checkout by design</p>
+    <p><span aria-hidden="true">02</span><strong>Unique address</strong>One address per invoice</p>
+    <p><span aria-hidden="true">03</span><strong>No scripts</strong>Works at Tor Browser's safest level</p>
   </section>
 
   {% if categories %}
-    {% for category in categories %}
-      <section class="catalog-section" aria-labelledby="category-{{ category.id }}">
-        <div class="section-heading">
-          <p class="eyebrow">Service category</p>
-          <h2 id="category-{{ category.id }}">{{ category.name }}</h2>
-          {% if category.description %}<p>{{ category.description }}</p>{% endif %}
+    <section class="catalog" id="services" aria-labelledby="services-title">
+      <div class="catalog-intro">
+        <div>
+          <p class="eyebrow"><span class="eyebrow-line" aria-hidden="true"></span>Service catalog</p>
+          <h2 id="services-title">Choose where to strengthen your defenses.</h2>
         </div>
-        <div class="service-grid">
-          {% for service in category.services %}
-            <article class="service-card">
-              <div>
-                <p class="service-duration">{{ service.duration_label or "Custom engagement" }}</p>
-                <h3>{{ service.service_name }}</h3>
-                <p>{{ service.service_description }}</p>
-              </div>
-              <div class="service-action">
-                <p class="price">{{ service.price_usd_cents|usd }}</p>
-                <form method="post" action="{{ url_for('public.create_checkout') }}">
-                  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                  <input type="hidden" name="checkout_nonce" value="{{ checkout_nonce }}">
-                  <input type="hidden" name="service_id" value="{{ service.service_id }}">
-                  <button type="submit">Create XMR invoice</button>
-                </form>
-              </div>
-            </article>
-          {% endfor %}
-        </div>
-      </section>
-    {% endfor %}
+        <p>Compare focused engagements by outcome, duration, and price. Each purchase receives a private payment page and a unique XMR address.</p>
+      </div>
+
+      <nav class="category-nav" aria-label="Service categories">
+        {% for category in categories %}
+          <a href="#category-{{ category.id }}">{{ "%02d"|format(loop.index) }} / {{ category.name }}</a>
+        {% endfor %}
+      </nav>
+
+      {% for category in categories %}
+        <section class="catalog-section" id="category-{{ category.id }}" aria-labelledby="category-title-{{ category.id }}">
+          <div class="section-heading">
+            <p class="category-number" aria-hidden="true">{{ "%02d"|format(loop.index) }}</p>
+            <div>
+              <p class="eyebrow">Service category</p>
+              <h3 id="category-title-{{ category.id }}">{{ category.name }}</h3>
+              {% if category.description %}<p>{{ category.description }}</p>{% endif %}
+            </div>
+          </div>
+          <div class="service-grid">
+            {% for service in category.services %}
+              <article class="service-card">
+                <div>
+                  <div class="service-meta">
+                    <p class="service-duration">{{ service.duration_label or "Custom engagement" }}</p>
+                    <span aria-hidden="true">{{ "%02d"|format(loop.index) }}</span>
+                  </div>
+                  <h4>{{ service.service_name }}</h4>
+                  <p>{{ service.service_description }}</p>
+                </div>
+                <div class="service-action">
+                  <div>
+                    <span>Starting at</span>
+                    <p class="price">{{ service.price_usd_cents|usd }}</p>
+                  </div>
+                  <form method="post" action="{{ url_for('public.create_checkout') }}">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <input type="hidden" name="checkout_nonce" value="{{ checkout_nonce }}">
+                    <input type="hidden" name="service_id" value="{{ service.service_id }}">
+                    <button type="submit">Create XMR invoice <span aria-hidden="true">&#8594;</span></button>
+                  </form>
+                </div>
+              </article>
+            {% endfor %}
+          </div>
+        </section>
+      {% endfor %}
+    </section>
   {% else %}
-    <section class="empty-state card" aria-labelledby="empty-title">
-      <p class="eyebrow">Catalog</p>
+    <section class="empty-state card" id="services" aria-labelledby="empty-title">
+      <p class="eyebrow">Service catalog</p>
       <h2 id="empty-title">No services are published yet.</h2>
       <p>Published services will appear here when they are available for purchase.</p>
     </section>
   {% endif %}
+
+  <section class="process-section" id="process" aria-labelledby="process-title">
+    <div class="process-heading">
+      <p class="eyebrow"><span class="eyebrow-line" aria-hidden="true"></span>How it works</p>
+      <h2 id="process-title">Payment is simple. Authorization stays rigorous.</h2>
+    </div>
+    <div class="process-grid">
+      <article>
+        <span>01</span>
+        <h3>Select and pay</h3>
+        <p>Choose a service and create an invoice. The listed USD price is converted to an exact XMR amount for the payment window.</p>
+      </article>
+      <article>
+        <span>02</span>
+        <h3>Track confirmations</h3>
+        <p>Use your private status page to follow payment progress without exposing wallet or transaction details in the catalog.</p>
+      </article>
+      <article>
+        <span>03</span>
+        <h3>Approve the scope</h3>
+        <p>After settlement, the exact engagement scope and written authorization are reviewed before any security testing begins.</p>
+      </article>
+    </div>
+  </section>
 {% endblock %}
