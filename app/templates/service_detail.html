@@ -1,0 +1,96 @@
+{% extends "base.html" %}
+
+{% block title %}{{ service.service_name }} | Servicesite{% endblock %}
+
+{% block content %}
+  <nav class="breadcrumb" aria-label="Breadcrumb">
+    <a href="{{ url_for('public.index') }}#services">Services</a>
+    <span aria-hidden="true">/</span>
+    <span>{{ service.category_name }}</span>
+    <span aria-hidden="true">/</span>
+    <span aria-current="page">{{ service.service_name }}</span>
+  </nav>
+
+  <section class="service-detail-layout" aria-labelledby="service-title">
+    <div class="service-detail-main">
+      <header class="service-detail-hero">
+        <p class="eyebrow"><span class="eyebrow-line" aria-hidden="true"></span>{{ service.category_name }}</p>
+        <h1 id="service-title">{{ service.service_name }}</h1>
+        <p class="service-detail-lede">{{ service.service_description }}</p>
+        <dl class="service-facts" aria-label="Service summary">
+          <div>
+            <dt>Engagement</dt>
+            <dd>{{ service.duration_label or "Custom engagement" }}</dd>
+          </div>
+          <div>
+            <dt>Payment</dt>
+            <dd>Monero (XMR)</dd>
+          </div>
+          <div>
+            <dt>Listed price</dt>
+            <dd>{{ service.price_usd_cents|usd }}</dd>
+          </div>
+        </dl>
+      </header>
+
+      {% if service.category_description %}
+        <section class="detail-section" aria-labelledby="category-context-title">
+          <p class="detail-number" aria-hidden="true">01</p>
+          <div>
+            <p class="eyebrow">Category context</p>
+            <h2 id="category-context-title">{{ service.category_name }}</h2>
+            <p>{{ service.category_description }}</p>
+          </div>
+        </section>
+      {% endif %}
+
+      <section class="detail-section" aria-labelledby="purchase-flow-title">
+        <p class="detail-number" aria-hidden="true">{% if service.category_description %}02{% else %}01{% endif %}</p>
+        <div>
+          <p class="eyebrow">Purchase flow</p>
+          <h2 id="purchase-flow-title">Know what happens after you continue.</h2>
+          <ol class="detail-steps">
+            <li>
+              <strong>Price lock</strong>
+              <span>The listed USD price is converted to an exact XMR amount for the displayed payment window.</span>
+            </li>
+            <li>
+              <strong>Private payment tracking</strong>
+              <span>Your invoice receives a unique Monero address and a private confirmation-status link.</span>
+            </li>
+            <li>
+              <strong>Authorization review</strong>
+              <span>Payment does not authorize testing. Written scope approval is required before work begins.</span>
+            </li>
+          </ol>
+        </div>
+      </section>
+    </div>
+
+    <aside class="purchase-panel" aria-labelledby="purchase-title">
+      <div class="purchase-panel-heading">
+        <p class="terminal-label">Secure checkout</p>
+        <span>XMR only</span>
+      </div>
+      <h2 id="purchase-title">Create your invoice</h2>
+      <p>Continue when you are ready to lock the XMR amount for this service.</p>
+      <div class="purchase-price">
+        <span>Service price</span>
+        <strong>{{ service.price_usd_cents|usd }}</strong>
+        <small>{{ service.duration_label or "Custom engagement" }}</small>
+      </div>
+      <form method="post" action="{{ url_for('public.create_checkout') }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <input type="hidden" name="checkout_nonce" value="{{ checkout_nonce }}">
+        <input type="hidden" name="service_id" value="{{ service.service_id }}">
+        <button type="submit">Create XMR invoice <span aria-hidden="true">&#8594;</span></button>
+      </form>
+      <ul class="purchase-assurances">
+        <li>Unique address for this invoice</li>
+        <li>Exact amount shown before payment</li>
+        <li>Private payment-status page</li>
+      </ul>
+      <a class="back-link" href="{{ url_for('public.index') }}#category-{{ service.category_id }}">&#8592; Back to {{ service.category_name }}</a>
+    </aside>
+  </section>
+{% endblock %}

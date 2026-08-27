@@ -7,7 +7,8 @@ database, CoinGecko key, payment, or polling job was accessed.
 
 | Method | Route | Purpose | Access |
 | --- | --- | --- | --- |
-| `GET` | `/` | Published service catalog and order forms | Public |
+| `GET` | `/` | Published service catalog and service-detail links | Public |
+| `GET` | `/services/<service_slug>` | Published service information and order form | Public |
 | `POST` | `/checkout` | Validate form, obtain quote, create one invoice | CSRF plus single-use form nonce |
 | `GET` | `/checkout/<invoice_id>/<status_token>` | Locked amount, unique address, expiry, and links | Invoice bearer token |
 | `GET` | `/checkout/<invoice_id>/<status_token>/qr.png` | Monero payment QR | Invoice bearer token |
@@ -34,8 +35,11 @@ There is no hard-coded or cached indefinite fallback.
 ## Form and route security
 
 - The signed Flask session carries a strong CSRF token.
-- Each catalog response issues a separate, single-use checkout nonce. Replaying
-  a successful form cannot create a second invoice.
+- Each published service-detail response issues a separate, single-use checkout
+  nonce. The catalog does not issue checkout tokens or create invoices directly.
+  Replaying a successful detail-page form cannot create a second invoice.
+- Unknown, unpublished, archived, or category-hidden service slugs return the
+  same generic 404 response and do not reveal catalog state.
 - Service identity and current publication state are revalidated server-side,
   then rechecked transactionally by the canonical invoice creator.
 - Checkout, QR, status, private errors, and redirects use `no-store` and

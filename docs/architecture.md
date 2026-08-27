@@ -62,9 +62,12 @@ snapshots, and expiry. A later catalog edit cannot alter historical invoices.
 
 ## Task 4 web boundary
 
-The public catalog reads only published, non-archived categories and services.
-Checkout uses a signed-session CSRF token plus a single-use form nonce, obtains
-a timestamped CoinGecko quote, and calls only the canonical `InvoiceCreator`.
+The public catalog and individual service-detail routes read only published,
+non-archived categories and services. Service-detail pages use the unique,
+validated service slug and return a generic 404 for unavailable records.
+Checkout begins from the detail page and uses a signed-session CSRF token plus
+a single-use form nonce, obtains a timestamped CoinGecko quote, and calls only
+the canonical `InvoiceCreator`.
 The route does not calculate amounts or create subaddresses itself.
 
 Checkout, QR, and status resources require the invoice bearer token and return

@@ -87,6 +87,27 @@ def index():
     return render_template(
         "index.html",
         categories=_group_services(services),
+    )
+
+
+@public.get("/services/<service_slug>")
+def service_detail(service_slug: str):
+    g.no_store = True
+    if not service_slug or len(service_slug) > 120:
+        abort(404)
+    try:
+        service = _repository().get_purchasable_service_by_slug(service_slug)
+    except (PersistenceError, sqlite3.Error):
+        return _error_page(
+            "Service temporarily unavailable",
+            "This service cannot be loaded right now. Please try again later.",
+            503,
+        )
+    if service is None:
+        abort(404)
+    return render_template(
+        "service_detail.html",
+        service=service,
         checkout_nonce=issue_checkout_nonce(),
     )
 

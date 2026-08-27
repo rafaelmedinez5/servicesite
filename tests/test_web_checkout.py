@@ -90,13 +90,13 @@ def web_context(tmp_path, monkeypatch):
     )
 
 
-def _category():
+def _category(*, published=True):
     return CategoryRecord(
         id="category-security",
         name="Security Services",
         slug="security-services",
         description="Authorized security engagements.",
-        published=True,
+        published=published,
         archived=False,
         sort_order=10,
         created_at=NOW,
@@ -123,7 +123,7 @@ def _service(*, service_id="service-assessment", published=True):
 
 
 def _form_tokens(client):
-    response = client.get("/")
+    response = client.get("/services/service-assessment-slug")
     assert response.status_code == 200
     tokens = {match.group("name"): match.group("value") for match in TOKEN_PATTERN.finditer(response.get_data(as_text=True))}
     assert set(tokens) == {"csrf_token", "checkout_nonce"}
@@ -161,10 +161,47 @@ def test_public_catalog_renders_only_published_services(web_context):
     assert "Find the gaps before they become incidents." in body
     assert 'id="services"' in body
     assert 'href="#process"' in body
-    assert "Create XMR invoice" in body
+    assert 'href="/services/service-assessment-slug"' in body
+    assert "View service" in body
+    assert "checkout_nonce" not in body
     assert "Security Assessment" in body
     assert "service-hidden" not in body
     assert "<script" not in body.lower()
+
+
+def test_service_detail_shows_purchase_information_and_protected_form(web_context):
+    response = web_context.client.get("/services/service-assessment-slug")
+    body = response.get_data(as_text=True)
+
+    assert response.status_code == 200
+    assert "Security Assessment" in body
+    assert "Authorized assessment with a written report." in body
+    assert "Security Services" in body
+    assert "One engagement" in body
+    assert "$100.00 USD" in body
+    assert 'action="/checkout"' in body
+    assert 'name="service_id" value="service-assessment"' in body
+    assert 'name="csrf_token"' in body
+    assert 'name="checkout_nonce"' in body
+    assert "Payment does not authorize testing" in body
+    assert "<script" not in body.lower()
+    assert response.headers["Cache-Control"] == "no-store, private, max-age=0"
+
+
+def test_unknown_and_unpublished_service_details_return_404(web_context):
+    web_context.repository.insert_service(
+        _service(service_id="service-hidden", published=False)
+    )
+
+    unknown = web_context.client.get("/services/not-a-service")
+    hidden = web_context.client.get("/services/service-hidden-slug")
+    web_context.repository.update_category(_category(published=False))
+    hidden_category = web_context.client.get("/services/service-assessment-slug")
+
+    assert unknown.status_code == 404
+    assert hidden.status_code == 404
+    assert hidden_category.status_code == 404
+    assert "service-hidden" not in hidden.get_data(as_text=True)
 
 
 def test_csrf_and_service_validation_happen_before_invoice_creation(web_context):
