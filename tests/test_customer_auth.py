@@ -75,6 +75,7 @@ def test_auth_pages_are_private_and_navigation_offers_account_creation(
 
     assert 'href="/login"' in home.get_data(as_text=True)
     assert 'href="/register"' in home.get_data(as_text=True)
+    assert 'pattern="[a-z0-9][a-z0-9._\\-]{1,30}[a-z0-9]"' in register.get_data(as_text=True)
     for response in (register, login):
         assert response.status_code == 200
         assert response.headers["Cache-Control"] == "no-store, private, max-age=0"

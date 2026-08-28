@@ -8,6 +8,7 @@
   <section class="admin-heading"><p class="eyebrow">Purchase detail</p><h1>{{ purchase.service_name }}</h1><p class="monospace breakable">{{ purchase.invoice_id }}</p></section>
   <section class="card admin-detail">
     <dl class="details-list">
+      {% if customer_username %}<div><dt>Customer</dt><dd>@{{ customer_username }}</dd></div>{% endif %}
       <div><dt>Category</dt><dd>{{ purchase.category_name }}</dd></div>
       <div><dt>USD price</dt><dd>{{ purchase.price_usd_cents|usd }}</dd></div>
       <div><dt>Expected XMR</dt><dd class="monospace">{{ purchase.expected_atomic|atomic_xmr }} XMR</dd></div>
@@ -17,6 +18,7 @@
       <div><dt>Fulfillment</dt><dd>{{ purchase.fulfillment_status.value }}</dd></div>
       <div><dt>Created</dt><dd>{{ purchase.created_at|display_datetime }}</dd></div>
     </dl>
+    {% include "_order_items.html" %}
     {% if purchase.fulfilled_at %}<p>Fulfilled {{ purchase.fulfilled_at|display_datetime }}{% if purchase.fulfillment_note %}: {{ purchase.fulfillment_note }}{% endif %}</p>{% endif %}
     {% if purchase.payment_status.value == 'settled' and purchase.fulfillment_status.value == 'unfulfilled' %}
       <form class="admin-form fulfillment-form" method="post" action="{{ url_for('admin.purchase_fulfill', invoice_id=purchase.invoice_id) }}">

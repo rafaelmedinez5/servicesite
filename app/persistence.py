@@ -11,6 +11,10 @@ from pathlib import Path
 from typing import Iterator
 
 from app.catalog import AdminServiceRecord, CategoryRecord, PurchasableService, ServiceRecord
+from app.orders import (
+    MAX_CART_SERVICES, CartChangedError, CartError, CartItem, CartSnapshot,
+    CheckoutInProgressError, OrderLine, validate_quantity,
+)
 from app.payments.invoice import (
     Invoice,
     InvoiceValidationError,
@@ -20,7 +24,7 @@ from app.payments.invoice import (
 from app.payments.xmr_wallet_rpc import MAX_ATOMIC_UNITS
 
 
-SCHEMA_VERSION = 5
+SCHEMA_VERSION = 6
 
 
 class PersistenceError(RuntimeError):
@@ -155,6 +159,7 @@ class SQLiteDatabase:
                     "2",
                     "3",
                     "4",
+                    "5",
                     str(SCHEMA_VERSION),
                 }:
                     raise SchemaVersionError("database schema version is unsupported")
@@ -162,7 +167,7 @@ class SQLiteDatabase:
                 if previous_version in {"1", "2"}:
                     _ensure_fulfillment_columns(connection)
                 connection.executescript(_SCHEMA_SQL)
-                if previous_version in {"1", "2", "3", "4"}:
+                if previous_version in {"1", "2", "3", "4", "5"}:
                     connection.execute(
                         "UPDATE schema_meta SET value=? WHERE key='schema_version'",
                         (str(SCHEMA_VERSION),),
@@ -496,31 +501,192 @@ class ServicesiteRepository:
                     raise CatalogChangedError(
                         "service changed before the invoice could be stored"
                     )
-                connection.execute(
-                    """
-                    INSERT INTO invoices(
-                        id, status_token, service_id, service_version,
-                        service_name_snapshot, service_description_snapshot,
-                        duration_label_snapshot, category_id, category_name_snapshot,
-                        category_description_snapshot, price_usd_cents, xmr_usd_rate,
-                        rate_source, quote_created_at, expected_atomic, observed_atomic,
-                        xmr_address, xmr_account_index, xmr_address_index,
-                        required_confirmations, observed_confirmations, deposit_txid,
-                        sweep_txid, sweep_required, status, status_note, created_at,
-                        expires_at, expired_at, settled_at, updated_at
-                    ) VALUES (
-                        ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
-                        ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
-                    )
-                    """,
-                    _invoice_values(invoice),
-                )
+                _insert_invoice_row(connection, invoice)
         except CatalogChangedError:
             raise
         except sqlite3.IntegrityError as exc:
             raise InvoicePersistenceError(
                 "invoice could not be stored without violating an invariant"
             ) from exc
+
+    def get_cart(self, customer_id: str) -> CartSnapshot:
+        _validate_customer_id(customer_id)
+        with self.database.transaction() as connection:
+            return _fetch_cart(connection, customer_id)
+
+    def change_cart_item(
+        self, customer_id: str, service_id: str, quantity: int, *, add: bool = False
+    ) -> None:
+        _validate_customer_id(customer_id)
+        validate_quantity(quantity, allow_zero=not add)
+        with self.database.transaction(immediate=True) as connection:
+            cart = _fetch_cart(connection, customer_id)
+            existing = next((item for item in cart.items if item.service_id == service_id), None)
+            if quantity and _fetch_purchasable_service(connection, service_id) is None:
+                raise CartError("this service is no longer available")
+            if add and existing:
+                quantity += existing.quantity
+                validate_quantity(quantity)
+            if quantity and existing is None and len(cart.items) >= MAX_CART_SERVICES:
+                raise CartError(f"a cart can contain up to {MAX_CART_SERVICES} different services")
+            connection.execute(
+                "INSERT OR IGNORE INTO customer_carts(customer_id, version) VALUES (?, 0)",
+                (customer_id,),
+            )
+            if quantity:
+                connection.execute(
+                    "INSERT INTO cart_items(customer_id, service_id, quantity) VALUES (?, ?, ?) "
+                    "ON CONFLICT(customer_id, service_id) DO UPDATE SET quantity=excluded.quantity",
+                    (customer_id, service_id, quantity),
+                )
+            else:
+                connection.execute(
+                    "DELETE FROM cart_items WHERE customer_id=? AND service_id=?",
+                    (customer_id, service_id),
+                )
+            connection.execute(
+                "UPDATE customer_carts SET version=version+1 WHERE customer_id=?", (customer_id,)
+            )
+
+    def claim_cart_checkout(
+        self, customer_id: str, *, version: int, fingerprint: str,
+        claim_token: str, now: datetime,
+    ) -> tuple[OrderLine, ...]:
+        _validate_customer_id(customer_id)
+        _require_token(claim_token, "cart checkout claim")
+        _require_aware_datetime(now, "cart checkout time")
+        with self.database.transaction(immediate=True) as connection:
+            cart = _fetch_cart(connection, customer_id)
+            if not cart.ready or cart.version != version or cart.fingerprint != fingerprint:
+                raise CartChangedError("the cart or its prices changed; review it again")
+            claim = connection.execute(
+                "SELECT expires_at FROM cart_checkout_claims WHERE customer_id=? AND cart_version=?",
+                (customer_id, version),
+            ).fetchone()
+            if claim is not None and _parse_datetime(claim["expires_at"]) > now:
+                raise CheckoutInProgressError("checkout is already in progress; check your orders shortly")
+            connection.execute(
+                "DELETE FROM cart_checkout_claims WHERE customer_id=? AND expires_at<=?",
+                (customer_id, _serialize_datetime(now)),
+            )
+            connection.execute(
+                "INSERT INTO cart_checkout_claims(customer_id, cart_version, claim_token, expires_at) "
+                "VALUES (?, ?, ?, ?)",
+                (customer_id, version, claim_token, _serialize_datetime(now + timedelta(minutes=5))),
+            )
+            return cart.lines
+
+    def release_cart_checkout(self, customer_id: str, claim_token: str) -> None:
+        with self.database.transaction(immediate=True) as connection:
+            connection.execute(
+                "DELETE FROM cart_checkout_claims WHERE customer_id=? AND claim_token=?",
+                (customer_id, claim_token),
+            )
+
+    def insert_order_invoice(
+        self, invoice: Invoice, lines: tuple[OrderLine, ...], *, customer_id: str,
+        cart_version: int | None = None, claim_token: str | None = None,
+    ) -> None:
+        _validate_customer_id(customer_id)
+        if not lines or len(lines) > MAX_CART_SERVICES:
+            raise CartError("order size is invalid")
+        if sum(line.total_usd_cents for line in lines) != invoice.price_usd_cents:
+            raise InvoicePersistenceError("order total does not match its invoice")
+        try:
+            with self.database.transaction(immediate=True) as connection:
+                for line in lines:
+                    if _fetch_purchasable_service(connection, line.service.service_id) != line.service:
+                        raise CatalogChangedError("an order service changed before persistence")
+                if cart_version is not None:
+                    cart = _fetch_cart(connection, customer_id)
+                    claim = connection.execute(
+                        "SELECT claim_token FROM cart_checkout_claims "
+                        "WHERE customer_id=? AND cart_version=?",
+                        (customer_id, cart_version),
+                    ).fetchone()
+                    if (
+                        cart.version != cart_version or not cart.ready or cart.lines != lines
+                        or claim is None or claim["claim_token"] != claim_token
+                    ):
+                        raise CartChangedError("cart checkout changed before persistence")
+                _insert_invoice_row(connection, invoice)
+                connection.execute(
+                    "INSERT INTO customer_orders(invoice_id, customer_id) VALUES (?, ?)",
+                    (invoice.id, customer_id),
+                )
+                for position, line in enumerate(lines, start=1):
+                    service = line.service
+                    connection.execute(
+                        """INSERT INTO invoice_items(
+                            invoice_id, position, service_id, service_slug, service_version,
+                            service_name, service_description, duration_label, category_id,
+                            category_name, category_description, unit_price_usd_cents, quantity
+                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                        (
+                            invoice.id, position, service.service_id, service.service_slug,
+                            service.service_version, service.service_name, service.service_description,
+                            service.duration_label, service.category_id, service.category_name,
+                            service.category_description, service.price_usd_cents, line.quantity,
+                        ),
+                    )
+                if cart_version is not None:
+                    connection.execute("DELETE FROM cart_items WHERE customer_id=?", (customer_id,))
+                    connection.execute(
+                        "UPDATE customer_carts SET version=version+1 WHERE customer_id=?", (customer_id,)
+                    )
+                    connection.execute("DELETE FROM cart_checkout_claims WHERE customer_id=?", (customer_id,))
+        except sqlite3.IntegrityError as exc:
+            raise InvoicePersistenceError("order could not be saved without violating an invariant") from exc
+
+    def get_invoice_items(self, invoice_id: str) -> tuple[OrderLine, ...]:
+        connection = self.database.connect()
+        try:
+            rows = connection.execute(
+                "SELECT * FROM invoice_items WHERE invoice_id=? ORDER BY position", (invoice_id,)
+            ).fetchall()
+            return tuple(OrderLine(PurchasableService(
+                service_id=row["service_id"], service_slug=row["service_slug"],
+                service_version=row["service_version"], service_name=row["service_name"],
+                service_description=row["service_description"], duration_label=row["duration_label"],
+                category_id=row["category_id"], category_name=row["category_name"],
+                category_description=row["category_description"], price_usd_cents=row["unit_price_usd_cents"],
+            ), row["quantity"]) for row in rows)
+        finally:
+            connection.close()
+
+    def list_customer_orders(self, customer_id: str) -> list[AdminPurchaseRecord]:
+        connection = self.database.connect()
+        try:
+            rows = connection.execute(
+                "SELECT i.* FROM invoices i JOIN customer_orders o ON o.invoice_id=i.id "
+                "WHERE o.customer_id=? ORDER BY i.created_at DESC, i.id DESC LIMIT 100",
+                (customer_id,),
+            ).fetchall()
+            return [_row_to_admin_purchase(row) for row in rows]
+        finally:
+            connection.close()
+
+    def get_customer_order(self, customer_id: str, invoice_id: str) -> Invoice | None:
+        connection = self.database.connect()
+        try:
+            row = connection.execute(
+                "SELECT i.* FROM invoices i JOIN customer_orders o ON o.invoice_id=i.id "
+                "WHERE o.customer_id=? AND i.id=?", (customer_id, invoice_id),
+            ).fetchone()
+            return _row_to_invoice(row) if row is not None else None
+        finally:
+            connection.close()
+
+    def get_order_username(self, invoice_id: str) -> str | None:
+        connection = self.database.connect()
+        try:
+            row = connection.execute(
+                "SELECT a.username FROM customer_accounts a JOIN customer_orders o "
+                "ON o.customer_id=a.id WHERE o.invoice_id=?", (invoice_id,),
+            ).fetchone()
+            return row["username"] if row else None
+        finally:
+            connection.close()
 
     def get_invoice(self, invoice_id: str) -> Invoice | None:
         connection = self.database.connect()
@@ -567,10 +733,18 @@ class ServicesiteRepository:
 
         clauses: list[str] = []
         parameters: list[object] = []
-        for column, value in (("category_id", category_id), ("service_id", service_id)):
-            if value:
-                clauses.append(f"{column}=?")
-                parameters.append(value)
+        item_filters = [(column, value) for column, value in (
+            ("category_id", category_id), ("service_id", service_id)
+        ) if value]
+        if item_filters:
+            legacy = " AND ".join(f"invoices.{column}=?" for column, _ in item_filters)
+            line_match = " AND ".join(f"item.{column}=?" for column, _ in item_filters)
+            clauses.append(
+                f"(({legacy}) OR EXISTS (SELECT 1 FROM invoice_items item "
+                f"WHERE item.invoice_id=invoices.id AND {line_match}))"
+            )
+            parameters.extend(value for _, value in item_filters)
+            parameters.extend(value for _, value in item_filters)
         if payment_status is not None:
             clauses.append("status=?")
             parameters.append(payment_status.value)
@@ -1170,6 +1344,44 @@ class ServicesiteRepository:
             return _require_invoice(connection, invoice_id)
 
 
+def _fetch_cart(connection: sqlite3.Connection, customer_id: str) -> CartSnapshot:
+    cart = connection.execute(
+        "SELECT version FROM customer_carts WHERE customer_id=?", (customer_id,)
+    ).fetchone()
+    rows = connection.execute(
+        "SELECT s.id, s.name, s.slug, c.quantity FROM cart_items c "
+        "JOIN services s ON s.id=c.service_id WHERE c.customer_id=? ORDER BY s.id",
+        (customer_id,),
+    ).fetchall()
+    return CartSnapshot(
+        version=int(cart["version"]) if cart else 0,
+        items=tuple(CartItem(
+            service_id=row["id"], name=row["name"], slug=row["slug"], quantity=row["quantity"],
+            service=_fetch_purchasable_service(connection, row["id"]),
+        ) for row in rows),
+    )
+
+
+def _insert_invoice_row(connection: sqlite3.Connection, invoice: Invoice) -> None:
+    connection.execute(
+        """INSERT INTO invoices(
+            id, status_token, service_id, service_version,
+            service_name_snapshot, service_description_snapshot,
+            duration_label_snapshot, category_id, category_name_snapshot,
+            category_description_snapshot, price_usd_cents, xmr_usd_rate,
+            rate_source, quote_created_at, expected_atomic, observed_atomic,
+            xmr_address, xmr_account_index, xmr_address_index,
+            required_confirmations, observed_confirmations, deposit_txid,
+            sweep_txid, sweep_required, status, status_note, created_at,
+            expires_at, expired_at, settled_at, updated_at
+        ) VALUES (
+            ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
+            ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+        )""",
+        _invoice_values(invoice),
+    )
+
+
 def _fetch_purchasable_service(
     connection: sqlite3.Connection, service_id: str
 ) -> PurchasableService | None:
@@ -1572,6 +1784,53 @@ CREATE TABLE IF NOT EXISTS customer_login_guard (
     failure_count INTEGER NOT NULL CHECK (failure_count >= 0),
     blocked_until TEXT
 );
+
+CREATE TABLE IF NOT EXISTS customer_carts (
+    customer_id TEXT PRIMARY KEY REFERENCES customer_accounts(id) ON DELETE CASCADE,
+    version INTEGER NOT NULL DEFAULT 0 CHECK (version >= 0)
+);
+
+CREATE TABLE IF NOT EXISTS cart_items (
+    customer_id TEXT NOT NULL REFERENCES customer_carts(customer_id) ON DELETE CASCADE,
+    service_id TEXT NOT NULL REFERENCES services(id) ON DELETE RESTRICT,
+    quantity INTEGER NOT NULL CHECK (quantity BETWEEN 1 AND 10),
+    PRIMARY KEY (customer_id, service_id)
+);
+
+CREATE TABLE IF NOT EXISTS cart_checkout_claims (
+    customer_id TEXT NOT NULL REFERENCES customer_carts(customer_id) ON DELETE CASCADE,
+    cart_version INTEGER NOT NULL CHECK (cart_version >= 0),
+    claim_token TEXT NOT NULL UNIQUE,
+    expires_at TEXT NOT NULL,
+    PRIMARY KEY (customer_id, cart_version)
+);
+
+CREATE TABLE IF NOT EXISTS customer_orders (
+    invoice_id TEXT PRIMARY KEY REFERENCES invoices(id) ON DELETE RESTRICT,
+    customer_id TEXT NOT NULL REFERENCES customer_accounts(id) ON DELETE RESTRICT
+);
+
+CREATE TABLE IF NOT EXISTS invoice_items (
+    invoice_id TEXT NOT NULL REFERENCES invoices(id) ON DELETE RESTRICT,
+    position INTEGER NOT NULL CHECK (position BETWEEN 1 AND 20),
+    service_id TEXT NOT NULL REFERENCES services(id) ON DELETE RESTRICT,
+    service_slug TEXT NOT NULL,
+    service_version INTEGER NOT NULL CHECK (service_version > 0),
+    service_name TEXT NOT NULL,
+    service_description TEXT NOT NULL,
+    duration_label TEXT,
+    category_id TEXT NOT NULL,
+    category_name TEXT NOT NULL,
+    category_description TEXT NOT NULL,
+    unit_price_usd_cents INTEGER NOT NULL CHECK (unit_price_usd_cents > 0),
+    quantity INTEGER NOT NULL CHECK (quantity BETWEEN 1 AND 10),
+    PRIMARY KEY (invoice_id, position),
+    UNIQUE (invoice_id, service_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_customer_orders_customer ON customer_orders(customer_id);
+CREATE INDEX IF NOT EXISTS idx_invoice_items_service ON invoice_items(service_id, invoice_id);
+CREATE INDEX IF NOT EXISTS idx_invoice_items_category ON invoice_items(category_id, invoice_id);
 
 CREATE TABLE IF NOT EXISTS invoice_poll_claims (
     invoice_id TEXT PRIMARY KEY REFERENCES invoices(id) ON DELETE CASCADE,

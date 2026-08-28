@@ -16,6 +16,12 @@ fully server-rendered and contains no JavaScript. It supports:
   sweep transaction identifiers; and
 - marking a purchase fulfilled only after its payment reaches `settled`.
 
+Cart orders appear as one purchase with all saved service lines and the customer
+username on the detail page. Category and service filters match any saved line.
+Fulfillment applies to the whole order and remains blocked until its single
+invoice is settled. Admin views still omit payment bearer tokens, deposit
+addresses, and transaction identifiers.
+
 Catalog edits never change an existing invoice snapshot. Archival replaces
 deletion. Fulfillment is a separate state and cannot settle an invoice or begin
 an authorized security engagement by itself.

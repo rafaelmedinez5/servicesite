@@ -9,6 +9,7 @@ from enum import StrEnum
 from typing import Callable, Protocol
 
 from app.catalog import PurchasableService
+from app.orders import MAX_CART_SERVICES, OrderLine
 from app.payments.xmr_wallet_rpc import (
     ATOMIC_UNITS_PER_XMR,
     MAX_ATOMIC_UNITS,
@@ -199,6 +200,11 @@ class InvoiceRepository(Protocol):
         self, invoice: Invoice, expected_service: PurchasableService
     ) -> None: ...
 
+    def insert_order_invoice(
+        self, invoice: Invoice, lines: tuple[OrderLine, ...], *, customer_id: str,
+        cart_version: int | None = None, claim_token: str | None = None,
+    ) -> None: ...
+
 
 class SubaddressFactory(Protocol):
     def create_subaddress(self, label: str) -> XmrSubaddress: ...
@@ -240,14 +246,54 @@ class InvoiceCreator:
         self.invoice_id_factory = invoice_id_factory
         self.status_token_factory = status_token_factory
 
-    def create_invoice(self, service_id: str, quote: XmrQuote) -> Invoice:
+    def create_invoice(
+        self, service_id: str, quote: XmrQuote, *, customer_id: str | None = None
+    ) -> Invoice:
         _require_text(service_id, "service ID", maximum=64)
-        if not isinstance(quote, XmrQuote):
-            raise InvoiceValidationError("a validated XMR quote is required")
-
         service = self.repository.get_purchasable_service(service_id)
         if service is None:
             raise ServiceUnavailableError("selected service is unavailable")
+        return self._create_invoice((OrderLine(service, 1),), quote, customer_id=customer_id)
+
+    def create_cart_invoice(
+        self, customer_id: str, lines: tuple[OrderLine, ...], quote: XmrQuote,
+        *, cart_version: int, claim_token: str,
+    ) -> Invoice:
+        if not isinstance(customer_id, str) or not 16 <= len(customer_id) <= 64:
+            raise InvoiceValidationError("customer ID is invalid")
+        _require_positive_int(cart_version, "cart version")
+        if not isinstance(claim_token, str) or not 16 <= len(claim_token) <= 200:
+            raise InvoiceValidationError("cart checkout claim is invalid")
+        if not isinstance(lines, tuple) or not lines or len(lines) > MAX_CART_SERVICES:
+            raise InvoiceValidationError("cart size is invalid")
+        for line in lines:
+            if not isinstance(line, OrderLine):
+                raise InvoiceValidationError("a validated order line is required")
+            if self.repository.get_purchasable_service(line.service.service_id) != line.service:
+                raise ServiceUnavailableError("a cart service changed")
+        return self._create_invoice(
+            lines, quote, customer_id=customer_id,
+            cart_version=cart_version, claim_token=claim_token,
+        )
+
+    def _create_invoice(
+        self, lines: tuple[OrderLine, ...], quote: XmrQuote,
+        *, customer_id: str | None, cart_version: int | None = None,
+        claim_token: str | None = None,
+    ) -> Invoice:
+        if not isinstance(quote, XmrQuote):
+            raise InvoiceValidationError("a validated XMR quote is required")
+        if len({line.service.service_id for line in lines}) != len(lines):
+            raise InvoiceValidationError("order service IDs must be unique")
+        if customer_id is not None and (
+            not isinstance(customer_id, str) or not 16 <= len(customer_id) <= 64
+        ):
+            raise InvoiceValidationError("customer ID is invalid")
+        service = lines[0].service
+        total_usd_cents = sum(line.total_usd_cents for line in lines)
+        if total_usd_cents > 2**63 - 1:
+            raise InvoiceValidationError("order total exceeds the storage range")
+        bundled = len(lines) > 1 or lines[0].quantity > 1
 
         now = self.now_factory()
         _require_aware_datetime(now, "invoice creation time")
@@ -260,7 +306,7 @@ class InvoiceCreator:
             raise InvoiceValidationError("quote is older than the approved policy")
 
         expected_atomic = calculate_expected_atomic(
-            service.price_usd_cents, quote.usd_per_xmr
+            total_usd_cents, quote.usd_per_xmr
         )
         invoice_id = self.invoice_id_factory()
         status_token = self.status_token_factory()
@@ -277,13 +323,18 @@ class InvoiceCreator:
             status_token=status_token,
             service_id=service.service_id,
             service_version=service.service_version,
-            service_name_snapshot=service.service_name,
-            service_description_snapshot=service.service_description,
-            duration_label_snapshot=service.duration_label,
+            service_name_snapshot=(
+                f"Service order ({sum(line.quantity for line in lines)} items)"
+                if bundled else service.service_name
+            ),
+            service_description_snapshot=(
+                "See the saved order items for each service." if bundled else service.service_description
+            ),
+            duration_label_snapshot=None if bundled else service.duration_label,
             category_id=service.category_id,
-            category_name_snapshot=service.category_name,
-            category_description_snapshot=service.category_description,
-            price_usd_cents=service.price_usd_cents,
+            category_name_snapshot="Service order" if bundled else service.category_name,
+            category_description_snapshot="" if bundled else service.category_description,
+            price_usd_cents=total_usd_cents,
             xmr_usd_rate=quote.rate_text,
             rate_source=quote.source.strip(),
             quote_created_at=quote.quoted_at,
@@ -299,7 +350,13 @@ class InvoiceCreator:
             expires_at=now + self.invoice_ttl,
             updated_at=now,
         )
-        self.repository.insert_invoice(invoice, service)
+        if customer_id is None:
+            self.repository.insert_invoice(invoice, service)
+        else:
+            self.repository.insert_order_invoice(
+                invoice, lines, customer_id=customer_id,
+                cart_version=cart_version, claim_token=claim_token,
+            )
         return invoice
 
 

@@ -18,6 +18,7 @@
         <a href="{{ url_for('public.index') }}#process">Process</a>
       </nav>
       <div class="account-nav">
+        <a class="cart-nav-link" href="{{ url_for('shopping.cart') }}">Cart{% if cart_quantity %} <span class="cart-count">{{ cart_quantity }}</span>{% endif %}</a>
         {% if g.customer %}
           <a href="{{ url_for('customer.account') }}">@{{ g.customer.username }}</a>
           <form method="post" action="{{ url_for('customer.logout') }}">

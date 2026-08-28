@@ -281,6 +281,9 @@ def test_successful_submit_creates_one_invoice_and_nonce_cannot_be_replayed(web_
     assert first.status_code == 303
     assert replay.status_code == 400
     assert web_context.repository.count_invoices() == 1
+    orders = web_context.repository.list_customer_orders("customer-test-00000001")
+    assert len(orders) == 1
+    assert len(web_context.repository.get_invoice_items(orders[0].invoice_id)) == 1
     assert web_context.rate_provider.calls == 1
     assert len(web_context.wallet.calls) == 1
 

@@ -149,7 +149,9 @@ def create_checkout():
 
     try:
         quote_snapshot = _rate_provider().get_quote()
-        invoice = _invoice_creator().create_invoice(selected_service.service_id, quote_snapshot)
+        invoice = _invoice_creator().create_invoice(
+            selected_service.service_id, quote_snapshot, customer_id=g.customer.id
+        )
     except ServiceUnavailableError:
         return _error_page(
             "Service changed",
@@ -177,11 +179,16 @@ def create_checkout():
 def checkout(invoice_id: str, status_token: str):
     invoice = _private_invoice(invoice_id, status_token)
     amount = atomic_to_xmr_str(invoice.expected_atomic)
+    try:
+        items = _repository().get_invoice_items(invoice.id)
+    except (PersistenceError, sqlite3.Error):
+        abort(503)
     return render_template(
         "checkout.html",
         invoice=invoice,
         xmr_amount=amount,
         monero_uri=build_monero_uri(invoice),
+        items=items,
     )
 
 
@@ -206,11 +213,13 @@ def status(invoice_id: str, status_token: str):
     invoice = _private_invoice(invoice_id, status_token)
     try:
         purchase = _repository().get_admin_purchase(invoice.id)
+        items = _repository().get_invoice_items(invoice.id)
     except (PersistenceError, sqlite3.Error):
         abort(503)
     return render_template(
         "status.html",
         invoice=invoice,
+        items=items,
         xmr_amount=atomic_to_xmr_str(invoice.expected_atomic),
         customer_state=customer_payment_state(
             invoice,

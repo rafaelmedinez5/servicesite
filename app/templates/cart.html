@@ -1,0 +1,75 @@
+{% set private_page = true %}
+{% extends "base.html" %}
+{% block title %}Your cart | Servicesite{% endblock %}
+{% block content %}
+  <header class="shopping-heading">
+    <p class="eyebrow">Your selection</p>
+    <h1>Your cart.</h1>
+    <p>Review your services before creating one private XMR invoice. Your cart is saved to your account.</p>
+  </header>
+  {% if error %}<p class="form-error shopping-error" role="alert">{{ error }}</p>{% endif %}
+  {% if cart.items %}
+    <div class="cart-layout">
+      <section class="cart-items" aria-label="Cart items">
+        {% for item in cart.items %}
+          <article class="card cart-item">
+            <div>
+              {% if item.service %}
+                <p class="eyebrow">{{ item.service.category_name }}</p>
+                <h2><a href="{{ url_for('public.service_detail', service_slug=item.slug) }}">{{ item.name }}</a></h2>
+                <p>{{ item.service.duration_label or "Custom engagement" }}</p>
+                <p class="cart-unit-price">{{ item.service.price_usd_cents|usd }} each</p>
+              {% else %}
+                <h2>{{ item.name }}</h2>
+                <p class="unavailable-note">This service is no longer available. Remove it to continue.</p>
+              {% endif %}
+            </div>
+            <div class="cart-item-controls">
+              {% if item.service %}
+                <strong class="cart-line-total">{{ item.total_usd_cents|usd }}</strong>
+                <form class="quantity-form" method="post" action="{{ url_for('shopping.update_item', service_id=item.service_id) }}">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                  <label for="quantity-{{ loop.index }}">Quantity</label>
+                  <input id="quantity-{{ loop.index }}" name="quantity" type="number" min="1" max="10" step="1" value="{{ item.quantity }}" required>
+                  <button type="submit" class="button secondary compact-button">Update</button>
+                </form>
+              {% endif %}
+              <form method="post" action="{{ url_for('shopping.update_item', service_id=item.service_id) }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <input type="hidden" name="quantity" value="0">
+                <button class="remove-button" type="submit" aria-label="Remove {{ item.name }}">Remove</button>
+              </form>
+            </div>
+          </article>
+        {% endfor %}
+        <a class="text-link" href="{{ url_for('public.index') }}#services">&#8592; Continue browsing</a>
+      </section>
+      <aside class="purchase-panel cart-summary" aria-labelledby="cart-summary-title">
+        <p class="eyebrow">Order summary</p>
+        <h2 id="cart-summary-title">{{ cart.quantity }} item{{ "s" if cart.quantity != 1 else "" }}</h2>
+        {% if cart.ready %}
+          <div class="purchase-price"><span>Total</span><strong>{{ cart.total_usd_cents|usd }}</strong></div>
+          <p>One invoice, one unique Monero address. The exact XMR amount is locked when you continue.</p>
+          <form method="post" action="{{ url_for('shopping.checkout_cart') }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <input type="hidden" name="checkout_nonce" value="{{ checkout_nonce }}">
+            <input type="hidden" name="cart_version" value="{{ cart.version }}">
+            <input type="hidden" name="cart_fingerprint" value="{{ cart.fingerprint }}">
+            <button type="submit">Create XMR invoice <span aria-hidden="true">&#8594;</span></button>
+          </form>
+        {% else %}
+          <p class="unavailable-note">Remove unavailable services before checkout. No invoice has been created.</p>
+        {% endif %}
+        <p class="cart-scope-note">Prices are rechecked at checkout. Payment does not replace written scope authorization.</p>
+        <a class="text-link" href="{{ url_for('customer.account') }}#orders">View your orders</a>
+      </aside>
+    </div>
+  {% else %}
+    <section class="card empty-state">
+      <p class="eyebrow">Ready when you are</p>
+      <h2>Your cart is empty.</h2>
+      <p>Add services from their detail pages, then return here to review your order.</p>
+      <a class="button" href="{{ url_for('public.index') }}#services">Browse services <span aria-hidden="true">&#8594;</span></a>
+    </section>
+  {% endif %}
+{% endblock %}

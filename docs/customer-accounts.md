@@ -11,6 +11,7 @@ requires a valid customer session.
 | `GET, POST` | `/register` | Validate a new username/password and create the account |
 | `GET, POST` | `/login` | Verify credentials and start the signed session |
 | `GET` | `/account` | Show the current username and checkout readiness |
+| `GET` | `/account/orders/<invoice_id>` | Show an order belonging to the signed-in customer |
 | `POST` | `/logout` | Verify CSRF and clear the signed session |
 
 Usernames are normalized to lowercase and must contain 3 through 32 ASCII
@@ -35,14 +36,18 @@ hashes.
 - Redirects after login accept only local absolute paths. External or malformed
   destinations are discarded.
 
-Password recovery, password changes, customer purchase history, and account
-deletion are not part of this checkpoint. Customers must store their credentials
-in a password manager. The cart/order milestone can add customer-owned order
-records without weakening the existing bearer-token payment status boundary.
+The account page lists the customer's 100 most recent orders. Both direct
+single-service checkout and cart checkout save ownership together with the
+invoice. Earlier invoices are not assigned to accounts retroactively because
+their original owner cannot be inferred safely; their bearer links still work.
+
+Password recovery, password changes, and account deletion are not part of this
+checkpoint. Customers must store their credentials in a password manager.
 
 ## Upgrade procedure
 
-Schema version 5 adds `customer_accounts` and `customer_login_guard`. Stop the
+Schema version 5 added `customer_accounts` and `customer_login_guard`. Version 6
+adds saved carts, checkout claims, order ownership, and line-item snapshots. Stop the
 web service, take and verify a SQLite online backup, run
 `SQLiteDatabase.initialize()` with the production environment loaded, and start
 the service only after migration succeeds. The migration does not alter existing
