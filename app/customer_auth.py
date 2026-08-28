@@ -217,7 +217,11 @@ def account():
         return redirect(
             url_for("customer.login", next=url_for("customer.account")), code=303
         )
-    return render_template("customer/account.html", private_page=True)
+    try:
+        orders = _repository().list_customer_orders(g.customer.id)
+    except (PersistenceError, sqlite3.Error):
+        abort(503)
+    return render_template("customer/account.html", private_page=True, orders=orders)
 
 
 @customer.post("/logout")

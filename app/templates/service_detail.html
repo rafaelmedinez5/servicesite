@@ -80,11 +80,17 @@
         <small>{{ service.duration_label or "Custom engagement" }}</small>
       </div>
       {% if g.customer %}
+        <form class="add-cart-form" method="post" action="{{ url_for('shopping.add_item') }}">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <input type="hidden" name="service_id" value="{{ service.service_id }}">
+          <input type="hidden" name="quantity" value="1">
+          <button type="submit">Add to cart <span aria-hidden="true">&#8594;</span></button>
+        </form>
         <form method="post" action="{{ url_for('public.create_checkout') }}">
           <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
           <input type="hidden" name="checkout_nonce" value="{{ checkout_nonce }}">
           <input type="hidden" name="service_id" value="{{ service.service_id }}">
-          <button type="submit">Create XMR invoice <span aria-hidden="true">&#8594;</span></button>
+          <button class="button secondary" type="submit">Buy this service now</button>
         </form>
       {% else %}
         <div class="purchase-auth-actions">

@@ -5,15 +5,17 @@ reconciliation layer; no production database or wallet was accessed.
 
 ## Fresh database boundary
 
-`SQLiteDatabase.initialize()` creates schema version 5 with WAL mode and applies
+`SQLiteDatabase.initialize()` creates schema version 6 with WAL mode and applies
 mode `0600` to the database file. Initialization is idempotent for a recognized
 `servicesite` database. If a database already contains tables but has no
 `servicesite` schema marker, initialization refuses it instead of treating a
-legacy database as compatible. Recognized schema versions 1 through 4 are
+legacy database as compatible. Recognized schema versions 1 through 5 are
 upgraded in place; version 3 adds fulfillment fields and the admin login guard,
 version 4 adds the singleton administrator credential table, and version 5 adds
 customer accounts and per-account login guards without altering payment
-amounts, addresses, tokens, or transaction identifiers.
+amounts, addresses, tokens, or transaction identifiers. Version 6 adds cart,
+checkout-claim, order-ownership, and invoice-line tables. Existing account and
+invoice rows are not rewritten or assigned inferred ownership.
 
 The production parent directory must already exist with operator-reviewed
 ownership and permissions. The application does not copy or inspect the legacy
@@ -76,10 +78,13 @@ temporary block for one existing customer account.
 
 ## Canonical creation path
 
-`InvoiceCreator.create_invoice(service_id, quote)` is the only application
-invoice-creation method. It:
+`InvoiceCreator` is the only application invoice builder. Direct purchases use
+`create_invoice(service_id, quote, customer_id=...)`; cart purchases use
+`create_cart_invoice(...)`. Both call the same internal builder for amount
+conversion, identity generation, wallet access, expiry, and confirmation policy.
+It:
 
-1. resolves a currently purchasable service;
+1. resolves and validates the selected purchasable services and quantities;
 2. validates the rate as `Decimal`, enforces the configured maximum quote age,
    and calculates atomic units with exact decimal arithmetic, rounding upward
    only to the next indivisible atomic unit;
@@ -88,7 +93,15 @@ invoice-creation method. It:
 5. builds immutable service, category, price, rate, confirmation, sweep-policy,
    and expiry snapshots;
 6. rechecks the catalog snapshot inside a SQLite `BEGIN IMMEDIATE` transaction;
-7. inserts the complete invoice before returning it.
+7. inserts the invoice, ownership, and item snapshots in one transaction before
+   returning it; cart checkout also clears exactly the claimed cart revision.
+
+Cart totals are summed in integer USD cents before one XMR conversion and one
+rounding operation. Each order receives one unique subaddress and follows the
+existing invoice payment state machine. All items share the order's payment
+and manual fulfillment state. The legacy invoice service/category ID fields
+retain the first line's identifiers for compatibility; the authoritative
+multi-service breakdown is in `invoice_items`.
 
 If the catalog changes during creation, persistence aborts. If wallet access
 fails, no database row is written. If a database insert fails after subaddress

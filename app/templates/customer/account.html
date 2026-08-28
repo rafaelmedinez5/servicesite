@@ -8,9 +8,10 @@
     <div>
       <p class="eyebrow"><span class="eyebrow-line" aria-hidden="true"></span>Customer account</p>
       <h1 id="account-title">Signed in as @{{ g.customer.username }}</h1>
-      <p class="lede">Your account is ready for secure checkout. Browse the catalog and choose a service when you are ready.</p>
+      <p class="lede">Manage your saved cart and follow your orders from one place.</p>
       <div class="hero-actions">
         <a class="button" href="{{ url_for('public.index') }}#services">Browse services <span aria-hidden="true">&#8594;</span></a>
+        <a class="button secondary" href="{{ url_for('shopping.cart') }}">View cart</a>
         <form method="post" action="{{ url_for('customer.logout') }}">
           <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
           <button class="button secondary" type="submit">Log out</button>
@@ -27,5 +28,28 @@
       </dl>
       <p class="account-note">Password recovery is not available yet. Store your credentials in a password manager.</p>
     </aside>
+  </section>
+  <section class="account-orders" id="orders" aria-labelledby="orders-title">
+    <p class="eyebrow">Purchase history</p>
+    <h2 id="orders-title">Your orders</h2>
+    <p>Your 100 most recent orders created after the cart update appear here. Keep private links for any earlier invoices.</p>
+    {% if orders %}
+      <div class="table-wrap card">
+        <table>
+          <thead><tr><th scope="col">Order</th><th scope="col">Total</th><th scope="col">Payment</th><th scope="col">Fulfillment</th><th scope="col">Created</th></tr></thead>
+          <tbody>{% for order in orders %}
+            <tr>
+              <td><a href="{{ url_for('shopping.order_detail', invoice_id=order.invoice_id) }}">{{ order.service_name }}</a><small class="monospace">{{ order.invoice_id[:12] }}…</small></td>
+              <td>{{ order.price_usd_cents|usd }}</td>
+              <td>{{ order.payment_status|customer_payment_label }}</td>
+              <td>{{ order.fulfillment_status.value }}</td>
+              <td>{{ order.created_at|display_datetime }}</td>
+            </tr>
+          {% endfor %}</tbody>
+        </table>
+      </div>
+    {% else %}
+      <div class="card empty-state"><h3>No orders yet.</h3><p>Your purchases will appear here when you create an invoice.</p></div>
+    {% endif %}
   </section>
 {% endblock %}

@@ -9,6 +9,7 @@ from decimal import Decimal
 from pathlib import Path
 
 import pytest
+from werkzeug.security import generate_password_hash
 
 from app.catalog import CategoryRecord, ServiceRecord
 from app.payments.invoice import (
@@ -173,6 +174,11 @@ def test_fresh_schema_initialization_is_idempotent_and_uses_wal(tmp_path):
         "admin_credentials",
         "customer_accounts",
         "customer_login_guard",
+        "customer_carts",
+        "cart_items",
+        "cart_checkout_claims",
+        "customer_orders",
+        "invoice_items",
     }
     assert journal_mode.lower() == "wal"
     assert stat.S_IMODE(database_path.stat().st_mode) == 0o600
@@ -216,7 +222,7 @@ def test_schema_version_one_is_upgraded_with_reconciliation_tables(tmp_path):
     finally:
         connection.close()
 
-    assert version == "5"
+    assert version == "6"
     assert {"invoice_poll_claims", "invoice_sweep_attempts"} <= tables
 
 
@@ -259,7 +265,7 @@ def test_schema_version_two_is_upgraded_with_fulfillment_columns(tmp_path):
     finally:
         connection.close()
 
-    assert version == "5"
+    assert version == "6"
     assert {"fulfillment_status", "fulfillment_note", "fulfilled_at"} <= columns
     assert guard_exists is not None
     assert repository.get_invoice(invoice.id) == invoice
@@ -295,7 +301,7 @@ def test_schema_version_three_is_upgraded_with_admin_credentials(tmp_path):
     finally:
         connection.close()
 
-    assert version == "5"
+    assert version == "6"
     assert credential_table is not None
     assert repository.get_admin_credential() is None
 
@@ -329,8 +335,37 @@ def test_schema_version_four_is_upgraded_with_customer_accounts(tmp_path):
     finally:
         connection.close()
 
-    assert version == "5"
+    assert version == "6"
     assert {"customer_accounts", "customer_login_guard"} <= tables
+
+
+def test_schema_five_upgrade_preserves_accounts_and_legacy_invoices(tmp_path):
+    database = SQLiteDatabase(tmp_path / "upgrade-v5.db")
+    database.initialize()
+    repository = ServicesiteRepository(database)
+    repository.insert_category(_category())
+    repository.insert_service(_service())
+    invoice = _creator(repository, FakeWallet()).create_invoice("service-assessment", _quote())
+    account = repository.create_customer_account(
+        customer_id="existing-customer-00000001", username="existing.customer",
+        password_hash=generate_password_hash("existing customer password"), now=NOW,
+    )
+    with database.transaction() as connection:
+        for table in ("invoice_items", "customer_orders", "cart_checkout_claims", "cart_items", "customer_carts"):
+            connection.execute(f"DROP TABLE {table}")
+        connection.execute("UPDATE schema_meta SET value='5' WHERE key='schema_version'")
+
+    database.initialize()
+    database.initialize()
+
+    assert repository.get_customer_account_by_id(account.id) == account
+    assert repository.get_invoice(invoice.id) == invoice
+    assert repository.get_invoice_by_token(invoice.id, invoice.status_token) == invoice
+    assert repository.get_cart(account.id).items == ()
+    assert repository.list_customer_orders(account.id) == []
+    with database.transaction() as connection:
+        assert connection.execute("SELECT value FROM schema_meta WHERE key='schema_version'").fetchone()[0] == "6"
+        assert connection.execute("PRAGMA foreign_key_check").fetchall() == []
 
 
 def test_each_invoice_gets_a_unique_persisted_subaddress(repository_context):

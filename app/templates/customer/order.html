@@ -1,0 +1,29 @@
+{% set private_page = true %}
+{% extends "base.html" %}
+{% block title %}Your order | Servicesite{% endblock %}
+{% block content %}
+  <a class="back-link" href="{{ url_for('customer.account') }}#orders">&#8592; Your orders</a>
+  <header class="shopping-heading order-heading">
+    <p class="eyebrow">Private order</p>
+    <h1>{{ invoice.service_name_snapshot }}</h1>
+    <p class="monospace breakable">{{ invoice.id }}</p>
+  </header>
+  <section class="card payment-card">
+    <div class="status-summary {{ customer_state.tone }}">
+      <span class="status-dot" aria-hidden="true"></span>
+      <div><strong>{{ customer_state.title }}</strong><p>{{ customer_state.message }}</p></div>
+    </div>
+    <dl class="details-list">
+      <div><dt>Order total</dt><dd>{{ invoice.price_usd_cents|usd }}</dd></div>
+      <div><dt>Locked amount</dt><dd class="monospace">{{ xmr_amount }} XMR</dd></div>
+      <div><dt>Created</dt><dd>{{ invoice.created_at|display_datetime }}</dd></div>
+      <div><dt>Payment window ends</dt><dd>{{ invoice.expires_at|display_datetime }}</dd></div>
+    </dl>
+    {% include "_order_items.html" %}
+    <p class="fulfillment-note">{{ customer_state.fulfillment_text }}</p>
+    <div class="button-row">
+      {% if invoice.status.value == "awaiting_payment" %}<a class="button" href="{{ url_for('public.checkout', invoice_id=invoice.id, status_token=invoice.status_token) }}">Open payment invoice</a>{% endif %}
+      <a class="button secondary" href="{{ url_for('public.status', invoice_id=invoice.id, status_token=invoice.status_token) }}">Payment status</a>
+    </div>
+  </section>
+{% endblock %}

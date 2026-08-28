@@ -42,6 +42,14 @@ Admin routes use fixed-expiry sessions, CSRF protection, and private/no-store
 responses. Routine admin views omit bearer tokens, wallet addresses, and
 transaction identifiers.
 
+Customer carts are stored in SQLite under the authenticated customer ID. A
+reviewed cart revision and catalog fingerprint must match at checkout. A
+five-minute SQLite claim prevents concurrent workers from invoicing the same
+revision; the transaction rechecks the claim and every item before inserting
+one invoice, customer ownership, and immutable line snapshots and clearing the
+cart. Order routes check ownership server-side. Existing bearer links remain
+unchanged. See `cart-orders.md` for recovery and upgrade details.
+
 Customer accounts use normalized, case-insensitive unique usernames and
 generated Werkzeug password hashes. Registration, login, logout, and the
 account page are server-rendered and CSRF-protected where state changes. The

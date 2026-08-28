@@ -1,8 +1,8 @@
 # servicesite
 
-Server-rendered Flask service catalog with customer accounts, account-gated
-XMR-only checkout, an authenticated admin-managed catalog, purchase visibility,
-and manual fulfillment.
+Server-rendered Flask service catalog with customer accounts, saved multi-service
+carts, customer order history, account-gated XMR-only checkout, an authenticated
+admin-managed catalog, purchase visibility, and manual fulfillment.
 
 Tasks 0 through 7 establish the application boundary, source inventory, strict
 configuration contract, isolated XMR wallet-RPC transport, fresh SQLite schema,
@@ -32,6 +32,8 @@ app/
   __init__.py             Flask application factory and Task 0 routes
   admin.py                authenticated catalog, purchase, and fulfillment routes
   customer_auth.py        customer registration, login, logout, and session loading
+  orders.py               cart snapshots, quantities, and order line values
+  shopping.py             saved cart and customer-owned order routes
   catalog.py              validated minimal category/service records
   config.py               typed startup and XMR configuration validation
   persistence.py          fresh SQLite schema and transactional repositories
@@ -59,6 +61,7 @@ docs/
   systemd-install.md
   web-checkout.md
   customer-accounts.md
+  cart-orders.md
   xmr-reconciliation.md
   xmr-source-inventory.md
   xmr-wallet-rpc.md
@@ -145,6 +148,18 @@ PIN failures share the same SQLite-backed global rate limit. Admin responses
 are private/no-store, all state-changing forms require CSRF, catalog records are
 archived instead of deleted, and fulfillment is rejected until payment is
 settled. See `docs/admin.md`.
+
+## Customer cart and orders
+
+Signed-in customers can add services, adjust quantities, and create one XMR
+invoice for the whole cart. `/account` lists their 100 most recent orders;
+order details remain ownership-checked. Direct single-service purchases also
+appear in this history. Existing bearer payment links continue to work.
+
+**Database migration required: schema 5 to 6.** Back up the database, stop the
+web service, and run the documented initializer before restarting. Existing
+accounts and invoices are preserved. See `docs/cart-orders.md` and the exact
+operator commands in `docs/deploy-xmr.md`.
 
 ## Next task
 

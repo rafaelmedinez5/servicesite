@@ -13,6 +13,11 @@ database, CoinGecko key, payment, or polling job was accessed.
 | `GET, POST` | `/login` | Start a customer session | Public form; CSRF and per-account rate limit |
 | `GET` | `/account` | Show the signed-in customer account | Customer session |
 | `POST` | `/logout` | End the customer session | Customer session plus CSRF |
+| `GET` | `/cart` | Review saved services, quantities, and current prices | Customer session |
+| `POST` | `/cart/add` | Add a service to the customer's cart | Customer session plus CSRF |
+| `POST` | `/cart/items/<service_id>` | Set quantity or remove an item | Customer session plus CSRF |
+| `POST` | `/cart/checkout` | Create one invoice for the complete cart | Customer session, CSRF, nonce, revision, and SQLite claim |
+| `GET` | `/account/orders/<invoice_id>` | Order items and payment/fulfillment progress | Owning customer session |
 | `POST` | `/checkout` | Validate form, obtain quote, create one invoice | Customer session, CSRF, and single-use form nonce |
 | `GET` | `/checkout/<invoice_id>/<status_token>` | Locked amount, unique address, expiry, and links | Invoice bearer token |
 | `GET` | `/checkout/<invoice_id>/<status_token>/qr.png` | Monero payment QR | Invoice bearer token |
@@ -50,6 +55,10 @@ There is no hard-coded or cached indefinite fallback.
   same generic 404 response and do not reveal catalog state.
 - Service identity and current publication state are revalidated server-side,
   then rechecked transactionally by the canonical invoice creator.
+- Cart checkout validates the reviewed revision and full catalog fingerprint
+  before rate or wallet access. A SQLite lease serializes checkout for that
+  revision; stale workers cannot commit after a lease takeover. Prices,
+  quantities, and ownership are never accepted from client-supplied totals.
 - Checkout, QR, status, private errors, and redirects use `no-store` and
   `X-Robots-Tag: noindex, nofollow, noarchive`.
 - All responses deny scripts, framing, cross-origin referrers, MIME sniffing,

@@ -9,6 +9,7 @@ from app.config import Settings
 from app.customer_auth import register_customer_auth
 from app.internal import register_internal
 from app.persistence import SQLiteDatabase, ServicesiteRepository
+from app.shopping import register_shopping
 from app.web import register_web
 
 
@@ -84,6 +85,7 @@ def create_app(test_config: dict | None = None) -> Flask:
 
     register_web(app)
     register_customer_auth(app)
+    register_shopping(app)
     register_admin(app)
     register_internal(app)
 

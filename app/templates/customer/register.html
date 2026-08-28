@@ -26,7 +26,7 @@
         {% if next_path %}<input type="hidden" name="next" value="{{ next_path }}">{% endif %}
         <label>
           Username
-          <input name="username" value="{{ username or '' }}" minlength="3" maxlength="32" pattern="[a-z0-9][a-z0-9._-]{1,30}[a-z0-9]" autocomplete="username" autocapitalize="none" spellcheck="false" required>
+          <input name="username" value="{{ username or '' }}" minlength="3" maxlength="32" pattern="[a-z0-9][a-z0-9._\-]{1,30}[a-z0-9]" autocomplete="username" autocapitalize="none" spellcheck="false" required>
           <small>3–32 lowercase letters, numbers, periods, underscores, or hyphens.</small>
         </label>
         <label>

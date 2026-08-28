@@ -1,0 +1,20 @@
+{% if items %}
+  <section class="order-items" aria-label="Saved order items">
+    <h3>Order items</h3>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th scope="col">Service</th><th scope="col">Qty</th><th scope="col">Unit price</th><th scope="col">Subtotal</th></tr></thead>
+        <tbody>
+          {% for item in items %}
+            <tr>
+              <td><strong>{{ item.service.service_name }}</strong><small>{{ item.service.category_name }}{% if item.service.duration_label %} · {{ item.service.duration_label }}{% endif %}</small><p class="order-description">{{ item.service.service_description }}</p></td>
+              <td>{{ item.quantity }}</td>
+              <td>{{ item.service.price_usd_cents|usd }}</td>
+              <td>{{ item.total_usd_cents|usd }}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+{% endif %}
