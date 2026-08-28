@@ -94,12 +94,53 @@ a {
 
 .site-nav a:hover,
 .site-nav a:focus-visible,
+.account-nav a:hover,
+.account-nav a:focus-visible,
 .text-link:hover,
 .text-link:focus-visible {
   color: #fff;
   text-decoration: underline;
   text-decoration-color: var(--blue);
   text-underline-offset: 0.35rem;
+}
+
+.account-nav {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+}
+
+.account-nav a,
+.nav-button {
+  color: #d6dde7;
+  font-size: 0.8rem;
+  font-weight: 750;
+  text-decoration: none;
+}
+
+.account-nav form {
+  margin: 0;
+}
+
+.account-nav .nav-cta {
+  padding: 0.5rem 0.7rem;
+  border: 1px solid var(--border-bright);
+  color: #fff;
+}
+
+.nav-button {
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
+.nav-button:hover,
+.nav-button:focus-visible {
+  border: 0;
+  background: transparent;
+  color: #fff;
+  outline-color: rgba(118, 215, 255, 0.28);
 }
 
 .network-label,
@@ -720,6 +761,16 @@ p {
   width: 100%;
 }
 
+.purchase-auth-actions {
+  display: grid;
+  gap: 0.9rem;
+}
+
+.purchase-auth-actions .text-link {
+  padding: 0.35rem;
+  text-align: center;
+}
+
 .purchase-assurances {
   display: grid;
   gap: 0.65rem;
@@ -805,6 +856,22 @@ button:focus-visible,
 .button.secondary:focus-visible {
   border-color: #71809a;
   background: #202a39;
+}
+
+button.nav-button,
+button.nav-button:hover,
+button.nav-button:focus-visible {
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: #d6dde7;
+}
+
+button.nav-button:hover,
+button.nav-button:focus-visible {
+  color: #fff;
+  outline-color: rgba(118, 215, 255, 0.28);
 }
 
 .empty-state,
@@ -1074,6 +1141,108 @@ dd {
 .flash.error,
 .form-error { border-color: var(--danger); color: #ffd7dc; }
 
+.auth-layout,
+.account-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.15fr) minmax(20rem, 0.75fr);
+  gap: clamp(2.5rem, 8vw, 7rem);
+  align-items: center;
+}
+
+.auth-intro h1,
+.account-layout h1 {
+  font-size: clamp(3rem, 7vw, 5.8rem);
+}
+
+.auth-assurances {
+  display: grid;
+  gap: 0;
+  max-width: 44rem;
+  margin: 2.5rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.auth-assurances li {
+  display: grid;
+  grid-template-columns: 2.4rem 1fr;
+  padding: 0.9rem 0;
+  border-top: 1px solid var(--border);
+  color: var(--muted);
+  font-size: 0.88rem;
+  line-height: 1.55;
+}
+
+.auth-assurances li:last-child {
+  border-bottom: 1px solid var(--border);
+}
+
+.auth-assurances span {
+  color: var(--blue);
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  font-size: 0.72rem;
+}
+
+.auth-card,
+.account-card {
+  padding: clamp(1.5rem, 4vw, 2.3rem);
+  border-color: var(--border-bright);
+  background:
+    linear-gradient(135deg, rgba(118, 215, 255, 0.065), transparent 34%),
+    rgba(15, 21, 30, 0.96);
+}
+
+.auth-card .terminal-label,
+.account-card .terminal-label {
+  margin-bottom: 0.8rem;
+  font-size: 0.7rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.auth-switch {
+  margin: 1.25rem 0 0;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border);
+  font-size: 0.86rem;
+}
+
+.auth-switch a {
+  color: #fff;
+  font-weight: 750;
+}
+
+.account-layout {
+  align-items: start;
+}
+
+.account-layout .hero-actions form {
+  margin: 0;
+}
+
+.account-facts {
+  margin: 1.5rem 0 0;
+}
+
+.account-facts > div {
+  padding: 1rem 0;
+  border-top: 1px solid var(--border);
+}
+
+.account-facts dd {
+  margin: 0;
+  color: #fff;
+  font-weight: 750;
+}
+
+.account-note {
+  margin: 1rem 0 0;
+  padding: 1rem;
+  border-left: 2px solid var(--accent);
+  background: rgba(255, 155, 82, 0.06);
+  font-size: 0.82rem;
+}
+
 .admin-nav {
   display: flex;
   flex-wrap: wrap;
@@ -1180,7 +1349,9 @@ th { color: var(--muted); font-size: 0.78rem; text-transform: uppercase; }
   .home-hero,
   .catalog-intro,
   .process-section,
-  .service-detail-layout {
+  .service-detail-layout,
+  .auth-layout,
+  .account-layout {
     grid-template-columns: 1fr;
   }
 
@@ -1225,6 +1396,10 @@ th { color: var(--muted); font-size: 0.78rem; text-transform: uppercase; }
   }
 
   .network-label {
+    display: none;
+  }
+
+  .account-nav {
     margin-left: auto;
   }
 
@@ -1300,6 +1475,10 @@ th { color: var(--muted); font-size: 0.78rem; text-transform: uppercase; }
   .button,
   button {
     width: 100%;
+  }
+
+  button.nav-button {
+    width: auto;
   }
 
   .hero-actions {

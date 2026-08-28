@@ -17,6 +17,18 @@
         <a href="{{ url_for('public.index') }}#services">Services</a>
         <a href="{{ url_for('public.index') }}#process">Process</a>
       </nav>
+      <div class="account-nav">
+        {% if g.customer %}
+          <a href="{{ url_for('customer.account') }}">@{{ g.customer.username }}</a>
+          <form method="post" action="{{ url_for('customer.logout') }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button class="nav-button" type="submit">Log out</button>
+          </form>
+        {% else %}
+          <a href="{{ url_for('customer.login') }}">Log in</a>
+          <a class="nav-cta" href="{{ url_for('customer.register') }}">Create account</a>
+        {% endif %}
+      </div>
       <span class="network-label"><span class="network-dot" aria-hidden="true"></span>XMR only</span>
     </header>
     <main class="page-shell">

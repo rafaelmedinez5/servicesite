@@ -72,19 +72,26 @@
         <p class="terminal-label">Secure checkout</p>
         <span>XMR only</span>
       </div>
-      <h2 id="purchase-title">Create your invoice</h2>
-      <p>Continue when you are ready to lock the XMR amount for this service.</p>
+      <h2 id="purchase-title">{{ "Create your invoice" if g.customer else "Sign in to continue" }}</h2>
+      <p>{% if g.customer %}Continue when you are ready to lock the XMR amount for this service.{% else %}Create an account or log in before starting secure checkout.{% endif %}</p>
       <div class="purchase-price">
         <span>Service price</span>
         <strong>{{ service.price_usd_cents|usd }}</strong>
         <small>{{ service.duration_label or "Custom engagement" }}</small>
       </div>
-      <form method="post" action="{{ url_for('public.create_checkout') }}">
-        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-        <input type="hidden" name="checkout_nonce" value="{{ checkout_nonce }}">
-        <input type="hidden" name="service_id" value="{{ service.service_id }}">
-        <button type="submit">Create XMR invoice <span aria-hidden="true">&#8594;</span></button>
-      </form>
+      {% if g.customer %}
+        <form method="post" action="{{ url_for('public.create_checkout') }}">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <input type="hidden" name="checkout_nonce" value="{{ checkout_nonce }}">
+          <input type="hidden" name="service_id" value="{{ service.service_id }}">
+          <button type="submit">Create XMR invoice <span aria-hidden="true">&#8594;</span></button>
+        </form>
+      {% else %}
+        <div class="purchase-auth-actions">
+          <a class="button" href="{{ url_for('customer.login', next=request.path) }}">Log in to purchase <span aria-hidden="true">&#8594;</span></a>
+          <a class="text-link" href="{{ url_for('customer.register', next=request.path) }}">Create an account</a>
+        </div>
+      {% endif %}
       <ul class="purchase-assurances">
         <li>Unique address for this invoice</li>
         <li>Exact amount shown before payment</li>

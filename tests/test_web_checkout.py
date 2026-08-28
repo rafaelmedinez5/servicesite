@@ -6,6 +6,7 @@ from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 
 import pytest
+from werkzeug.security import generate_password_hash
 
 from app import create_app
 from app.catalog import CategoryRecord, ServiceRecord
@@ -68,6 +69,12 @@ def web_context(tmp_path, monkeypatch):
     repository = ServicesiteRepository(database)
     repository.insert_category(_category())
     repository.insert_service(_service())
+    repository.create_customer_account(
+        customer_id="customer-test-00000001",
+        username="test.customer",
+        password_hash=generate_password_hash("correct horse battery staple"),
+        now=NOW,
+    )
     wallet = FakeWallet()
     rate_provider = FakeRateProvider()
     app = create_app(
@@ -123,11 +130,31 @@ def _service(*, service_id="service-assessment", published=True):
 
 
 def _form_tokens(client):
+    _login_customer(client)
     response = client.get("/services/service-assessment-slug")
     assert response.status_code == 200
     tokens = {match.group("name"): match.group("value") for match in TOKEN_PATTERN.finditer(response.get_data(as_text=True))}
     assert set(tokens) == {"csrf_token", "checkout_nonce"}
     return tokens
+
+
+def _login_customer(client):
+    if client.get("/account").status_code == 200:
+        return
+    response = client.get("/login")
+    tokens = {
+        match.group("name"): match.group("value")
+        for match in TOKEN_PATTERN.finditer(response.get_data(as_text=True))
+    }
+    login = client.post(
+        "/login",
+        data={
+            "csrf_token": tokens["csrf_token"],
+            "username": "test.customer",
+            "password": "correct horse battery staple",
+        },
+    )
+    assert login.status_code == 303
 
 
 def _create_invoice(context):
@@ -169,7 +196,7 @@ def test_public_catalog_renders_only_published_services(web_context):
     assert "<script" not in body.lower()
 
 
-def test_service_detail_shows_purchase_information_and_protected_form(web_context):
+def test_service_detail_is_public_but_requires_login_to_purchase(web_context):
     response = web_context.client.get("/services/service-assessment-slug")
     body = response.get_data(as_text=True)
 
@@ -179,13 +206,36 @@ def test_service_detail_shows_purchase_information_and_protected_form(web_contex
     assert "Security Services" in body
     assert "One engagement" in body
     assert "$100.00 USD" in body
-    assert 'action="/checkout"' in body
-    assert 'name="service_id" value="service-assessment"' in body
-    assert 'name="csrf_token"' in body
-    assert 'name="checkout_nonce"' in body
+    assert "Sign in to continue" in body
+    assert 'href="/login?next=/services/service-assessment-slug"' in body
+    assert 'href="/register?next=/services/service-assessment-slug"' in body
+    assert 'action="/checkout"' not in body
+    assert 'name="checkout_nonce"' not in body
     assert "Payment does not authorize testing" in body
     assert "<script" not in body.lower()
     assert response.headers["Cache-Control"] == "no-store, private, max-age=0"
+
+
+def test_signed_in_service_detail_shows_protected_checkout_form(web_context):
+    tokens = _form_tokens(web_context.client)
+    response = web_context.client.get("/services/service-assessment-slug")
+    body = response.get_data(as_text=True)
+
+    assert response.status_code == 200
+    assert 'action="/checkout"' in body
+    assert 'name="service_id" value="service-assessment"' in body
+    assert set(tokens) == {"csrf_token", "checkout_nonce"}
+    assert 'name="checkout_nonce"' in body
+
+
+def test_checkout_redirects_anonymous_customers_before_external_calls(web_context):
+    response = web_context.client.post("/checkout", data={})
+
+    assert response.status_code == 303
+    assert response.headers["Location"].endswith("/login?next=/")
+    assert web_context.repository.count_invoices() == 0
+    assert web_context.rate_provider.calls == 0
+    assert web_context.wallet.calls == []
 
 
 def test_unknown_and_unpublished_service_details_return_404(web_context):
@@ -205,6 +255,7 @@ def test_unknown_and_unpublished_service_details_return_404(web_context):
 
 
 def test_csrf_and_service_validation_happen_before_invoice_creation(web_context):
+    _login_customer(web_context.client)
     missing_csrf = web_context.client.post(
         "/checkout",
         data={"service_id": "service-assessment", "checkout_nonce": "invalid"},

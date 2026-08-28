@@ -4,15 +4,16 @@ Status: Tasks 0 through 7 plus the admin checkpoint. The validated wallet transp
 persistence, canonical invoice domain, fresh SQLite schema, and private web
 checkout/status boundary are implemented. The protected reconciliation boundary
 is implemented but not scheduled or production-verified. Sanitized deployment
-units and a read-only deployment preflight exist. Single-admin catalog,
-purchase visibility, and fulfillment are implemented; stagenet payment
-verification remains a separate task.
+units and a read-only deployment preflight exist. Customer registration and
+account-gated checkout plus single-admin catalog, purchase visibility, and
+fulfillment are implemented; stagenet payment verification remains a separate
+task.
 
 ## Runtime components
 
 | Component | Responsibility | Boundary |
 | --- | --- | --- |
-| Public Flask app | Server-rendered catalog, checkout, and private status pages | `servicesite` user; loopback `127.0.0.1:5100` |
+| Public Flask app | Server-rendered catalog, customer accounts, checkout, and private status pages | `servicesite` user; loopback `127.0.0.1:5100` |
 | Admin Flask routes | Purchase visibility and catalog management | Same process; authenticated, CSRF-protected admin session |
 | SQLite | Catalog, purchase, invoice, and fulfillment records | Fresh DB under `/opt/servicesite/instance` with WAL mode |
 | XMR poll job | Reconcile invoice transfers and confirmations | Separate oneshot/timer; protected internal interface |
@@ -41,6 +42,14 @@ Admin routes use fixed-expiry sessions, CSRF protection, and private/no-store
 responses. Routine admin views omit bearer tokens, wallet addresses, and
 transaction identifiers.
 
+Customer accounts use normalized, case-insensitive unique usernames and
+generated Werkzeug password hashes. Registration, login, logout, and the
+account page are server-rendered and CSRF-protected where state changes. The
+signed session stores only the customer ID, username, and credential version;
+each request reloads the account from SQLite. Login failures are limited per
+existing customer account so one Tor client cannot globally lock out every
+customer. Auth and account responses are private, no-store, and noindex.
+
 ## Payment separation
 
 Catalog administration does not mutate an open invoice. Checkout locks a USD
@@ -65,9 +74,9 @@ snapshots, and expiry. A later catalog edit cannot alter historical invoices.
 The public catalog and individual service-detail routes read only published,
 non-archived categories and services. Service-detail pages use the unique,
 validated service slug and return a generic 404 for unavailable records.
-Checkout begins from the detail page and uses a signed-session CSRF token plus
-a single-use form nonce, obtains a timestamped CoinGecko quote, and calls only
-the canonical `InvoiceCreator`.
+Checkout begins from the detail page only for an authenticated customer and
+uses a signed-session CSRF token plus a single-use form nonce, obtains a
+timestamped CoinGecko quote, and calls only the canonical `InvoiceCreator`.
 The route does not calculate amounts or create subaddresses itself.
 
 Checkout, QR, and status resources require the invoice bearer token and return
@@ -125,6 +134,7 @@ poll reconciliation, transfer/sweep XMR, alter a file, or operate a service.
 - Task 2: wallet-rpc transport and complete XMR configuration validation.
 - Task 3: minimal catalog/invoice persistence and canonical invoice domain.
 - Task 4: public catalog, checkout, QR, and private status views.
+- Customer registration, login, account sessions, and account-gated checkout are implemented.
 - Admin authentication, catalog management, purchase filters, and guarded manual fulfillment are implemented.
 - Task 5: poll/confirm/sweep orchestration (implemented; staged verification pending).
 - Task 6: sanitized systemd units, poll launcher, and install/rollback commands.

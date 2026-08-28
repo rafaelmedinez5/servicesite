@@ -1,0 +1,46 @@
+{% set private_page = true %}
+{% extends "base.html" %}
+
+{% block title %}Create account | Servicesite{% endblock %}
+
+{% block content %}
+  <section class="auth-layout" aria-labelledby="register-title">
+    <div class="auth-intro">
+      <p class="eyebrow"><span class="eyebrow-line" aria-hidden="true"></span>Customer access</p>
+      <h1 id="register-title">Create your account.</h1>
+      <p class="lede">Use one private account to enter checkout and keep future purchases connected to a consistent identity.</p>
+      <ul class="auth-assurances">
+        <li><span aria-hidden="true">01</span>Passwords are stored only as strong one-way hashes.</li>
+        <li><span aria-hidden="true">02</span>Account pages are private and never cached.</li>
+        <li><span aria-hidden="true">03</span>No email address or third-party identity provider is required.</li>
+      </ul>
+    </div>
+
+    <div class="card auth-card">
+      <p class="terminal-label">New customer</p>
+      <h2>Choose your credentials</h2>
+      <p>Create a username you can remember and a unique password you store safely.</p>
+      {% if error %}<p class="form-error" role="alert">{{ error }}</p>{% endif %}
+      <form class="admin-form" method="post" action="{{ url_for('customer.register') }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        {% if next_path %}<input type="hidden" name="next" value="{{ next_path }}">{% endif %}
+        <label>
+          Username
+          <input name="username" value="{{ username or '' }}" minlength="3" maxlength="32" pattern="[a-z0-9][a-z0-9._-]{1,30}[a-z0-9]" autocomplete="username" autocapitalize="none" spellcheck="false" required>
+          <small>3–32 lowercase letters, numbers, periods, underscores, or hyphens.</small>
+        </label>
+        <label>
+          Password
+          <input type="password" name="password" minlength="12" maxlength="1024" autocomplete="new-password" required>
+          <small>Use at least 12 characters and do not reuse this password elsewhere.</small>
+        </label>
+        <label>
+          Confirm password
+          <input type="password" name="confirm_password" minlength="12" maxlength="1024" autocomplete="new-password" required>
+        </label>
+        <button type="submit">Create account <span aria-hidden="true">&#8594;</span></button>
+      </form>
+      <p class="auth-switch">Already registered? <a href="{{ url_for('customer.login', next=next_path) if next_path else url_for('customer.login') }}">Log in</a></p>
+    </div>
+  </section>
+{% endblock %}
