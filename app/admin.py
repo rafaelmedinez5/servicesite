@@ -8,6 +8,7 @@ from typing import Callable
 
 from flask import (
     Blueprint,
+    Response,
     abort,
     current_app,
     flash,
@@ -29,6 +30,11 @@ from app.persistence import (
     InvoiceNotFoundError,
     PersistenceError,
     ServicesiteRepository,
+)
+from app.service_images import (
+    ServiceImageError,
+    ServiceImageStore,
+    sanitize_service_image,
 )
 from app.web_security import FormSecurityError, require_csrf
 
@@ -398,12 +404,115 @@ def service_edit(service_id: str):
 def service_archive(service_id: str):
     _require_admin_csrf()
     try:
+        service = _repository().get_service(service_id)
         _repository().archive_service(service_id, now=_now())
     except (PersistenceError, sqlite3.Error):
         flash("The service could not be archived.", "error")
     else:
+        if service is not None:
+            _image_store().delete(service.image_key)
         flash("Service archived and removed from the public catalog.", "success")
     return redirect(url_for("admin.services"), code=303)
+
+
+@admin.post("/services/<service_id>/image")
+def service_image_upload(service_id: str):
+    _require_admin_csrf()
+    repository = _repository()
+    try:
+        service = repository.get_service(service_id)
+    except (PersistenceError, sqlite3.Error):
+        abort(503)
+    if service is None or service.archived:
+        abort(404)
+
+    upload = request.files.get("image")
+    try:
+        sanitized = sanitize_service_image(upload.stream if upload else None)
+        new_key = _image_store().save(sanitized)
+    except (ServiceImageError, OSError) as exc:
+        flash(
+            str(exc) if isinstance(exc, ServiceImageError)
+            else "The image could not be stored.",
+            "error",
+        )
+        return redirect(url_for("admin.service_edit", service_id=service_id), code=303)
+
+    try:
+        changed = repository.replace_service_image_key(
+            service_id,
+            expected_image_key=service.image_key,
+            new_image_key=new_key,
+            now=_now(),
+        )
+    except (PersistenceError, sqlite3.Error, ValueError):
+        _image_store().delete(new_key)
+        flash("The image could not be attached to this service.", "error")
+        return redirect(url_for("admin.service_edit", service_id=service_id), code=303)
+    if not changed:
+        _image_store().delete(new_key)
+        flash("The service image changed. Reload the page and try again.", "error")
+        return redirect(url_for("admin.service_edit", service_id=service_id), code=303)
+
+    _image_store().delete(service.image_key)
+    flash("Service image saved. Source metadata and filename were discarded.", "success")
+    return redirect(url_for("admin.service_edit", service_id=service_id), code=303)
+
+
+@admin.post("/services/<service_id>/image/remove")
+def service_image_remove(service_id: str):
+    _require_admin_csrf()
+    repository = _repository()
+    try:
+        service = repository.get_service(service_id)
+        if service is None or service.archived:
+            abort(404)
+        if service.image_key is None:
+            flash("This service does not have an image.", "error")
+            return redirect(url_for("admin.service_edit", service_id=service_id), code=303)
+        changed = repository.replace_service_image_key(
+            service_id,
+            expected_image_key=service.image_key,
+            new_image_key=None,
+            now=_now(),
+        )
+    except (PersistenceError, sqlite3.Error, ValueError):
+        flash("The service image could not be removed.", "error")
+        return redirect(url_for("admin.service_edit", service_id=service_id), code=303)
+    if not changed:
+        flash("The service image changed. Reload the page and try again.", "error")
+    else:
+        _image_store().delete(service.image_key)
+        flash("Service image removed.", "success")
+    return redirect(url_for("admin.service_edit", service_id=service_id), code=303)
+
+
+@admin.get("/services/<service_id>/image/<image_key>.webp")
+def service_image_preview(service_id: str, image_key: str):
+    try:
+        service = _repository().get_service(service_id)
+    except (PersistenceError, sqlite3.Error):
+        abort(503)
+    if (
+        service is None
+        or service.image_key is None
+        or not secrets.compare_digest(service.image_key, image_key)
+    ):
+        abort(404)
+    try:
+        data = _image_store().read(image_key)
+    except ServiceImageError:
+        abort(404)
+    if data is None:
+        abort(404)
+    return Response(
+        data,
+        200,
+        {
+            "Content-Type": "image/webp",
+            "Content-Disposition": 'inline; filename="service-image.webp"',
+        },
+    )
 
 
 @admin.get("/purchases")
@@ -610,11 +719,17 @@ def _save_service(existing: ServiceRecord | None, categories: list[CategoryRecor
             error=_safe_form_error(exc),
         ), 400
     flash("Service saved.", "success")
+    if existing is None:
+        return redirect(url_for("admin.service_edit", service_id=record.id), code=303)
     return redirect(url_for("admin.services"), code=303)
 
 
 def _repository() -> ServicesiteRepository:
     return current_app.extensions["servicesite_repository"]
+
+
+def _image_store() -> ServiceImageStore:
+    return current_app.extensions["servicesite_image_store"]
 
 
 def _now() -> datetime:

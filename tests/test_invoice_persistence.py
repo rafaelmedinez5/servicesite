@@ -27,6 +27,7 @@ from app.persistence import (
     DatabaseNotFreshError,
     FulfillmentStatus,
     InvoicePersistenceError,
+    SCHEMA_VERSION,
     SQLiteDatabase,
     ServicesiteRepository,
 )
@@ -222,7 +223,7 @@ def test_schema_version_one_is_upgraded_with_reconciliation_tables(tmp_path):
     finally:
         connection.close()
 
-    assert version == "6"
+    assert version == str(SCHEMA_VERSION)
     assert {"invoice_poll_claims", "invoice_sweep_attempts"} <= tables
 
 
@@ -265,7 +266,7 @@ def test_schema_version_two_is_upgraded_with_fulfillment_columns(tmp_path):
     finally:
         connection.close()
 
-    assert version == "6"
+    assert version == str(SCHEMA_VERSION)
     assert {"fulfillment_status", "fulfillment_note", "fulfilled_at"} <= columns
     assert guard_exists is not None
     assert repository.get_invoice(invoice.id) == invoice
@@ -301,7 +302,7 @@ def test_schema_version_three_is_upgraded_with_admin_credentials(tmp_path):
     finally:
         connection.close()
 
-    assert version == "6"
+    assert version == str(SCHEMA_VERSION)
     assert credential_table is not None
     assert repository.get_admin_credential() is None
 
@@ -335,7 +336,7 @@ def test_schema_version_four_is_upgraded_with_customer_accounts(tmp_path):
     finally:
         connection.close()
 
-    assert version == "6"
+    assert version == str(SCHEMA_VERSION)
     assert {"customer_accounts", "customer_login_guard"} <= tables
 
 
@@ -364,8 +365,37 @@ def test_schema_five_upgrade_preserves_accounts_and_legacy_invoices(tmp_path):
     assert repository.get_cart(account.id).items == ()
     assert repository.list_customer_orders(account.id) == []
     with database.transaction() as connection:
-        assert connection.execute("SELECT value FROM schema_meta WHERE key='schema_version'").fetchone()[0] == "6"
+        assert connection.execute("SELECT value FROM schema_meta WHERE key='schema_version'").fetchone()[0] == str(SCHEMA_VERSION)
         assert connection.execute("PRAGMA foreign_key_check").fetchall() == []
+
+
+def test_schema_six_upgrade_adds_service_image_key_without_losing_catalog(tmp_path):
+    database = SQLiteDatabase(tmp_path / "upgrade-v6.db")
+    database.initialize()
+    repository = ServicesiteRepository(database)
+    repository.insert_category(_category())
+    repository.insert_service(_service())
+    with database.transaction() as connection:
+        connection.execute("DROP INDEX idx_services_image_key")
+        connection.execute("ALTER TABLE services DROP COLUMN image_key")
+        connection.execute("UPDATE schema_meta SET value='6' WHERE key='schema_version'")
+
+    database.initialize()
+
+    service = repository.get_service("service-assessment")
+    with database.transaction() as connection:
+        version = connection.execute(
+            "SELECT value FROM schema_meta WHERE key='schema_version'"
+        ).fetchone()[0]
+        columns = {
+            row["name"] for row in connection.execute("PRAGMA table_info(services)")
+        }
+        foreign_key_errors = connection.execute("PRAGMA foreign_key_check").fetchall()
+
+    assert version == str(SCHEMA_VERSION)
+    assert "image_key" in columns
+    assert service is not None and service.image_key is None
+    assert foreign_key_errors == []
 
 
 def test_each_invoice_gets_a_unique_persisted_subaddress(repository_context):

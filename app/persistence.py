@@ -24,7 +24,7 @@ from app.payments.invoice import (
 from app.payments.xmr_wallet_rpc import MAX_ATOMIC_UNITS
 
 
-SCHEMA_VERSION = 6
+SCHEMA_VERSION = 7
 
 
 class PersistenceError(RuntimeError):
@@ -160,14 +160,17 @@ class SQLiteDatabase:
                     "3",
                     "4",
                     "5",
+                    "6",
                     str(SCHEMA_VERSION),
                 }:
                     raise SchemaVersionError("database schema version is unsupported")
 
                 if previous_version in {"1", "2"}:
                     _ensure_fulfillment_columns(connection)
+                if previous_version in {"1", "2", "3", "4", "5", "6"}:
+                    _ensure_service_image_column(connection)
                 connection.executescript(_SCHEMA_SQL)
-                if previous_version in {"1", "2", "3", "4", "5"}:
+                if previous_version in {"1", "2", "3", "4", "5", "6"}:
                     connection.execute(
                         "UPDATE schema_meta SET value=? WHERE key='schema_version'",
                         (str(SCHEMA_VERSION),),
@@ -239,8 +242,8 @@ class ServicesiteRepository:
                     INSERT INTO services(
                         id, category_id, name, slug, description, price_usd_cents,
                         duration_label, published, archived, sort_order, version,
-                        created_at, updated_at
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        created_at, updated_at, image_key
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """,
                     (
                         service.id,
@@ -256,6 +259,7 @@ class ServicesiteRepository:
                         service.version,
                         _serialize_datetime(service.created_at),
                         _serialize_datetime(service.updated_at),
+                        service.image_key,
                     ),
                 )
         except sqlite3.IntegrityError as exc:
@@ -393,13 +397,41 @@ class ServicesiteRepository:
             result = connection.execute(
                 """
                 UPDATE services
-                SET published=0, archived=1, version=version+1, updated_at=?
+                SET published=0, archived=1, image_key=NULL,
+                    version=version+1, updated_at=?
                 WHERE id=? AND archived=0
                 """,
                 (_serialize_datetime(now), service_id),
             )
             if result.rowcount != 1:
                 raise PersistenceError("service was not found or is already archived")
+
+    def replace_service_image_key(
+        self,
+        service_id: str,
+        *,
+        expected_image_key: str | None,
+        new_image_key: str | None,
+        now: datetime,
+    ) -> bool:
+        _validate_service_image_key(expected_image_key)
+        _validate_service_image_key(new_image_key)
+        _require_aware_datetime(now, "service image update time")
+        with self.database.transaction(immediate=True) as connection:
+            result = connection.execute(
+                """
+                UPDATE services
+                SET image_key=?, version=version+1, updated_at=?
+                WHERE id=? AND archived=0 AND image_key IS ?
+                """,
+                (
+                    new_image_key,
+                    _serialize_datetime(now),
+                    service_id,
+                    expected_image_key,
+                ),
+            )
+            return result.rowcount == 1
 
     def update_service_price(
         self, service_id: str, *, price_usd_cents: int, now: datetime
@@ -439,6 +471,7 @@ class ServicesiteRepository:
                     s.name AS service_name,
                     s.description AS service_description,
                     s.duration_label,
+                    s.image_key,
                     s.price_usd_cents,
                     c.id AS category_id,
                     c.name AS category_name,
@@ -469,6 +502,7 @@ class ServicesiteRepository:
                     s.name AS service_name,
                     s.description AS service_description,
                     s.duration_label,
+                    s.image_key,
                     s.price_usd_cents,
                     c.id AS category_id,
                     c.name AS category_name,
@@ -1394,6 +1428,7 @@ def _fetch_purchasable_service(
             s.name AS service_name,
             s.description AS service_description,
             s.duration_label,
+            s.image_key,
             s.price_usd_cents,
             c.id AS category_id,
             c.name AS category_name,
@@ -1423,6 +1458,7 @@ def _row_to_purchasable_service(row: sqlite3.Row) -> PurchasableService:
         category_name=row["category_name"],
         category_description=row["category_description"],
         price_usd_cents=int(row["price_usd_cents"]),
+        image_key=row["image_key"],
     )
 
 
@@ -1455,6 +1491,7 @@ def _row_to_service(row: sqlite3.Row) -> ServiceRecord:
         version=int(row["version"]),
         created_at=_parse_datetime(row["created_at"]),
         updated_at=_parse_datetime(row["updated_at"]),
+        image_key=row["image_key"],
     )
 
 
@@ -1656,6 +1693,17 @@ def _validate_customer_password_hash(value: str) -> None:
         raise PersistenceError("customer password hash is invalid")
 
 
+def _validate_service_image_key(value: str | None) -> None:
+    if value is None:
+        return
+    if (
+        not isinstance(value, str)
+        or len(value) != 64
+        or any(character not in "0123456789abcdef" for character in value)
+    ):
+        raise PersistenceError("service image key is invalid")
+
+
 def _ensure_fulfillment_columns(connection: sqlite3.Connection) -> None:
     columns = {
         row["name"] for row in connection.execute("PRAGMA table_info(invoices)")
@@ -1673,6 +1721,18 @@ def _ensure_fulfillment_columns(connection: sqlite3.Connection) -> None:
     for name, statement in additions.items():
         if name not in columns:
             connection.execute(statement)
+
+
+def _ensure_service_image_column(connection: sqlite3.Connection) -> None:
+    columns = {
+        row["name"] for row in connection.execute("PRAGMA table_info(services)")
+    }
+    if "image_key" not in columns:
+        connection.execute(
+            "ALTER TABLE services ADD COLUMN image_key TEXT "
+            "CHECK (image_key IS NULL OR (length(image_key)=64 "
+            "AND image_key NOT GLOB '*[^0-9a-f]*'))"
+        )
 
 
 _SCHEMA_SQL = """
@@ -1701,7 +1761,12 @@ CREATE TABLE IF NOT EXISTS services (
     sort_order INTEGER NOT NULL DEFAULT 0,
     version INTEGER NOT NULL DEFAULT 1 CHECK (version > 0),
     created_at TEXT NOT NULL,
-    updated_at TEXT NOT NULL
+    updated_at TEXT NOT NULL,
+    image_key TEXT CHECK (
+        image_key IS NULL OR (
+            length(image_key)=64 AND image_key NOT GLOB '*[^0-9a-f]*'
+        )
+    )
 );
 
 CREATE TABLE IF NOT EXISTS invoices (
@@ -1849,6 +1914,8 @@ CREATE TABLE IF NOT EXISTS invoice_sweep_attempts (
 
 CREATE INDEX IF NOT EXISTS idx_services_public
     ON services(category_id, published, archived, sort_order);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_services_image_key
+    ON services(image_key) WHERE image_key IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_invoices_open
     ON invoices(status, expires_at);
 CREATE INDEX IF NOT EXISTS idx_invoices_service

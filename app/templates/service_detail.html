@@ -15,6 +15,9 @@
     <div class="service-detail-main">
       <header class="service-detail-hero">
         <p class="eyebrow"><span class="eyebrow-line" aria-hidden="true"></span>{{ service.category_name }}</p>
+        {% if service.image_key %}
+          <img class="service-detail-image" src="{{ url_for('public.service_image', service_slug=service.service_slug, image_key=service.image_key) }}" alt="" width="1600" height="1200">
+        {% endif %}
         <h1 id="service-title">{{ service.service_name }}</h1>
         <p class="service-detail-lede">{{ service.service_description }}</p>
         <dl class="service-facts" aria-label="Service summary">

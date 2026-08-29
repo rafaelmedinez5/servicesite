@@ -28,4 +28,33 @@
       <a class="button" href="{{ url_for('admin.category_new') }}">Create category</a>
     {% endif %}
   </section>
+  {% if service %}
+    <section class="card admin-form-card service-image-admin" aria-labelledby="service-image-title">
+      <div>
+        <p class="eyebrow">Public image</p>
+        <h2 id="service-image-title">Service image</h2>
+        <p>JPEG, PNG, or WebP up to 5 MB. The server creates a new WebP, strips embedded metadata, and discards the source filename and bytes.</p>
+      </div>
+      {% if service.image_key %}
+        <img class="admin-service-image" src="{{ url_for('admin.service_image_preview', service_id=service.id, image_key=service.image_key) }}" alt="Current image for {{ service.name }}" width="1600" height="1200">
+      {% endif %}
+      <form class="admin-form" method="post" enctype="multipart/form-data" action="{{ url_for('admin.service_image_upload', service_id=service.id) }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <label>
+          <span>{{ "Replace image" if service.image_key else "Choose image" }}</span>
+          <input name="image" type="file" accept="image/jpeg,image/png,image/webp" required>
+          <small>Check the visible picture itself for faces, names, addresses, reflections, or other identifying details. Metadata removal cannot hide visible content.</small>
+        </label>
+        <div class="button-row">
+          <button type="submit">{{ "Replace image" if service.image_key else "Upload image" }}</button>
+        </div>
+      </form>
+      {% if service.image_key %}
+        <form method="post" action="{{ url_for('admin.service_image_remove', service_id=service.id) }}">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <button class="button danger" type="submit">Remove image</button>
+        </form>
+      {% endif %}
+    </section>
+  {% endif %}
 {% endblock %}

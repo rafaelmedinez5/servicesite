@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import io
+import secrets
 import sqlite3
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
@@ -40,6 +41,7 @@ from app.payments.xmr_wallet_rpc import (
     atomic_to_xmr_str,
 )
 from app.persistence import FulfillmentStatus, PersistenceError, ServicesiteRepository
+from app.service_images import ServiceImageError, ServiceImageStore
 from app.web_security import (
     FormSecurityError,
     consume_checkout_nonce,
@@ -110,6 +112,40 @@ def service_detail(service_slug: str):
         service=service,
         checkout_nonce=issue_checkout_nonce() if g.customer is not None else None,
     )
+
+
+@public.get("/services/<service_slug>/image/<image_key>.webp")
+def service_image(service_slug: str, image_key: str):
+    if not service_slug or len(service_slug) > 120:
+        abort(404)
+    try:
+        service = _repository().get_purchasable_service_by_slug(service_slug)
+    except (PersistenceError, sqlite3.Error):
+        abort(503)
+    if (
+        service is None
+        or service.image_key is None
+        or not secrets.compare_digest(service.image_key, image_key)
+    ):
+        abort(404)
+    try:
+        data = _image_store().read(image_key)
+    except ServiceImageError:
+        abort(404)
+    if data is None:
+        abort(404)
+
+    response = Response(
+        data,
+        200,
+        {
+            "Content-Type": "image/webp",
+            "Content-Disposition": 'inline; filename="service-image.webp"',
+            "Cache-Control": "public, max-age=31536000, immutable",
+        },
+    )
+    response.set_etag(image_key)
+    return response.make_conditional(request)
 
 
 @public.post("/checkout")
@@ -266,6 +302,14 @@ def register_web(app) -> None:
             404,
         )
 
+    @app.errorhandler(413)
+    def request_too_large(_error):
+        return _error_page(
+            "Request too large",
+            "The submitted file or form exceeds the allowed size.",
+            413,
+        )
+
 
 def build_monero_uri(invoice: Invoice) -> str:
     amount = atomic_to_xmr_str(invoice.expected_atomic)
@@ -361,6 +405,10 @@ def _mark_private() -> None:
 
 def _repository() -> ServicesiteRepository:
     return current_app.extensions["servicesite_repository"]
+
+
+def _image_store() -> ServiceImageStore:
+    return current_app.extensions["servicesite_image_store"]
 
 
 def _rate_provider() -> RateProvider:

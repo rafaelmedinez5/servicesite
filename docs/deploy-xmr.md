@@ -20,6 +20,7 @@ PASS/FAIL lines.
 | Application root | `/opt/servicesite/app` |
 | Python environment | `/opt/servicesite/.venv` |
 | SQLite directory | `/opt/servicesite/instance` |
+| Sanitized service images | `/opt/servicesite/instance/service-images` |
 | External app environment | `/etc/servicesite/servicesite.env`, mode `0600` |
 | Web identity and listener | `servicesite:servicesite`, `127.0.0.1:5100` |
 | Wallet root | `/opt/monero` |
@@ -129,7 +130,7 @@ directory, while only wallet state and wallet logs are writable by `xmrwallet`.
 
 ```bash
 install -d -o servicesite -g servicesite -m 0750 /opt/servicesite /opt/servicesite/app /opt/servicesite/logs
-install -d -o servicesite -g servicesite -m 0700 /opt/servicesite/instance /opt/servicesite/secrets
+install -d -o servicesite -g servicesite -m 0700 /opt/servicesite/instance /opt/servicesite/instance/service-images /opt/servicesite/secrets
 install -d -o root -g xmrwallet -m 0750 /opt/monero /opt/monero/bin
 install -d -o xmrwallet -g xmrwallet -m 0750 /opt/monero/logs
 install -d -o xmrwallet -g xmrwallet -m 0700 /opt/monero/wallet
@@ -290,6 +291,23 @@ After deploying a revision with a newer recognized schema, stop the web service,
 take and verify an online backup, then rerun the same initialization command.
 The recognized migration preserves existing invoices. Start the web service
 only after the command succeeds; never edit schema tables manually.
+
+For the schema 6-to-7 service-image release, install the reviewed dependencies
+before initialization and ensure the private image directory belongs only to
+the application identity:
+
+```bash
+systemctl stop servicesite-web.service
+install -d -o servicesite -g servicesite -m 0700 /opt/servicesite/instance/service-images
+runuser -u servicesite -- /opt/servicesite/.venv/bin/pip install -r /opt/servicesite/app/requirements.txt
+runuser -u servicesite -- sh -c 'cd /opt/servicesite/app && exec /opt/servicesite/.venv/bin/python -c "from dotenv import load_dotenv; load_dotenv(\"/etc/servicesite/servicesite.env\"); from app.config import Settings; from app.persistence import SQLiteDatabase; SQLiteDatabase(Settings.from_env().database_path).initialize()"'
+systemctl start servicesite-web.service
+curl -fsS http://127.0.0.1:5100/health
+```
+
+Run these only after the online backup below returns exactly `ok`. The migration
+adds one nullable image-key column and does not rewrite invoice, order, account,
+or credential data.
 
 Create backups with SQLite's online backup operation; never copy a live WAL
 database with plain `cp`.

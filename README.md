@@ -18,6 +18,7 @@ verification and production cutover remain deferred.
 - no JavaScript
 - fresh SQLite database with WAL mode
 - administrator-defined categories and services
+- privacy-sanitized administrator service-image uploads
 - USD prices converted and locked into XMR at checkout
 - separate payment and manual-fulfillment states
 - Gunicorn bound to `127.0.0.1:5100`
@@ -149,6 +150,12 @@ are private/no-store, all state-changing forms require CSRF, catalog records are
 archived instead of deleted, and fulfillment is rejected until payment is
 settled. See `docs/admin.md`.
 
+Service edit pages accept a JPEG, PNG, or WebP image. The server decodes it and
+creates a new metadata-free WebP under the private instance directory with a
+random name; the original filename and bytes are not retained. Public image
+routes expose only the current sanitized derivative for a published service.
+Visible identifying details in the pixels still require manual review.
+
 ## Customer cart and orders
 
 Signed-in customers can add services, adjust quantities, and create one XMR
@@ -156,10 +163,16 @@ invoice for the whole cart. `/account` lists their 100 most recent orders;
 order details remain ownership-checked. Direct single-service purchases also
 appear in this history. Existing bearer payment links continue to work.
 
-**Database migration required: schema 5 to 6.** Back up the database, stop the
-web service, and run the documented initializer before restarting. Existing
-accounts and invoices are preserved. See `docs/cart-orders.md` and the exact
-operator commands in `docs/deploy-xmr.md`.
+The cart release introduced the schema 5-to-6 migration. Existing accounts and
+invoices are preserved. See `docs/cart-orders.md`.
+
+## Current database migration
+
+**Database migration required: schema 6 to 7.** Schema 7 adds only the nullable
+random service-image key; image bytes remain outside SQLite. Back up the
+database, stop the web service, install the updated requirements, run the
+documented initializer, and then restart. See `docs/admin.md` and the exact
+operator procedure in `docs/deploy-xmr.md`.
 
 ## Next task
 
