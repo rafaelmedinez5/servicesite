@@ -187,7 +187,10 @@ def test_public_catalog_renders_only_published_services(web_context):
     assert response.status_code == 200
     assert "Find the gaps before they become incidents." in body
     assert 'id="services"' in body
-    assert 'href="#process"' in body
+    assert 'id="process"' in body
+    assert "Choose the engagement that fits." in body
+    assert "Three clear steps." in body
+    assert "Engagement protocol" not in body
     assert 'href="/services/service-assessment-slug"' in body
     assert "View service" in body
     assert "checkout_nonce" not in body
