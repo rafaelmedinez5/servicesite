@@ -13,8 +13,7 @@ from PIL import Image, ImageOps, UnidentifiedImageError
 
 MAX_UPLOAD_BYTES = 5 * 1024 * 1024
 MAX_SOURCE_PIXELS = 24_000_000
-OUTPUT_FRAME_UNITS = (8, 5)
-MAX_OUTPUT_SIZE = (1_600, 1_000)
+MAX_OUTPUT_SIZE = (1_200, 900)
 MAX_STORED_BYTES = 3 * 1024 * 1024
 _ALLOWED_FORMATS = {"JPEG", "PNG", "WEBP"}
 _IMAGE_KEY_LENGTH = 64
@@ -32,7 +31,7 @@ class SanitizedServiceImage:
 
 
 def sanitize_service_image(stream) -> SanitizedServiceImage:
-    """Return a centered 8:5 WebP containing only decoded source pixels."""
+    """Return an aspect-preserving WebP containing only decoded source pixels."""
     if stream is None or not hasattr(stream, "read"):
         raise ServiceImageError("Choose a JPEG, PNG, or WebP image.")
 
@@ -60,27 +59,9 @@ def sanitize_service_image(stream) -> SanitizedServiceImage:
                 oriented = ImageOps.exif_transpose(source)
                 oriented.load()
                 rgba = oriented.convert("RGBA")
-                frame_width, frame_height = OUTPUT_FRAME_UNITS
-                frame_units = min(
-                    rgba.width // frame_width,
-                    rgba.height // frame_height,
-                    MAX_OUTPUT_SIZE[0] // frame_width,
-                    MAX_OUTPUT_SIZE[1] // frame_height,
-                )
-                if frame_units < 1:
-                    raise ServiceImageError("The image dimensions are too small.")
-                output_size = (
-                    frame_units * frame_width,
-                    frame_units * frame_height,
-                )
-                fitted = ImageOps.fit(
-                    rgba,
-                    output_size,
-                    method=Image.Resampling.LANCZOS,
-                    centering=(0.5, 0.5),
-                )
-                clean = Image.new("RGB", output_size, (16, 23, 33))
-                clean.paste(fitted.convert("RGB"), mask=fitted.getchannel("A"))
+                rgba.thumbnail(MAX_OUTPUT_SIZE, Image.Resampling.LANCZOS)
+                clean = Image.new("RGB", rgba.size, (16, 23, 33))
+                clean.paste(rgba.convert("RGB"), mask=rgba.getchannel("A"))
 
                 output = io.BytesIO()
                 clean.save(output, format="WEBP", quality=84, method=6)

@@ -527,7 +527,7 @@ def test_admin_uploads_metadata_free_service_image_with_unrelated_name(admin_con
     assert original_filename.encode() not in stored_bytes
     with Image.open(io.BytesIO(stored_bytes)) as sanitized:
         assert sanitized.format == "WEBP"
-        assert sanitized.size == (120, 75)
+        assert sanitized.size == (120, 80)
         assert not sanitized.getexif()
         assert "exif" not in sanitized.info
         assert "xmp" not in sanitized.info
@@ -537,6 +537,7 @@ def test_admin_uploads_metadata_free_service_image_with_unrelated_name(admin_con
     )
     homepage = client.get("/").get_data(as_text=True)
     detail = client.get("/services/security-assessment").get_data(as_text=True)
+    stylesheet = client.get("/static/css/style.css").get_data(as_text=True)
     public_image = client.get(public_path)
     private_preview = client.get(
         f"/admin/services/service-assessment/image/{service.image_key}.webp"
@@ -545,9 +546,12 @@ def test_admin_uploads_metadata_free_service_image_with_unrelated_name(admin_con
     assert public_path in homepage
     assert public_path in detail
     assert 'class="service-card-image"' in homepage
-    assert 'width="1600" height="1000"' in homepage
+    assert 'width="1200" height="900"' in homepage
     assert 'class="service-detail-image"' in detail
-    assert 'width="1600" height="1000"' in detail
+    assert 'width="1200" height="900"' in detail
+    assert "object-fit: contain;" in stylesheet
+    assert "width: min(100%, 16rem);" in stylesheet
+    assert "width: min(100%, 38rem);" in stylesheet
     assert original_filename not in homepage
     assert public_image.status_code == 200
     assert public_image.mimetype == "image/webp"
