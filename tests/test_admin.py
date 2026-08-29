@@ -1,10 +1,15 @@
 from __future__ import annotations
 
+import io
 import re
+import secrets
+import stat
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
+from pathlib import Path
 
 import pytest
+from PIL import Image, PngImagePlugin
 from werkzeug.security import check_password_hash, generate_password_hash
 
 from app import create_app
@@ -16,6 +21,15 @@ from app.persistence import FulfillmentStatus, SQLiteDatabase, ServicesiteReposi
 
 NOW = datetime(2026, 8, 23, 12, 0, tzinfo=timezone.utc)
 CSRF_PATTERN = re.compile(r'name="csrf_token" value="([^"]+)"')
+TEST_SESSION_SECRET = secrets.token_urlsafe(32)
+TEST_ADMIN_PASSWORD = secrets.token_urlsafe(24)
+TEST_SETUP_PASSWORD = secrets.token_urlsafe(24)
+TEST_REPLACEMENT_PASSWORD = secrets.token_urlsafe(24)
+TEST_WRONG_PASSWORD = secrets.token_urlsafe(24)
+TEST_MISMATCH_PASSWORD = secrets.token_urlsafe(24)
+TEST_SHORT_PASSWORD = secrets.token_urlsafe(4)
+TEST_RECOVERY_PIN = f"{secrets.randbelow(1_000_000):06d}"
+TEST_WRONG_PIN = f"{(int(TEST_RECOVERY_PIN) + 1) % 1_000_000:06d}"
 
 
 class FakeWallet:
@@ -28,12 +42,12 @@ class FakeWallet:
 @pytest.fixture
 def admin_context(tmp_path, monkeypatch):
     monkeypatch.setenv("ENVIRONMENT", "test")
-    monkeypatch.setenv("SECRET_KEY", "test-admin-session-secret")
+    monkeypatch.setenv("SECRET_KEY", TEST_SESSION_SECRET)
     database = SQLiteDatabase(tmp_path / "admin.db")
     database.initialize()
     repository = ServicesiteRepository(database)
     repository.create_admin_credential(
-        generate_password_hash("correct horse battery staple"), now=NOW
+        generate_password_hash(TEST_ADMIN_PASSWORD), now=NOW
     )
     app = create_app(
         {
@@ -42,7 +56,7 @@ def admin_context(tmp_path, monkeypatch):
             "SERVICESITE_REPOSITORY": repository,
             "SERVICESITE_NOW_FACTORY": lambda: NOW,
             "ADMIN_USERNAME": "operator",
-            "ADMIN_RECOVERY_PIN": "384729",
+            "ADMIN_RECOVERY_PIN": TEST_RECOVERY_PIN,
             "ADMIN_SESSION_HOURS": 4,
         }
     )
@@ -52,7 +66,7 @@ def admin_context(tmp_path, monkeypatch):
 @pytest.fixture
 def uninitialized_admin_context(tmp_path, monkeypatch):
     monkeypatch.setenv("ENVIRONMENT", "test")
-    monkeypatch.setenv("SECRET_KEY", "test-admin-session-secret")
+    monkeypatch.setenv("SECRET_KEY", TEST_SESSION_SECRET)
     database = SQLiteDatabase(tmp_path / "uninitialized-admin.db")
     database.initialize()
     repository = ServicesiteRepository(database)
@@ -82,7 +96,7 @@ def _login(client):
         data={
             "csrf_token": token,
             "username": "operator",
-            "password": "correct horse battery staple",
+            "password": TEST_ADMIN_PASSWORD,
         },
     )
     assert response.status_code == 303
@@ -146,6 +160,16 @@ def _invoice(repository: ServicesiteRepository):
     )
 
 
+def _private_png() -> bytes:
+    image = Image.new("RGB", (120, 80), (28, 75, 116))
+    metadata = PngImagePlugin.PngInfo()
+    metadata.add_text("Author", "private-admin-identity")
+    metadata.add_text("Location", "private-camera-location")
+    output = io.BytesIO()
+    image.save(output, format="PNG", pnginfo=metadata)
+    return output.getvalue()
+
+
 def test_admin_routes_require_login_and_private_headers(admin_context):
     _app, client, _repository = admin_context
 
@@ -173,8 +197,8 @@ def test_first_visit_sets_hashed_password_once_and_signs_in(uninitialized_admin_
         "/admin/login",
         data={
             "csrf_token": _csrf(setup),
-            "new_password": "first password is long enough",
-            "confirm_password": "first password is long enough",
+            "new_password": TEST_SETUP_PASSWORD,
+            "confirm_password": TEST_SETUP_PASSWORD,
         },
     )
     credential = repository.get_admin_credential()
@@ -182,10 +206,10 @@ def test_first_visit_sets_hashed_password_once_and_signs_in(uninitialized_admin_
     assert response.status_code == 303
     assert response.headers["Location"].endswith("/admin")
     assert credential is not None
-    assert "first password is long enough" not in credential.password_hash
+    assert TEST_SETUP_PASSWORD not in credential.password_hash
     assert credential.password_hash.startswith("scrypt:")
     assert check_password_hash(
-        credential.password_hash, "first password is long enough"
+        credential.password_hash, TEST_SETUP_PASSWORD
     )
     assert client.get("/admin").status_code == 200
 
@@ -202,8 +226,8 @@ def test_first_password_setup_validates_length_and_confirmation(
     missing_csrf = client.post(
         "/admin/login",
         data={
-            "new_password": "first password is long enough",
-            "confirm_password": "first password is long enough",
+            "new_password": TEST_SETUP_PASSWORD,
+            "confirm_password": TEST_SETUP_PASSWORD,
         },
     )
     token = _csrf(client.get("/admin/login"))
@@ -212,16 +236,16 @@ def test_first_password_setup_validates_length_and_confirmation(
         "/admin/login",
         data={
             "csrf_token": token,
-            "new_password": "too short",
-            "confirm_password": "too short",
+            "new_password": TEST_SHORT_PASSWORD,
+            "confirm_password": TEST_SHORT_PASSWORD,
         },
     )
     mismatch = client.post(
         "/admin/login",
         data={
             "csrf_token": token,
-            "new_password": "long password number one",
-            "confirm_password": "long password number two",
+            "new_password": TEST_SETUP_PASSWORD,
+            "confirm_password": TEST_MISMATCH_PASSWORD,
         },
     )
 
@@ -240,7 +264,11 @@ def test_login_requires_csrf_and_rate_limits_failures(admin_context):
     for _ in range(5):
         response = client.post(
             "/admin/login",
-            data={"csrf_token": token, "username": "operator", "password": "wrong"},
+            data={
+                "csrf_token": token,
+                "username": "operator",
+                "password": TEST_WRONG_PASSWORD,
+            },
         )
         assert response.status_code == 401
 
@@ -249,11 +277,11 @@ def test_login_requires_csrf_and_rate_limits_failures(admin_context):
         data={
             "csrf_token": token,
             "username": "operator",
-            "password": "correct horse battery staple",
+            "password": TEST_ADMIN_PASSWORD,
         },
     )
     assert blocked.status_code == 429
-    assert "correct horse" not in blocked.get_data(as_text=True)
+    assert TEST_ADMIN_PASSWORD not in blocked.get_data(as_text=True)
 
 
 def test_login_logout_and_session_cookie(admin_context):
@@ -279,17 +307,18 @@ def test_recovery_pin_login_requires_username_csrf_and_shared_rate_limit(
     assert "Sign in with recovery PIN" in login.get_data(as_text=True)
     assert pin_page.status_code == 200
     assert client.post(
-        "/admin/pin-login", data={"username": "operator", "pin": "384729"}
+        "/admin/pin-login",
+        data={"username": "operator", "pin": TEST_RECOVERY_PIN},
     ).status_code == 400
 
     token = _csrf(pin_page)
     wrong = client.post(
         "/admin/pin-login",
-        data={"csrf_token": token, "username": "operator", "pin": "000000"},
+        data={"csrf_token": token, "username": "operator", "pin": TEST_WRONG_PIN},
     )
     correct = client.post(
         "/admin/pin-login",
-        data={"csrf_token": token, "username": "operator", "pin": "384729"},
+        data={"csrf_token": token, "username": "operator", "pin": TEST_RECOVERY_PIN},
     )
 
     assert wrong.status_code == 401
@@ -307,7 +336,7 @@ def test_password_failures_also_block_recovery_pin(admin_context):
             data={
                 "csrf_token": password_token,
                 "username": "operator",
-                "password": "wrong",
+                "password": TEST_WRONG_PASSWORD,
             },
         )
         assert response.status_code == 401
@@ -318,7 +347,7 @@ def test_password_failures_also_block_recovery_pin(admin_context):
         data={
             "csrf_token": pin_token,
             "username": "operator",
-            "pin": "384729",
+            "pin": TEST_RECOVERY_PIN,
         },
     )
 
@@ -347,9 +376,9 @@ def test_password_change_requires_current_password_and_invalidates_sessions(
         "/admin/password",
         data={
             "csrf_token": _csrf(password_page),
-            "current_password": "wrong current password",
-            "new_password": "replacement password is long",
-            "confirm_password": "replacement password is long",
+            "current_password": TEST_WRONG_PASSWORD,
+            "new_password": TEST_REPLACEMENT_PASSWORD,
+            "confirm_password": TEST_REPLACEMENT_PASSWORD,
         },
     )
     unchanged = repository.get_admin_credential()
@@ -357,16 +386,16 @@ def test_password_change_requires_current_password_and_invalidates_sessions(
     assert wrong_current.status_code == 400
     assert unchanged is not None and unchanged.version == 1
     assert check_password_hash(
-        unchanged.password_hash, "correct horse battery staple"
+        unchanged.password_hash, TEST_ADMIN_PASSWORD
     )
 
     changed = client.post(
         "/admin/password",
         data={
             "csrf_token": _csrf(client.get("/admin/password")),
-            "current_password": "correct horse battery staple",
-            "new_password": "replacement password is long",
-            "confirm_password": "replacement password is long",
+            "current_password": TEST_ADMIN_PASSWORD,
+            "new_password": TEST_REPLACEMENT_PASSWORD,
+            "confirm_password": TEST_REPLACEMENT_PASSWORD,
         },
     )
     credential = repository.get_admin_credential()
@@ -375,7 +404,7 @@ def test_password_change_requires_current_password_and_invalidates_sessions(
     assert changed.headers["Location"].endswith("/admin/login")
     assert credential is not None and credential.version == 2
     assert check_password_hash(
-        credential.password_hash, "replacement password is long"
+        credential.password_hash, TEST_REPLACEMENT_PASSWORD
     )
     assert client.get("/admin").headers["Location"].endswith("/admin/login")
     assert other_client.get("/admin").headers["Location"].endswith("/admin/login")
@@ -386,7 +415,7 @@ def test_password_change_requires_current_password_and_invalidates_sessions(
         data={
             "csrf_token": token,
             "username": "operator",
-            "password": "correct horse battery staple",
+            "password": TEST_ADMIN_PASSWORD,
         },
     )
     new_login = client.post(
@@ -394,7 +423,7 @@ def test_password_change_requires_current_password_and_invalidates_sessions(
         data={
             "csrf_token": token,
             "username": "operator",
-            "password": "replacement password is long",
+            "password": TEST_REPLACEMENT_PASSWORD,
         },
     )
 
@@ -466,6 +495,156 @@ def test_admin_creates_edits_and_archives_catalog_without_float_money(admin_cont
     assert updated.price_usd_cents == 12_500
     assert archived.status_code == 303
     assert "Configuration Review Plus" not in client.get("/").get_data(as_text=True)
+
+
+def test_admin_uploads_metadata_free_service_image_with_unrelated_name(admin_context):
+    app, client, repository = admin_context
+    repository.insert_category(_category())
+    repository.insert_service(_service())
+    _login(client)
+    edit_page = client.get("/admin/services/service-assessment/edit")
+    original_filename = "camera-owner-and-location.png"
+
+    uploaded = client.post(
+        "/admin/services/service-assessment/image",
+        data={
+            "csrf_token": _csrf(edit_page),
+            "image": (io.BytesIO(_private_png()), original_filename),
+        },
+        content_type="multipart/form-data",
+    )
+    service = repository.get_service("service-assessment")
+
+    assert uploaded.status_code == 303
+    assert service is not None and service.image_key is not None
+    assert original_filename not in service.image_key
+    stored_path = Path(app.config["SERVICE_IMAGE_DIR"]) / f"{service.image_key}.webp"
+    assert stat.S_IMODE(stored_path.parent.stat().st_mode) == 0o700
+    assert stat.S_IMODE(stored_path.stat().st_mode) == 0o600
+    stored_bytes = stored_path.read_bytes()
+    assert b"private-admin-identity" not in stored_bytes
+    assert b"private-camera-location" not in stored_bytes
+    assert original_filename.encode() not in stored_bytes
+    with Image.open(io.BytesIO(stored_bytes)) as sanitized:
+        assert sanitized.format == "WEBP"
+        assert not sanitized.getexif()
+        assert "exif" not in sanitized.info
+        assert "xmp" not in sanitized.info
+
+    public_path = (
+        f"/services/security-assessment/image/{service.image_key}.webp"
+    )
+    homepage = client.get("/").get_data(as_text=True)
+    detail = client.get("/services/security-assessment").get_data(as_text=True)
+    public_image = client.get(public_path)
+    private_preview = client.get(
+        f"/admin/services/service-assessment/image/{service.image_key}.webp"
+    )
+
+    assert public_path in homepage
+    assert public_path in detail
+    assert original_filename not in homepage
+    assert public_image.status_code == 200
+    assert public_image.mimetype == "image/webp"
+    assert public_image.headers["Content-Disposition"] == 'inline; filename="service-image.webp"'
+    assert "immutable" in public_image.headers["Cache-Control"]
+    assert private_preview.headers["Cache-Control"] == "no-store, private, max-age=0"
+
+
+def test_replacing_removing_and_archiving_images_revoke_public_urls(admin_context):
+    app, client, repository = admin_context
+    repository.insert_category(_category())
+    repository.insert_service(_service())
+    _login(client)
+
+    def upload(color: tuple[int, int, int]):
+        output = io.BytesIO()
+        Image.new("RGB", (60, 40), color).save(output, format="PNG")
+        response = client.post(
+            "/admin/services/service-assessment/image",
+            data={
+                "csrf_token": _csrf(client.get("/admin/services/service-assessment/edit")),
+                "image": (io.BytesIO(output.getvalue()), "ignored-source.png"),
+            },
+            content_type="multipart/form-data",
+        )
+        assert response.status_code == 303
+        return repository.get_service("service-assessment").image_key
+
+    first_key = upload((10, 20, 30))
+    first_path = f"/services/security-assessment/image/{first_key}.webp"
+    second_key = upload((40, 50, 60))
+    second_path = f"/services/security-assessment/image/{second_key}.webp"
+
+    assert first_key != second_key
+    assert client.get(first_path).status_code == 404
+    assert client.get(second_path).status_code == 200
+    image_directory = Path(app.config["SERVICE_IMAGE_DIR"])
+    assert not (image_directory / f"{first_key}.webp").exists()
+    assert (image_directory / f"{second_key}.webp").is_file()
+
+    removed = client.post(
+        "/admin/services/service-assessment/image/remove",
+        data={
+            "csrf_token": _csrf(client.get("/admin/services/service-assessment/edit"))
+        },
+    )
+
+    assert removed.status_code == 303
+    assert repository.get_service("service-assessment").image_key is None
+    assert client.get(second_path).status_code == 404
+    assert not (image_directory / f"{second_key}.webp").exists()
+
+    third_key = upload((70, 80, 90))
+    third_path = f"/services/security-assessment/image/{third_key}.webp"
+    archived = client.post(
+        "/admin/services/service-assessment/archive",
+        data={
+            "csrf_token": _csrf(client.get("/admin/services/service-assessment/edit"))
+        },
+    )
+    archived_service = repository.get_service("service-assessment")
+
+    assert archived.status_code == 303
+    assert archived_service is not None and archived_service.archived
+    assert archived_service.image_key is None
+    assert client.get(third_path).status_code == 404
+    assert not (image_directory / f"{third_key}.webp").exists()
+
+
+def test_service_image_upload_requires_admin_csrf_and_valid_image(admin_context):
+    app, client, repository = admin_context
+    repository.insert_category(_category())
+    repository.insert_service(_service())
+
+    anonymous = client.post(
+        "/admin/services/service-assessment/image",
+        data={"image": (io.BytesIO(_private_png()), "private.png")},
+        content_type="multipart/form-data",
+    )
+    assert anonymous.status_code == 303
+    assert anonymous.headers["Location"].endswith("/admin/login")
+
+    _login(client)
+    missing_csrf = client.post(
+        "/admin/services/service-assessment/image",
+        data={"image": (io.BytesIO(_private_png()), "private.png")},
+        content_type="multipart/form-data",
+    )
+    invalid = client.post(
+        "/admin/services/service-assessment/image",
+        data={
+            "csrf_token": _csrf(client.get("/admin/services/service-assessment/edit")),
+            "image": (io.BytesIO(b"<svg>not an image</svg>"), "tracking.svg"),
+        },
+        content_type="multipart/form-data",
+    )
+
+    assert missing_csrf.status_code == 400
+    assert invalid.status_code == 303
+    assert repository.get_service("service-assessment").image_key is None
+    image_directory = Path(app.config["SERVICE_IMAGE_DIR"])
+    assert not image_directory.exists() or list(image_directory.iterdir()) == []
 
 
 def test_purchase_views_filter_redact_and_fulfill_only_settled(admin_context):

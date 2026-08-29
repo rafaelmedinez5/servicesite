@@ -1,22 +1,39 @@
 from __future__ import annotations
 
+import io
 from datetime import timedelta
+from pathlib import Path
 
-from flask import Flask
+from flask import Flask, Request, abort, request
 
 from app.admin import register_admin
 from app.config import Settings
 from app.customer_auth import register_customer_auth
 from app.internal import register_internal
 from app.persistence import SQLiteDatabase, ServicesiteRepository
+from app.service_images import MAX_UPLOAD_BYTES, ServiceImageStore
 from app.shopping import register_shopping
 from app.web import register_web
+
+
+class _InMemoryUploadRequest(Request):
+    def _get_file_stream(
+        self,
+        total_content_length,
+        content_type,
+        filename=None,
+        content_length=None,
+    ):
+        # The only file-upload surface is the bounded, admin-only service-image
+        # route. Keep its source bytes out of Werkzeug's temporary-file spool.
+        return io.BytesIO()
 
 
 def create_app(test_config: dict | None = None) -> Flask:
     settings = Settings.from_env()
 
     app = Flask(__name__)
+    app.request_class = _InMemoryUploadRequest
     app.config.from_mapping(
         ENVIRONMENT=settings.environment,
         SECRET_KEY=settings.secret_key,
@@ -51,8 +68,12 @@ def create_app(test_config: dict | None = None) -> Flask:
     if test_config:
         app.config.update(test_config)
 
+    app.config["SERVICE_IMAGE_DIR"] = app.config.get("SERVICE_IMAGE_DIR") or str(
+        Path(app.config["DB_PATH"]).parent / "service-images"
+    )
+
     app.config.from_mapping(
-        MAX_CONTENT_LENGTH=16 * 1024,
+        MAX_CONTENT_LENGTH=MAX_UPLOAD_BYTES + (64 * 1024),
         SESSION_COOKIE_HTTPONLY=True,
         SESSION_COOKIE_SAMESITE="Strict",
         SESSION_COOKIE_SECURE=app.config["ENVIRONMENT"] == "production",
@@ -62,9 +83,27 @@ def create_app(test_config: dict | None = None) -> Flask:
         SESSION_REFRESH_EACH_REQUEST=False,
     )
 
+    @app.before_request
+    def enforce_request_size():
+        content_length = request.content_length
+        if content_length is None:
+            return None
+        limit = (
+            MAX_UPLOAD_BYTES + (64 * 1024)
+            if request.endpoint == "admin.service_image_upload"
+            else 16 * 1024
+        )
+        if content_length > limit:
+            abort(413)
+        return None
+
     app.extensions["servicesite_repository"] = app.config.get(
         "SERVICESITE_REPOSITORY",
         ServicesiteRepository(SQLiteDatabase(app.config["DB_PATH"])),
+    )
+    app.extensions["servicesite_image_store"] = app.config.get(
+        "SERVICESITE_IMAGE_STORE",
+        ServiceImageStore(app.config["SERVICE_IMAGE_DIR"]),
     )
     if app.config.get("SERVICESITE_RATE_PROVIDER") is not None:
         app.extensions["servicesite_rate_provider"] = app.config[

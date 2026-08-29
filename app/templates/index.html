@@ -35,6 +35,9 @@
             {% for service in category.services %}
               <article class="service-card">
                 <div>
+                  {% if service.image_key %}
+                    <img class="service-card-image" src="{{ url_for('public.service_image', service_slug=service.service_slug, image_key=service.image_key) }}" alt="" width="1600" height="1200" loading="lazy" decoding="async">
+                  {% endif %}
                   <p class="service-duration">{{ service.duration_label or "Custom engagement" }}</p>
                   <h4>{{ service.service_name }}</h4>
                   <p>{{ service.service_description }}</p>

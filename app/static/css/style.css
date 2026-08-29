@@ -359,6 +359,21 @@ p {
   background: #131c28;
 }
 
+.service-card-image,
+.service-detail-image,
+.admin-service-image {
+  display: block;
+  width: 100%;
+  border: 1px solid var(--border);
+  background: #090e16;
+  object-fit: cover;
+}
+
+.service-card-image {
+  aspect-ratio: 16 / 10;
+  margin-bottom: 1.25rem;
+}
+
 .service-duration {
   color: var(--accent-strong);
 }
@@ -430,6 +445,11 @@ p {
 .service-detail-hero {
   padding-bottom: clamp(3rem, 7vw, 5.5rem);
   border-bottom: 1px solid var(--border);
+}
+
+.service-detail-image {
+  aspect-ratio: 16 / 10;
+  margin: 1.5rem 0 2rem;
 }
 
 .service-detail-hero h1 {
@@ -1245,6 +1265,10 @@ button.remove-button:focus-visible { color: #fff; }
 .admin-login { max-width: 34rem; margin-inline: auto; }
 
 .admin-form { display: grid; gap: 1rem; }
+.service-image-admin { display: grid; gap: 1.25rem; margin-top: 1rem; }
+.service-image-admin h2 { font-size: clamp(1.7rem, 4vw, 2.4rem); }
+.service-image-admin > div > p:last-child { max-width: 46rem; margin-bottom: 0; }
+.admin-service-image { max-width: 34rem; aspect-ratio: 16 / 10; }
 .admin-form label,
 .filter-form label { display: grid; gap: 0.45rem; color: #eef3fa; font-weight: 700; }
 .admin-form small,

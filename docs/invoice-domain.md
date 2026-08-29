@@ -5,17 +5,19 @@ reconciliation layer; no production database or wallet was accessed.
 
 ## Fresh database boundary
 
-`SQLiteDatabase.initialize()` creates schema version 6 with WAL mode and applies
+`SQLiteDatabase.initialize()` creates schema version 7 with WAL mode and applies
 mode `0600` to the database file. Initialization is idempotent for a recognized
 `servicesite` database. If a database already contains tables but has no
 `servicesite` schema marker, initialization refuses it instead of treating a
-legacy database as compatible. Recognized schema versions 1 through 5 are
+legacy database as compatible. Recognized schema versions 1 through 6 are
 upgraded in place; version 3 adds fulfillment fields and the admin login guard,
 version 4 adds the singleton administrator credential table, and version 5 adds
 customer accounts and per-account login guards without altering payment
 amounts, addresses, tokens, or transaction identifiers. Version 6 adds cart,
-checkout-claim, order-ownership, and invoice-line tables. Existing account and
-invoice rows are not rewritten or assigned inferred ownership.
+checkout-claim, order-ownership, and invoice-line tables. Version 7 adds the
+nullable random service-image key without storing any image bytes. Existing
+account, catalog, and invoice rows are not rewritten or assigned inferred
+ownership.
 
 The production parent directory must already exist with operator-reviewed
 ownership and permissions. The application does not copy or inspect the legacy
@@ -33,8 +35,10 @@ timestamps.
 
 Stores category ownership, identity, name, slug, description, integer USD cents,
 optional duration, publish/archive flags, sort order, a catalog version, and
-timestamps. A service is purchasable only when both it and its category are
-published and not archived.
+timestamps. Schema 7 also stores the optional random key for its sanitized image
+derivative; the file itself remains under the private instance directory. A
+service is purchasable only when both it and its category are published and not
+archived.
 
 ### `invoices`
 

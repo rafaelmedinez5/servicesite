@@ -14,7 +14,7 @@
       {% set service = item.service %}
       <article class="card admin-list-item">
         <div>
-          <p class="record-meta">{{ item.category_name }} · {{ "Archived" if service.archived else ("Published" if service.published else "Draft") }} · version {{ service.version }}</p>
+          <p class="record-meta">{{ item.category_name }} · {{ "Archived" if service.archived else ("Published" if service.published else "Draft") }} · {{ "Image added" if service.image_key else "No image" }} · version {{ service.version }}</p>
           <h2>{{ service.name }}</h2>
           <p>{{ service.description }}</p>
           <p><strong>{{ service.price_usd_cents|usd }}</strong>{% if service.duration_label %} · {{ service.duration_label }}{% endif %}</p>

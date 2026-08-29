@@ -6,6 +6,7 @@ from datetime import datetime
 
 
 _SLUG_PATTERN = re.compile(r"[a-z0-9]+(?:-[a-z0-9]+)*\Z")
+_IMAGE_KEY_PATTERN = re.compile(r"[0-9a-f]{64}\Z")
 
 
 class CatalogValidationError(ValueError):
@@ -69,6 +70,7 @@ class ServiceRecord:
     version: int
     created_at: datetime
     updated_at: datetime
+    image_key: str | None = None
 
     def __post_init__(self) -> None:
         _require_text(self.id, "service ID", maximum=64)
@@ -93,6 +95,8 @@ class ServiceRecord:
             raise CatalogValidationError("service sort order must be an integer")
         if isinstance(self.version, bool) or not isinstance(self.version, int) or self.version < 1:
             raise CatalogValidationError("service version must be a positive integer")
+        if self.image_key is not None and not _IMAGE_KEY_PATTERN.fullmatch(self.image_key):
+            raise CatalogValidationError("service image key is invalid")
         _require_aware_datetime(self.created_at, "service created_at")
         _require_aware_datetime(self.updated_at, "service updated_at")
 
@@ -109,6 +113,7 @@ class PurchasableService:
     category_name: str
     category_description: str
     price_usd_cents: int
+    image_key: str | None = None
 
 
 @dataclass(frozen=True)
