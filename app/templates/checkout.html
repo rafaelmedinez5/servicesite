@@ -4,10 +4,10 @@
 {% block title %}Private XMR checkout | Servicesite{% endblock %}
 
 {% block content %}
-  <section class="private-heading" aria-labelledby="checkout-title">
+  <section class="private-heading flow-heading" aria-labelledby="checkout-title">
     <p class="eyebrow">Private checkout</p>
-    <h1 id="checkout-title">Pay the exact locked amount.</h1>
-    <p class="lede">Send one payment before the expiry time. This page is private; do not share its URL.</p>
+    <h1 id="checkout-title">Complete your payment.</h1>
+    <p class="lede">Send the exact amount before the deadline, then use the private status page to follow confirmation progress.</p>
   </section>
 
   <div class="payment-layout">
@@ -20,7 +20,7 @@
         <span class="status-chip waiting">Awaiting payment</span>
       </div>
 
-      <dl class="details-list">
+      <dl class="details-list payment-facts">
         <div>
           <dt>Amount</dt>
           <dd class="monospace amount">{{ xmr_amount }} XMR</dd>
@@ -41,7 +41,7 @@
 
       {% include "_order_items.html" %}
       <div class="address-block">
-        <p class="field-label">Unique Monero address</p>
+        <p class="field-label">Send to this unique Monero address</p>
         <p class="monospace breakable address">{{ invoice.xmr_address }}</p>
       </div>
 

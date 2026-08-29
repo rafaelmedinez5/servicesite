@@ -336,6 +336,8 @@ def test_checkout_contains_numeric_monero_uri_and_customer_safe_fields(web_conte
     response = web_context.client.get(_private_urls(invoice)["checkout"])
     body = response.get_data(as_text=True)
 
+    assert "Complete your payment." in body
+    assert "Send to this unique Monero address" in body
     assert f"monero:{invoice.xmr_address}?tx_amount=0.500000000000" in body
     assert "tx_amount=0.500000000000+XMR" not in body
     assert "0.500000000000 XMR" in body

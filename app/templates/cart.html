@@ -2,10 +2,10 @@
 {% extends "base.html" %}
 {% block title %}Your cart | Servicesite{% endblock %}
 {% block content %}
-  <header class="shopping-heading">
-    <p class="eyebrow">Your selection</p>
-    <h1>Your cart.</h1>
-    <p>Review your services before creating one private XMR invoice. Your cart is saved to your account.</p>
+  <header class="shopping-heading flow-heading">
+    <p class="eyebrow">Cart</p>
+    <h1>Review your order.</h1>
+    <p>Your services are saved to your account and combined into one private XMR invoice.</p>
   </header>
   {% if error %}<p class="form-error shopping-error" role="alert">{{ error }}</p>{% endif %}
   {% if cart.items %}
@@ -17,8 +17,7 @@
               {% if item.service %}
                 <p class="eyebrow">{{ item.service.category_name }}</p>
                 <h2><a href="{{ url_for('public.service_detail', service_slug=item.slug) }}">{{ item.name }}</a></h2>
-                <p>{{ item.service.duration_label or "Custom engagement" }}</p>
-                <p class="cart-unit-price">{{ item.service.price_usd_cents|usd }} each</p>
+                <p class="cart-item-meta">{{ item.service.duration_label or "Custom engagement" }} <span aria-hidden="true">&middot;</span> {{ item.service.price_usd_cents|usd }} each</p>
               {% else %}
                 <h2>{{ item.name }}</h2>
                 <p class="unavailable-note">This service is no longer available. Remove it to continue.</p>
@@ -26,7 +25,7 @@
             </div>
             <div class="cart-item-controls">
               {% if item.service %}
-                <strong class="cart-line-total">{{ item.total_usd_cents|usd }}</strong>
+                <div class="cart-line-price"><span>Line total</span><strong class="cart-line-total">{{ item.total_usd_cents|usd }}</strong></div>
                 <form class="quantity-form" method="post" action="{{ url_for('shopping.update_item', service_id=item.service_id) }}">
                   <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                   <label for="quantity-{{ loop.index }}">Quantity</label>
@@ -45,11 +44,14 @@
         <a class="text-link" href="{{ url_for('public.index') }}#services">&#8592; Continue browsing</a>
       </section>
       <aside class="purchase-panel cart-summary" aria-labelledby="cart-summary-title">
-        <p class="eyebrow">Order summary</p>
-        <h2 id="cart-summary-title">{{ cart.quantity }} item{{ "s" if cart.quantity != 1 else "" }}</h2>
+        <p class="eyebrow">Summary</p>
+        <div class="cart-summary-heading">
+          <h2 id="cart-summary-title">Order total</h2>
+          <span>{{ cart.quantity }} item{{ "s" if cart.quantity != 1 else "" }}</span>
+        </div>
         {% if cart.ready %}
-          <div class="purchase-price"><span>Total</span><strong>{{ cart.total_usd_cents|usd }}</strong></div>
-          <p>One invoice, one unique Monero address. The exact XMR amount is locked when you continue.</p>
+          <div class="purchase-price"><span>USD total</span><strong>{{ cart.total_usd_cents|usd }}</strong></div>
+          <p>The exact XMR amount and unique payment address are created when you continue.</p>
           <form method="post" action="{{ url_for('shopping.checkout_cart') }}">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <input type="hidden" name="checkout_nonce" value="{{ checkout_nonce }}">
