@@ -31,10 +31,12 @@ an authorized security engagement by itself.
 
 An authenticated service edit page accepts one JPEG, PNG, or WebP file up to
 5 MB and 24 million source pixels. Animated images and every other format are
-rejected. The application applies EXIF orientation, bounds the output to
-1600 by 1200 pixels, copies only decoded pixels into a new RGB image, and writes
-a fresh WebP without EXIF, XMP, comments, color profiles, the source filename,
-or the source bytes.
+rejected. The application applies EXIF orientation, center-crops every upload to
+the same 8:5 frame without upscaling it, bounds the output to 1600 by 1000
+pixels, copies only decoded pixels into a new RGB image, and writes a fresh WebP
+without EXIF, XMP, comments, color profiles, the source filename, or the source
+bytes. The homepage, service detail, and administrator preview all reserve that
+same frame so existing and newly uploaded images cannot stretch the layout.
 
 Derivatives are stored below `/opt/servicesite/instance/service-images`, not in
 Git or SQLite. The directory is mode `0700`, each file is mode `0600`, and every
