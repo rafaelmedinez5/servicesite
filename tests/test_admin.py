@@ -549,6 +549,7 @@ def test_admin_uploads_metadata_free_service_image_with_unrelated_name(admin_con
     assert 'width="1200" height="900"' in homepage
     assert 'class="service-detail-image"' in detail
     assert 'width="1200" height="900"' in detail
+    assert "height: auto;" in stylesheet
     assert "object-fit: contain;" in stylesheet
     assert "width: min(100%, 16rem);" in stylesheet
     assert "width: min(100%, 38rem);" in stylesheet
