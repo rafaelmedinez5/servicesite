@@ -549,10 +549,15 @@ def test_admin_uploads_metadata_free_service_image_with_unrelated_name(admin_con
     assert 'width="1200" height="900"' in homepage
     assert 'class="service-detail-image"' in detail
     assert 'width="1200" height="900"' in detail
-    assert "height: auto;" in stylesheet
-    assert "object-fit: contain;" in stylesheet
+    image_rule = stylesheet.split(
+        ".service-card-image,\n.service-detail-image,\n.admin-service-image {", 1
+    )[1].split("}", 1)[0]
+    assert "height: auto;" in image_rule
+    assert "aspect-ratio: auto;" in image_rule
+    assert "padding:" not in image_rule
+    assert "object-fit:" not in image_rule
     assert "width: min(100%, 16rem);" in stylesheet
-    assert "width: min(100%, 38rem);" in stylesheet
+    assert "width: min(100%, 32rem);" in stylesheet
     assert original_filename not in homepage
     assert public_image.status_code == 200
     assert public_image.mimetype == "image/webp"

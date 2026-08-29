@@ -365,13 +365,10 @@ p {
   display: block;
   width: 100%;
   height: auto;
-  aspect-ratio: 4 / 3;
+  aspect-ratio: auto;
   box-sizing: border-box;
-  padding: 0.4rem;
   border: 1px solid var(--border);
   background: #090e16;
-  object-fit: contain;
-  object-position: center;
 }
 
 .service-card-image {
@@ -453,7 +450,7 @@ p {
 }
 
 .service-detail-image {
-  width: min(100%, 38rem);
+  width: min(100%, 32rem);
   margin: 1.5rem auto 2rem;
 }
 
