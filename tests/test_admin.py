@@ -527,6 +527,7 @@ def test_admin_uploads_metadata_free_service_image_with_unrelated_name(admin_con
     assert original_filename.encode() not in stored_bytes
     with Image.open(io.BytesIO(stored_bytes)) as sanitized:
         assert sanitized.format == "WEBP"
+        assert sanitized.size == (120, 75)
         assert not sanitized.getexif()
         assert "exif" not in sanitized.info
         assert "xmp" not in sanitized.info
@@ -543,6 +544,10 @@ def test_admin_uploads_metadata_free_service_image_with_unrelated_name(admin_con
 
     assert public_path in homepage
     assert public_path in detail
+    assert 'class="service-card-image"' in homepage
+    assert 'width="1600" height="1000"' in homepage
+    assert 'class="service-detail-image"' in detail
+    assert 'width="1600" height="1000"' in detail
     assert original_filename not in homepage
     assert public_image.status_code == 200
     assert public_image.mimetype == "image/webp"

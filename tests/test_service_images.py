@@ -42,6 +42,28 @@ def test_sanitizer_decodes_pixels_and_discards_source_metadata():
         assert "icc_profile" not in image.info
 
 
+@pytest.mark.parametrize(
+    ("source_size", "expected_size"),
+    [
+        ((160, 50), (80, 50)),
+        ((80, 120), (80, 50)),
+        ((100, 100), (96, 60)),
+        ((2_000, 1_500), (1_600, 1_000)),
+    ],
+)
+def test_sanitizer_center_crops_every_source_to_the_same_frame(
+    source_size, expected_size
+):
+    sanitized = sanitize_service_image(
+        io.BytesIO(_png_bytes(size=source_size, metadata=False))
+    )
+
+    assert (sanitized.width, sanitized.height) == expected_size
+    assert sanitized.width * 5 == sanitized.height * 8
+    with Image.open(io.BytesIO(sanitized.data)) as image:
+        assert image.size == expected_size
+
+
 def test_sanitizer_rejects_unsupported_oversized_and_excessive_pixel_inputs():
     gif = io.BytesIO()
     Image.new("RGB", (20, 20), "red").save(gif, format="GIF")

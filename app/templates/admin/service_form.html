@@ -36,7 +36,7 @@
         <p>JPEG, PNG, or WebP up to 5 MB. The server creates a new WebP, strips embedded metadata, and discards the source filename and bytes.</p>
       </div>
       {% if service.image_key %}
-        <img class="admin-service-image" src="{{ url_for('admin.service_image_preview', service_id=service.id, image_key=service.image_key) }}" alt="Current image for {{ service.name }}" width="1600" height="1200">
+        <img class="admin-service-image" src="{{ url_for('admin.service_image_preview', service_id=service.id, image_key=service.image_key) }}" alt="Current image for {{ service.name }}" width="1600" height="1000">
       {% endif %}
       <form class="admin-form" method="post" enctype="multipart/form-data" action="{{ url_for('admin.service_image_upload', service_id=service.id) }}">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
