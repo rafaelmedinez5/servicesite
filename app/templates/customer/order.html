@@ -3,12 +3,16 @@
 {% block title %}Your order | Servicesite{% endblock %}
 {% block content %}
   <a class="back-link" href="{{ url_for('customer.account') }}#orders">&#8592; Your orders</a>
-  <header class="shopping-heading order-heading">
+  <header class="shopping-heading flow-heading order-heading">
     <p class="eyebrow">Private order</p>
-    <h1>{{ invoice.service_name_snapshot }}</h1>
-    <p class="monospace breakable">{{ invoice.id }}</p>
+    <h1>Order details.</h1>
+    <p>Review your items, payment progress, and fulfillment status.</p>
   </header>
   <section class="card payment-card">
+    <div class="order-title-row">
+      <div><p class="eyebrow">Order</p><h2>{{ invoice.service_name_snapshot }}</h2></div>
+      <p class="monospace breakable">{{ invoice.id }}</p>
+    </div>
     <div class="status-summary {{ customer_state.tone }}">
       <span class="status-dot" aria-hidden="true"></span>
       <div><strong>{{ customer_state.title }}</strong><p>{{ customer_state.message }}</p></div>

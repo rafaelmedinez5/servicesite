@@ -32,21 +32,23 @@
   <section class="account-orders" id="orders" aria-labelledby="orders-title">
     <p class="eyebrow">Purchase history</p>
     <h2 id="orders-title">Your orders</h2>
-    <p>Your 100 most recent orders created after the cart update appear here. Keep private links for any earlier invoices.</p>
+    <p>Your recent orders, payment progress, and fulfillment status appear here.</p>
     {% if orders %}
-      <div class="table-wrap card">
-        <table>
-          <thead><tr><th scope="col">Order</th><th scope="col">Total</th><th scope="col">Payment</th><th scope="col">Fulfillment</th><th scope="col">Created</th></tr></thead>
-          <tbody>{% for order in orders %}
-            <tr>
-              <td><a href="{{ url_for('shopping.order_detail', invoice_id=order.invoice_id) }}">{{ order.service_name }}</a><small class="monospace">{{ order.invoice_id[:12] }}…</small></td>
-              <td>{{ order.price_usd_cents|usd }}</td>
-              <td>{{ order.payment_status|customer_payment_label }}</td>
-              <td>{{ order.fulfillment_status.value }}</td>
-              <td>{{ order.created_at|display_datetime }}</td>
-            </tr>
-          {% endfor %}</tbody>
-        </table>
+      <div class="order-history">
+        {% for order in orders %}
+          <article class="card order-history-card">
+            <div class="order-history-title">
+              <p>{{ order.created_at|display_datetime }}</p>
+              <h3><a href="{{ url_for('shopping.order_detail', invoice_id=order.invoice_id) }}">{{ order.service_name }}</a></h3>
+              <small class="monospace">{{ order.invoice_id[:12] }}…</small>
+            </div>
+            <dl class="order-history-facts">
+              <div><dt>Total</dt><dd>{{ order.price_usd_cents|usd }}</dd></div>
+              <div><dt>Payment</dt><dd>{{ order.payment_status|customer_payment_label }}</dd></div>
+              <div><dt>Fulfillment</dt><dd>{{ order.fulfillment_status.value|replace("_", " ")|title }}</dd></div>
+            </dl>
+          </article>
+        {% endfor %}
       </div>
     {% else %}
       <div class="card empty-state"><h3>No orders yet.</h3><p>Your purchases will appear here when you create an invoice.</p></div>

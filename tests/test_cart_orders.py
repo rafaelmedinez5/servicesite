@@ -123,7 +123,9 @@ def test_cart_creates_one_owned_invoice_with_immutable_items(web_context):
         assert "$55.00 USD" in body
         assert page.headers["Cache-Control"] == "no-store, private, max-age=0"
         assert page.headers["X-Robots-Tag"] == "noindex, nofollow, noarchive"
-    assert f'/account/orders/{invoice.id}' in web_context.client.get("/account").get_data(as_text=True)
+    account_body = web_context.client.get("/account").get_data(as_text=True)
+    assert 'class="order-history"' in account_body
+    assert f'/account/orders/{invoice.id}' in account_body
 
 
 def test_client_supplied_prices_and_owner_are_not_checkout_authority(web_context):

@@ -4,7 +4,7 @@
 {% block title %}Private payment status | Servicesite{% endblock %}
 
 {% block content %}
-  <section class="private-heading" aria-labelledby="status-title">
+  <section class="private-heading flow-heading" aria-labelledby="status-title">
     <p class="eyebrow">Private payment status</p>
     <h1 id="status-title">{{ customer_state.title }}</h1>
     <p class="lede">{{ customer_state.message }}</p>
@@ -50,12 +50,10 @@
           <a class="button" href="{{ url_for('public.checkout', invoice_id=invoice.id, status_token=invoice.status_token) }}">Return to checkout</a>
         {% endif %}
       </div>
+      <aside class="privacy-note" aria-label="Private status link reminder">
+        <strong>Keep this link private.</strong>
+        <p>This URL provides access to the invoice. Support will never ask for wallet credentials or private keys.</p>
+      </aside>
     </section>
-
-    <aside class="card privacy-card">
-      <p class="eyebrow">Keep this link private</p>
-      <h2>Status access</h2>
-      <p>This URL acts as the access credential for this invoice. Support will never ask for wallet credentials or private keys.</p>
-    </aside>
   </div>
 {% endblock %}
