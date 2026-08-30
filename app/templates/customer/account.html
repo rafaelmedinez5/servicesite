@@ -5,7 +5,7 @@
 
 {% block content %}
   <section class="account-layout" aria-labelledby="account-title">
-    <div>
+    <div class="account-intro">
       <p class="eyebrow"><span class="eyebrow-line" aria-hidden="true"></span>Customer account</p>
       <h1 id="account-title">Signed in as @{{ g.customer.username }}</h1>
       <p class="lede">Manage your saved cart and follow your orders from one place.</p>
@@ -18,16 +18,6 @@
         </form>
       </div>
     </div>
-    <aside class="card account-card" aria-labelledby="account-security-title">
-      <p class="terminal-label">Account security</p>
-      <h2 id="account-security-title">Your session is protected.</h2>
-      <dl class="account-facts">
-        <div><dt>Username</dt><dd>@{{ g.customer.username }}</dd></div>
-        <div><dt>Session</dt><dd>Automatic expiry enabled</dd></div>
-        <div><dt>Checkout</dt><dd>Sign-in required</dd></div>
-      </dl>
-      <p class="account-note">Password recovery is not available yet. Store your credentials in a password manager.</p>
-    </aside>
   </section>
   <section class="account-orders" id="orders" aria-labelledby="orders-title">
     <p class="eyebrow">Purchase history</p>

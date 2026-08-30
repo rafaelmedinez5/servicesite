@@ -9,7 +9,7 @@
   </head>
   <body>
     <header class="site-header">
-      <a class="brand" href="{{ url_for('public.index') }}" aria-label="Servicesite home">
+      <a class="brand" href="{{ url_for('public.index') if g.site_authenticated else url_for('customer.login') }}" aria-label="Servicesite {{ 'home' if g.site_authenticated else 'login' }}">
         <span class="brand-mark" aria-hidden="true">S</span>
         <span>Servicesite</span>
       </a>
@@ -19,33 +19,37 @@
         <a href="{{ url_for('public.contact') }}">Contact</a>
       </nav>
       <div class="header-actions">
-        <details class="nav-dropdown">
-          <summary>Categories <span aria-hidden="true">+</span></summary>
-          <div class="nav-dropdown-panel">
-            <p>Browse by category</p>
-            {% if navigation_categories %}
-              {% for category in navigation_categories %}
-                <a href="{{ url_for('public.category_detail', category_slug=category.slug) }}">{{ category.name }}</a>
-              {% endfor %}
-            {% else %}
-              <span class="nav-empty">No categories published</span>
-            {% endif %}
-          </div>
-        </details>
-        <a class="cart-nav-link" href="{{ url_for('shopping.cart') }}">Cart{% if cart_quantity %} <span class="cart-count">{{ cart_quantity }}</span>{% endif %}</a>
-        {% if g.customer %}
-          <details class="account-dropdown">
-            <summary><span class="account-name">@{{ g.customer.username }}</span><span class="account-chevron" aria-hidden="true">&#8964;</span></summary>
-            <div class="account-dropdown-panel">
-              <p>Customer menu</p>
-              <a href="{{ url_for('customer.account') }}">Account overview</a>
-              <a href="{{ url_for('customer.account') }}#orders">Transactions</a>
-              <form method="post" action="{{ url_for('customer.logout') }}">
-                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                <button class="nav-button" type="submit">Log out</button>
-              </form>
+        {% if g.site_authenticated %}
+          <details class="nav-dropdown">
+            <summary>Categories <span aria-hidden="true">+</span></summary>
+            <div class="nav-dropdown-panel">
+              <p>Browse by category</p>
+              {% if navigation_categories %}
+                {% for category in navigation_categories %}
+                  <a href="{{ url_for('public.category_detail', category_slug=category.slug) }}">{{ category.name }}</a>
+                {% endfor %}
+              {% else %}
+                <span class="nav-empty">No categories published</span>
+              {% endif %}
             </div>
           </details>
+          {% if g.customer %}
+            <a class="cart-nav-link" href="{{ url_for('shopping.cart') }}">Cart{% if cart_quantity %} <span class="cart-count">{{ cart_quantity }}</span>{% endif %}</a>
+            <details class="account-dropdown">
+              <summary><span class="account-name">@{{ g.customer.username }}</span><span class="account-chevron" aria-hidden="true">&#8964;</span></summary>
+              <div class="account-dropdown-panel">
+                <p>Customer menu</p>
+                <a href="{{ url_for('customer.account') }}">Account overview</a>
+                <a href="{{ url_for('customer.account') }}#orders">Transactions</a>
+                <form method="post" action="{{ url_for('customer.logout') }}">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                  <button class="nav-button" type="submit">Log out</button>
+                </form>
+              </div>
+            </details>
+          {% else %}
+            <a class="nav-cta" href="{{ url_for('admin.dashboard') }}">Admin</a>
+          {% endif %}
         {% else %}
           <div class="account-nav">
             <a href="{{ url_for('customer.login') }}">Log in</a>
@@ -61,24 +65,28 @@
             <a href="{{ url_for('public.join') }}">Join</a>
             <a href="{{ url_for('public.contact') }}">Contact</a>
           </nav>
-          <div class="mobile-category-links">
-            <p>Categories</p>
-            {% if navigation_categories %}
-              {% for category in navigation_categories %}
-                <a href="{{ url_for('public.category_detail', category_slug=category.slug) }}">{{ category.name }}</a>
-              {% endfor %}
-            {% else %}
-              <span class="nav-empty">No categories published</span>
-            {% endif %}
-          </div>
+          {% if g.site_authenticated %}
+            <div class="mobile-category-links">
+              <p>Categories</p>
+              {% if navigation_categories %}
+                {% for category in navigation_categories %}
+                  <a href="{{ url_for('public.category_detail', category_slug=category.slug) }}">{{ category.name }}</a>
+                {% endfor %}
+              {% else %}
+                <span class="nav-empty">No categories published</span>
+              {% endif %}
+            </div>
+          {% endif %}
           <div class="mobile-account-links">
-            <a href="{{ url_for('shopping.cart') }}">Cart{% if cart_quantity %} <span class="cart-count">{{ cart_quantity }}</span>{% endif %}</a>
             {% if g.customer %}
+              <a href="{{ url_for('shopping.cart') }}">Cart{% if cart_quantity %} <span class="cart-count">{{ cart_quantity }}</span>{% endif %}</a>
               <a href="{{ url_for('customer.account') }}">@{{ g.customer.username }}</a>
               <form method="post" action="{{ url_for('customer.logout') }}">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 <button class="nav-button" type="submit">Log out</button>
               </form>
+            {% elif g.admin_authenticated %}
+              <a href="{{ url_for('admin.dashboard') }}">Admin dashboard</a>
             {% else %}
               <a href="{{ url_for('customer.login') }}">Log in</a>
               <a href="{{ url_for('customer.register') }}">Create account</a>
@@ -100,16 +108,16 @@
       {% block content %}{% endblock %}
     </main>
     <footer class="site-footer">
-      <div>
-        <a class="footer-brand" href="{{ url_for('public.index') }}">Servicesite</a>
-        <p>Authorized security services with private, Monero-only checkout.</p>
-      </div>
       <nav class="footer-links" aria-label="Footer navigation">
         <a href="{{ url_for('public.about') }}">About</a>
         <a href="{{ url_for('public.join') }}">Join</a>
         <a href="{{ url_for('public.contact') }}">Contact</a>
       </nav>
-      <p class="legal-note">Payments do not authorize testing. Engagement scope and written authorization are reviewed separately.</p>
+      <a class="footer-pgp-link" href="{{ url_for('public.pgp_key') }}">Our PGP key</a>
+      <p class="footer-onion">
+        <span>Onion address</span>
+        {% if public_onion_address %}<code>{{ public_onion_address }}</code>{% else %}<em>Not yet configured</em>{% endif %}
+      </p>
     </footer>
   </body>
 </html>

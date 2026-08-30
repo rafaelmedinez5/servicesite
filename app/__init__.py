@@ -45,6 +45,7 @@ def create_app(test_config: dict | None = None) -> Flask:
         ADMIN_SESSION_HOURS=settings.admin_session_hours,
         PUBLIC_CONTACT_METHOD=settings.public_contact_method,
         PUBLIC_CONTACT_ADDRESS=settings.public_contact_address,
+        PUBLIC_ONION_ADDRESS=settings.public_onion_address,
         XMR_WALLET_RPC_URL=settings.xmr_wallet_rpc_url,
         XMR_WALLET_RPC_USER=settings.xmr_wallet_rpc_user,
         XMR_WALLET_RPC_PASS=settings.xmr_wallet_rpc_password,

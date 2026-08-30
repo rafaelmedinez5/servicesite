@@ -79,9 +79,10 @@ snapshots, and expiry. A later catalog edit cannot alter historical invoices.
 
 ## Task 4 web boundary
 
-The public catalog and individual service-detail routes read only published,
-non-archived categories and services. Service-detail pages use the unique,
-validated service slug and return a generic 404 for unavailable records.
+The session-gated catalog and individual service-detail routes read only
+published, non-archived categories and services. Anonymous requests redirect
+to login. Service-detail pages use the unique, validated service slug and return
+a generic 404 for unavailable records after the access boundary is satisfied.
 Checkout begins from the detail page only for an authenticated customer and
 uses a signed-session CSRF token plus a single-use form nonce, obtains a
 timestamped CoinGecko quote, and calls only the canonical `InvoiceCreator`.
@@ -141,7 +142,7 @@ poll reconciliation, transfer/sweep XMR, alter a file, or operate a service.
 - Task 0: scaffold and decisions only.
 - Task 2: wallet-rpc transport and complete XMR configuration validation.
 - Task 3: minimal catalog/invoice persistence and canonical invoice domain.
-- Task 4: public catalog, checkout, QR, and private status views.
+- Task 4: customer catalog, checkout, QR, and private status views.
 - Customer registration, login, account sessions, and account-gated checkout are implemented.
 - Admin authentication, catalog management, purchase filters, and guarded manual fulfillment are implemented.
 - Task 5: poll/confirm/sweep orchestration (implemented; staged verification pending).

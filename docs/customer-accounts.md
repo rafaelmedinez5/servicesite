@@ -1,8 +1,9 @@
 # Customer accounts
 
-Customer accounts provide the identity boundary required before checkout. The
-catalog and individual service information remain public; creating an invoice
-requires a valid customer session.
+Customer accounts provide the identity boundary for catalog access and
+checkout. Anonymous visitors are redirected to login before the catalog or an
+individual service can be viewed; creating an invoice requires a valid customer
+session.
 
 ## Routes
 
@@ -39,7 +40,8 @@ hashes.
 The account page lists the customer's 100 most recent orders. Both direct
 single-service checkout and cart checkout save ownership together with the
 invoice. Earlier invoices are not assigned to accounts retroactively because
-their original owner cannot be inferred safely; their bearer links still work.
+their original owner cannot be inferred safely; their bearer links still work
+for a signed-in site session.
 
 Password recovery, password changes, and account deletion are not part of this
 checkpoint. Customers must store their credentials in a password manager.

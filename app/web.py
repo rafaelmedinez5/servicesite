@@ -148,6 +148,12 @@ def contact():
     )
 
 
+@public.get("/pgp-key")
+def pgp_key():
+    g.no_store = True
+    return render_template("pgp_key.html")
+
+
 @public.get("/services/<service_slug>")
 def service_detail(service_slug: str):
     g.no_store = True
@@ -353,11 +359,19 @@ def register_web(app) -> None:
 
     @app.context_processor
     def inject_public_navigation():
-        try:
-            categories = _published_category_records()
-        except (PersistenceError, sqlite3.Error):
+        if not getattr(g, "site_authenticated", False):
             categories = ()
-        return {"navigation_categories": categories}
+        else:
+            try:
+                categories = _published_category_records()
+            except (PersistenceError, sqlite3.Error):
+                categories = ()
+        return {
+            "navigation_categories": categories,
+            "public_onion_address": current_app.config.get(
+                "PUBLIC_ONION_ADDRESS"
+            ),
+        }
 
     @app.after_request
     def apply_security_headers(response):

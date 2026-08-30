@@ -18,7 +18,7 @@
         <p>Verify the address through this page before beginning a conversation. Initial messages should contain only the minimum context needed to route the request.</p>
       {% else %}
         <h2 id="contact-channel-title">Direct channel not yet published</h2>
-        <p>The operator has not configured a public contact address. You can still browse services, create an account, or review your existing orders.</p>
+        <p>The operator has not configured a public contact address. You can still create an account or review the public information pages.</p>
       {% endif %}
     </div>
 
@@ -27,7 +27,7 @@
         <span>New engagement</span>
         <h2>Start with the catalog</h2>
         <p>Choose the closest service category and review the available engagements before making contact.</p>
-        <a href="{{ url_for('public.index') }}#services">Browse categories <span aria-hidden="true">&#8594;</span></a>
+        <a href="{{ (url_for('public.index') + '#services') if g.site_authenticated else url_for('customer.login', next=url_for('public.index')) }}">{{ "Browse categories" if g.site_authenticated else "Log in to browse" }} <span aria-hidden="true">&#8594;</span></a>
       </article>
       <article>
         <span>Existing purchase</span>

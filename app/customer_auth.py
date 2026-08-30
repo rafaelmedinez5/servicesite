@@ -20,6 +20,7 @@ from flask import (
 )
 from werkzeug.security import check_password_hash, generate_password_hash
 
+from app.admin import admin_session_authenticated
 from app.persistence import CustomerAccount, PersistenceError, ServicesiteRepository
 from app.web_security import FormSecurityError, require_csrf
 
@@ -28,6 +29,18 @@ customer = Blueprint("customer", __name__)
 _CUSTOMER_SESSION_KEY = "_servicesite_customer"
 _USERNAME_PATTERN = re.compile(r"[a-z0-9](?:[a-z0-9._-]{1,30}[a-z0-9])")
 _DUMMY_PASSWORD_HASH = generate_password_hash(secrets.token_urlsafe(32))
+_ANONYMOUS_ENDPOINTS = frozenset(
+    {
+        "customer.login",
+        "customer.register",
+        "health",
+        "public.about",
+        "public.contact",
+        "public.join",
+        "public.pgp_key",
+        "static",
+    }
+)
 
 
 @customer.before_app_request
@@ -54,6 +67,26 @@ def load_customer() -> None:
         session.pop(_CUSTOMER_SESSION_KEY, None)
         return
     g.customer = account
+
+
+@customer.before_app_request
+def require_site_session():
+    g.admin_authenticated = admin_session_authenticated()
+    g.site_authenticated = g.customer is not None or g.admin_authenticated
+    if g.site_authenticated:
+        return None
+    if request.endpoint in _ANONYMOUS_ENDPOINTS:
+        return None
+    if request.blueprint in {"admin", "internal"}:
+        return None
+    next_path = (
+        request.full_path.removesuffix("?")
+        if request.method == "GET"
+        else url_for("public.index")
+    )
+    if len(next_path) > 512:
+        next_path = request.path[:512]
+    return redirect(url_for("customer.login", next=next_path), code=303)
 
 
 @customer.before_request
@@ -231,7 +264,7 @@ def logout():
     except FormSecurityError:
         abort(400)
     session.clear()
-    return redirect(url_for("public.index"), code=303)
+    return redirect(url_for("customer.login"), code=303)
 
 
 def register_customer_auth(app) -> None:

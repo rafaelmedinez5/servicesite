@@ -170,8 +170,10 @@ def test_orders_and_carts_are_isolated_between_customers(web_context):
     assert other.get(f"/account/orders/{invoice.id}").status_code == 404
     assert invoice.id not in other.get("/account").get_data(as_text=True)
     assert "Your cart is empty" in other.get("/cart").get_data(as_text=True)
-    # Existing bearer links remain valid for anyone who possesses the exact link.
-    assert web_context.app.test_client().get(response.headers["Location"]).status_code == 200
+    # Exact bearer links still require a signed-in site session.
+    anonymous = web_context.app.test_client().get(response.headers["Location"])
+    assert anonymous.status_code == 303
+    assert "/login?next=" in anonymous.headers["Location"]
 
 
 @pytest.mark.parametrize("change", ["price", "quantity", "archive"])
