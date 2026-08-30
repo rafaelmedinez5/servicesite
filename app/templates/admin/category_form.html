@@ -17,7 +17,7 @@
       <label><span>Slug</span><input name="slug" maxlength="120" pattern="[a-z0-9]+(?:-[a-z0-9]+)*" value="{{ category.slug if category else '' }}" required><small>Lowercase letters, digits, and hyphens.</small></label>
       <label><span>Description</span><textarea name="description" maxlength="10000" rows="6">{{ category.description if category else '' }}</textarea></label>
       <label><span>Sort order</span><input name="sort_order" type="number" min="-1000000" max="1000000" value="{{ category.sort_order if category else 0 }}" required></label>
-      <label class="check-row"><input name="published" type="checkbox" {% if category and category.published %}checked{% endif %}><span>Published publicly</span></label>
+      <label class="check-row"><input name="published" type="checkbox" {% if category and category.published %}checked{% endif %}><span>Published in catalog</span></label>
       <div class="button-row"><button type="submit">Save category</button><a class="button secondary" href="{{ url_for('admin.categories') }}">Cancel</a></div>
     </form>
   </section>

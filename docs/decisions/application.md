@@ -2,10 +2,12 @@
 
 Status: application and Task 4 pricing decisions confirmed on 2026-08-17.
 
-## Catalog and public pages
+## Catalog and entry pages
 
 - Categories and services are created and maintained through an admin panel.
-- Only published categories and services are displayed publicly.
+- Only published categories and services are displayed in the signed-in catalog.
+- Anonymous visitors can reach Login, Register, About, Join, Contact, the PGP
+  page, and Admin Login; the catalog requires a customer or administrator session.
 - Services have a name, slug, description, USD price, optional access duration,
   publication state, archive state, and sort order.
 - Categories have a name, slug, description, publication state, archive state,

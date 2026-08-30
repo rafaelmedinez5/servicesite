@@ -187,15 +187,15 @@ def test_public_catalog_renders_only_published_services(web_context):
         _service(service_id="service-hidden", published=False)
     )
 
+    _login_customer(web_context.client)
     response = web_context.client.get("/")
     body = response.get_data(as_text=True)
 
     assert response.status_code == 200
     assert "Find the gaps before they become incidents." in body
     assert 'id="services"' in body
-    assert 'id="process"' in body
     assert "Choose the engagement that fits." in body
-    assert "Three clear steps." in body
+    assert "Three clear steps." not in body
     assert "Engagement protocol" not in body
     assert 'href="/categories/security-services"' in body
     assert "View category" in body
@@ -217,6 +217,7 @@ def test_category_page_lists_only_its_published_services(web_context):
         _service(service_id="service-hidden", published=False)
     )
 
+    _login_customer(web_context.client)
     response = web_context.client.get("/categories/security-services")
     body = response.get_data(as_text=True)
 
@@ -229,6 +230,7 @@ def test_category_page_lists_only_its_published_services(web_context):
 
 
 def test_unknown_and_unpublished_category_pages_return_404(web_context):
+    _login_customer(web_context.client)
     assert web_context.client.get("/categories/not-a-category").status_code == 404
 
     web_context.repository.update_category(_category(published=False))
@@ -236,18 +238,21 @@ def test_unknown_and_unpublished_category_pages_return_404(web_context):
     assert web_context.client.get("/categories/security-services").status_code == 404
 
 
-def test_about_join_and_contact_pages_are_public_and_script_free(web_context):
+def test_information_and_pgp_pages_are_public_and_script_free(web_context):
     for path, expected in (
         ("/about", "Security work should begin with clarity."),
         ("/join", "Do careful work with people who value evidence."),
         ("/contact", "Direct channel not yet published"),
+        ("/pgp-key", "Our PGP key."),
     ):
         response = web_context.client.get(path)
         body = response.get_data(as_text=True)
 
         assert response.status_code == 200
         assert expected in body
-        assert 'href="/categories/security-services"' in body
+        assert 'href="/categories/security-services"' not in body
+        assert 'href="/pgp-key">Our PGP key</a>' in body
+        assert "Payments do not authorize testing" not in body
         assert "<script" not in body.lower()
         assert response.headers["Cache-Control"] == "no-store, private, max-age=0"
 
@@ -265,27 +270,23 @@ def test_contact_page_displays_configured_public_channel(web_context):
     assert "Direct channel not yet published" not in body
 
 
-def test_service_detail_is_public_but_requires_login_to_purchase(web_context):
-    response = web_context.client.get("/services/service-assessment-slug")
-    body = response.get_data(as_text=True)
+def test_footer_displays_configured_onion_address(web_context):
+    hostname = ("a" * 56) + ".onion"
+    web_context.app.config["PUBLIC_ONION_ADDRESS"] = hostname
 
-    assert response.status_code == 200
-    assert "Security Assessment" in body
-    assert "Authorized assessment with a written report." in body
-    assert "Security Services" in body
-    assert "One engagement" in body
-    assert "$100.00 USD" in body
-    assert "Sign in to continue" in body
-    assert 'href="/login?next=/services/service-assessment-slug"' in body
-    assert 'href="/register?next=/services/service-assessment-slug"' in body
-    assert 'action="/checkout"' not in body
-    assert 'name="checkout_nonce"' not in body
-    assert 'href="/categories/security-services"' in body
-    assert "Purchase flow" not in body
-    assert "Price lock" not in body
-    assert "Payments do not authorize testing" in body
-    assert "<script" not in body.lower()
-    assert response.headers["Cache-Control"] == "no-store, private, max-age=0"
+    body = web_context.client.get("/about").get_data(as_text=True)
+
+    assert hostname in body
+    assert "Not yet configured" not in body
+
+
+def test_service_detail_requires_login_before_browsing(web_context):
+    response = web_context.client.get("/services/service-assessment-slug")
+
+    assert response.status_code == 303
+    assert response.headers["Location"].endswith(
+        "/login?next=/services/service-assessment-slug"
+    )
 
 
 def test_service_detail_recommends_other_services(web_context):
@@ -297,6 +298,7 @@ def test_service_detail_recommends_other_services(web_context):
         )
     )
 
+    _login_customer(web_context.client)
     body = web_context.client.get(
         "/services/service-assessment-slug"
     ).get_data(as_text=True)
@@ -313,6 +315,9 @@ def test_signed_in_service_detail_shows_protected_checkout_form(web_context):
     body = response.get_data(as_text=True)
 
     assert response.status_code == 200
+    assert "Security Assessment" in body
+    assert "Authorized assessment with a written report." in body
+    assert "$100.00 USD" in body
     assert 'action="/checkout"' in body
     assert 'name="service_id" value="service-assessment"' in body
     assert set(tokens) == {"csrf_token", "checkout_nonce"}
@@ -334,6 +339,7 @@ def test_unknown_and_unpublished_service_details_return_404(web_context):
         _service(service_id="service-hidden", published=False)
     )
 
+    _login_customer(web_context.client)
     unknown = web_context.client.get("/services/not-a-service")
     hidden = web_context.client.get("/services/service-hidden-slug")
     web_context.repository.update_category(_category(published=False))

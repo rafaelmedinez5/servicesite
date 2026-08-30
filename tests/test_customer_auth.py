@@ -73,8 +73,13 @@ def test_auth_pages_are_private_and_navigation_offers_account_creation(
     register = client.get("/register")
     login = client.get("/login")
 
-    assert 'href="/login"' in home.get_data(as_text=True)
-    assert 'href="/register"' in home.get_data(as_text=True)
+    assert home.status_code == 303
+    assert home.headers["Location"].endswith("/login?next=/")
+    login_body = login.get_data(as_text=True)
+    assert 'href="/login"' in login_body
+    assert 'href="/register"' in login_body
+    assert 'href="/about"' in login_body
+    assert 'class="nav-dropdown"' not in login_body
     assert 'pattern="[a-z0-9][a-z0-9._\\-]{1,30}[a-z0-9]"' in register.get_data(as_text=True)
     for response in (register, login):
         assert response.status_code == 200
@@ -116,6 +121,7 @@ def test_registration_normalizes_username_hashes_password_and_starts_session(
     assert 'href="/account">Account overview</a>' in account_body
     assert 'href="/account#orders">Transactions</a>' in account_body
     assert 'action="/logout"' in account_body
+    assert "Account security" not in account_body
     cookie = response.headers["Set-Cookie"]
     assert "HttpOnly" in cookie
     assert "SameSite=Strict" in cookie
@@ -205,7 +211,7 @@ def test_login_uses_generic_errors_supports_local_next_and_logout(customer_conte
 
     logout = client.post("/logout", data={"csrf_token": _csrf(account)})
     assert logout.status_code == 303
-    assert logout.headers["Location"].endswith("/")
+    assert logout.headers["Location"].endswith("/login")
     assert client.get("/account").headers["Location"].endswith(
         "/login?next=/account"
     )
@@ -253,8 +259,36 @@ def test_customer_forms_require_csrf(customer_context):
             "password": "correct horse battery staple",
         },
     )
+    _login(client)
     logout = client.post("/logout", data={})
 
     assert register.status_code == 400
     assert login.status_code == 400
     assert logout.status_code == 400
+
+
+def test_anonymous_access_is_limited_to_entry_and_information_pages(customer_context):
+    _, client, _ = customer_context
+
+    for path in (
+        "/",
+        "/categories/example",
+        "/services/example",
+        "/cart",
+        "/account",
+    ):
+        response = client.get(path)
+        assert response.status_code == 303
+        assert response.headers["Location"].startswith("/login?next=")
+
+    for path in (
+        "/login",
+        "/register",
+        "/about",
+        "/join",
+        "/contact",
+        "/pgp-key",
+        "/admin/login",
+        "/health",
+    ):
+        assert client.get(path).status_code == 200

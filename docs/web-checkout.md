@@ -44,12 +44,13 @@ There is no hard-coded or cached indefinite fallback.
 ## Form and route security
 
 - The signed Flask session carries a strong CSRF token.
-- Published service details remain public, but only a signed-in customer sees
-  the purchase form. Anonymous requests receive login and registration links,
-  and a direct anonymous checkout POST is rejected before rate or wallet access.
+- Anonymous catalog and service-detail requests redirect to customer login.
+  A valid customer or administrator session can browse published services, but
+  only a signed-in customer sees the purchase form. A direct anonymous checkout
+  POST is rejected before rate or wallet access.
 - Each signed-in service-detail response issues a separate, single-use checkout
-  nonce. The catalog and anonymous detail pages do not issue checkout tokens or
-  create invoices directly.
+  nonce. Catalog pages and administrator browsing do not issue checkout tokens
+  or create invoices directly.
   Replaying a successful detail-page form cannot create a second invoice.
 - Unknown, unpublished, archived, or category-hidden service slugs return the
   same generic 404 response and do not reveal catalog state.
@@ -63,7 +64,8 @@ There is no hard-coded or cached indefinite fallback.
   `X-Robots-Tag: noindex, nofollow, noarchive`.
 - All responses deny scripts, framing, cross-origin referrers, MIME sniffing,
   camera, microphone, geolocation, and browser payment APIs.
-- Wrong bearer tokens return the same 404 as an unavailable private resource.
+- Invoice bearer routes require a signed-in site session. Wrong bearer tokens
+  return the same 404 as an unavailable private resource.
 
 ## Monero URI and customer state
 

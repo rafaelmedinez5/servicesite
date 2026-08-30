@@ -6,6 +6,13 @@ page for focused browsing and direct links. Service detail pages recommend up
 to three other services, prioritizing the current category before the rest of
 the catalog.
 
+The catalog is session-gated. Anonymous visitors are redirected to customer
+login and may access only Login, Register, About, Join, Contact, the PGP-key
+page, and Admin Login. Health checks and the independently authenticated
+internal polling routes remain available to their existing callers. A valid
+customer or administrator session unlocks the catalog; customer-only shopping
+routes continue to require a customer session.
+
 The desktop header uses three balanced zones: the brand on the left,
 About/Join/Contact in the center, and Categories/Cart/account actions on the
 right. The brand links directly to the homepage, so the header does not
@@ -28,3 +35,15 @@ PUBLIC_CONTACT_ADDRESS=<public address>
 Both values are optional, but they must be configured together. The address is
 rendered as plain text rather than an automatic external link. This release does
 not change the SQLite schema and requires no database migration.
+
+The centered footer contains only About, Join, Contact, a link to `/pgp-key`,
+and the configured onion hostname. Set the optional Tor v3 hostname in the
+protected application environment:
+
+```text
+PUBLIC_ONION_ADDRESS=<56-character-v3-hostname>.onion
+```
+
+The value is normalized to a hostname and rendered as plain text. The PGP page
+does not publish a placeholder key; it clearly reports that the operator's
+armored public key is pending until the real key is supplied.

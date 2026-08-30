@@ -49,7 +49,19 @@ def protect_admin_routes():
     g.private_response = True
     if request.endpoint in {"admin.login", "admin.pin_login"}:
         return None
+    if not admin_session_authenticated():
+        session.clear()
+        return redirect(url_for("admin.login"), code=303)
+    return None
+
+
+def admin_session_authenticated() -> bool:
+    if hasattr(g, "admin_authenticated"):
+        return bool(g.admin_authenticated)
     candidate = session.get(_ADMIN_SESSION_KEY)
+    if not isinstance(candidate, dict):
+        g.admin_authenticated = False
+        return False
     username = current_app.config["ADMIN_USERNAME"]
     try:
         credential = _repository().get_admin_credential()
@@ -63,9 +75,9 @@ def protect_admin_routes():
         and candidate.get("credential_version") == credential.version
     )
     if not authenticated:
-        session.clear()
-        return redirect(url_for("admin.login"), code=303)
-    return None
+        session.pop(_ADMIN_SESSION_KEY, None)
+    g.admin_authenticated = authenticated
+    return authenticated
 
 
 @admin.route("/login", methods=["GET", "POST"])

@@ -21,7 +21,10 @@ def test_application_smoke(monkeypatch, tmp_path):
     )
     client = app.test_client()
 
-    assert client.get("/").status_code == 200
+    entry = client.get("/")
+    assert entry.status_code == 303
+    assert entry.headers["Location"].endswith("/login?next=/")
+    assert client.get("/login").status_code == 200
     health = client.get("/health")
     assert health.status_code == 200
     assert health.get_data(as_text=True) == "OK"
@@ -63,6 +66,25 @@ def test_public_contact_channel_accepts_a_configured_pair(monkeypatch):
 
     assert settings.public_contact_method == "Session"
     assert settings.public_contact_address == "05-test-public-address"
+
+
+def test_public_onion_address_is_optional_and_normalized(monkeypatch):
+    monkeypatch.delenv("PUBLIC_ONION_ADDRESS", raising=False)
+    assert Settings.from_env().public_onion_address is None
+
+    hostname = ("a" * 56) + ".onion"
+    monkeypatch.setenv("PUBLIC_ONION_ADDRESS", f"http://{hostname}/")
+    assert Settings.from_env().public_onion_address == hostname
+
+
+@pytest.mark.parametrize(
+    "invalid_address",
+    ["example.com", "short.onion", "ftp://" + ("a" * 56) + ".onion"],
+)
+def test_public_onion_address_requires_a_v3_hostname(monkeypatch, invalid_address):
+    monkeypatch.setenv("PUBLIC_ONION_ADDRESS", invalid_address)
+    with pytest.raises(RuntimeError, match="PUBLIC_ONION_ADDRESS"):
+        Settings.from_env()
 
 
 def test_non_loopback_bind_is_rejected(monkeypatch):

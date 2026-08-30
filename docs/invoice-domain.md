@@ -27,7 +27,7 @@ database.
 
 ### `categories`
 
-Stores the minimum catalog category fields needed for later admin/public work:
+Stores the minimum catalog category fields needed for later admin/customer work:
 identity, name, slug, description, publish/archive flags, sort order, and
 timestamps.
 

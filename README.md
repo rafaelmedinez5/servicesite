@@ -47,7 +47,7 @@ app/
     xmr_wallet_rpc.py     isolated amount and wallet-RPC transport
   internal.py             loopback-and-token-protected polling endpoint
   static/css/style.css    local CSS
-  templates/index.html    public service catalog
+  templates/index.html    session-gated service catalog
   templates/service_detail.html  individual service information and purchase form
   templates/customer/     customer registration, login, and account views
 deploy/systemd/           sanitized web, poll, timer, and wallet-RPC units

@@ -20,7 +20,7 @@
           <label><span>Duration label</span><input name="duration_label" maxlength="200" value="{{ service.duration_label if service and service.duration_label else '' }}" placeholder="One engagement"></label>
           <label><span>Sort order</span><input name="sort_order" type="number" min="-1000000" max="1000000" value="{{ service.sort_order if service else 0 }}" required></label>
         </div>
-        <label class="check-row"><input name="published" type="checkbox" {% if service and service.published %}checked{% endif %}><span>Published publicly</span></label>
+        <label class="check-row"><input name="published" type="checkbox" {% if service and service.published %}checked{% endif %}><span>Published in catalog</span></label>
         <div class="button-row"><button type="submit">Save service</button><a class="button secondary" href="{{ url_for('admin.services') }}">Cancel</a></div>
       </form>
     {% else %}

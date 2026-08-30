@@ -3,11 +3,13 @@ from __future__ import annotations
 import ipaddress
 import math
 import os
+import re
 from dataclasses import dataclass, field
 from urllib.parse import SplitResult, urlsplit
 
 
 LOOPBACK_HOSTS = {"127.0.0.1", "::1", "localhost"}
+ONION_V3_HOST_PATTERN = re.compile(r"[a-z2-7]{56}\.onion")
 PLACEHOLDER_SECRET_VALUES = {
     "",
     "change-me",
@@ -84,6 +86,34 @@ def _is_placeholder(value: str) -> bool:
     return value.strip().lower() in PLACEHOLDER_SECRET_VALUES
 
 
+def _parse_onion_host(name: str, raw_value: str) -> str | None:
+    value = raw_value.strip().lower()
+    if not value:
+        return None
+    if "://" in value:
+        parsed = urlsplit(value)
+        try:
+            port = parsed.port
+        except ValueError as exc:
+            raise RuntimeError(
+                f"{name} must contain only a Tor v3 onion address"
+            ) from exc
+        if (
+            parsed.scheme not in {"http", "https"}
+            or parsed.username is not None
+            or parsed.password is not None
+            or port is not None
+            or parsed.query
+            or parsed.fragment
+            or parsed.path not in {"", "/"}
+        ):
+            raise RuntimeError(f"{name} must contain only a Tor v3 onion address")
+        value = parsed.hostname or ""
+    if ONION_V3_HOST_PATTERN.fullmatch(value) is None:
+        raise RuntimeError(f"{name} must be a valid Tor v3 onion hostname")
+    return value
+
+
 def _require_production_secret(name: str, value: str, *, minimum_length: int) -> None:
     if _is_placeholder(value) or len(value) < minimum_length:
         raise RuntimeError(
@@ -104,6 +134,7 @@ class Settings:
     admin_session_hours: int
     public_contact_method: str | None
     public_contact_address: str | None
+    public_onion_address: str | None
     xmr_wallet_rpc_url: str
     xmr_wallet_rpc_user: str = field(repr=False)
     xmr_wallet_rpc_password: str = field(repr=False)
@@ -175,6 +206,9 @@ class Settings:
             )
         public_contact_method = raw_public_contact_method or None
         public_contact_address = raw_public_contact_address or None
+        public_onion_address = _parse_onion_host(
+            "PUBLIC_ONION_ADDRESS", os.getenv("PUBLIC_ONION_ADDRESS", "")
+        )
 
         xmr_wallet_rpc_url = os.getenv(
             "XMR_WALLET_RPC_URL", "http://127.0.0.1:28088/json_rpc"
@@ -231,6 +265,7 @@ class Settings:
             admin_session_hours=admin_session_hours,
             public_contact_method=public_contact_method,
             public_contact_address=public_contact_address,
+            public_onion_address=public_onion_address,
             xmr_wallet_rpc_url=xmr_wallet_rpc_url,
             xmr_wallet_rpc_user=xmr_wallet_rpc_user,
             xmr_wallet_rpc_password=xmr_wallet_rpc_password,
