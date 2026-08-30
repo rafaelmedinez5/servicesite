@@ -462,14 +462,15 @@ def test_admin_creates_edits_and_archives_catalog_without_float_money(admin_cont
         },
     )
     service = repository.list_services()[0].service
-    public_body = client.get("/").get_data(as_text=True)
+    homepage = client.get("/").get_data(as_text=True)
+    category_body = client.get("/categories/blue-team").get_data(as_text=True)
 
     assert created_category.status_code == 303
     assert created_service.status_code == 303
     assert service.price_usd_cents == 10_025
-    assert "Blue Team" in public_body
-    assert "Configuration Review" in public_body
-    assert "$100.25 USD" in public_body
+    assert "Blue Team" in homepage
+    assert "Configuration Review" in category_body
+    assert "$100.25 USD" in category_body
 
     edited = client.post(
         f"/admin/services/{service.id}/edit",
@@ -494,7 +495,9 @@ def test_admin_creates_edits_and_archives_catalog_without_float_money(admin_cont
     assert updated is not None and updated.version == 2
     assert updated.price_usd_cents == 12_500
     assert archived.status_code == 303
-    assert "Configuration Review Plus" not in client.get("/").get_data(as_text=True)
+    assert "Configuration Review Plus" not in client.get(
+        "/categories/blue-team"
+    ).get_data(as_text=True)
 
 
 def test_admin_uploads_metadata_free_service_image_with_unrelated_name(admin_context):
@@ -535,7 +538,7 @@ def test_admin_uploads_metadata_free_service_image_with_unrelated_name(admin_con
     public_path = (
         f"/services/security-assessment/image/{service.image_key}.webp"
     )
-    homepage = client.get("/").get_data(as_text=True)
+    category_page = client.get("/categories/security-services").get_data(as_text=True)
     detail = client.get("/services/security-assessment").get_data(as_text=True)
     stylesheet = client.get("/static/css/style.css").get_data(as_text=True)
     public_image = client.get(public_path)
@@ -543,10 +546,10 @@ def test_admin_uploads_metadata_free_service_image_with_unrelated_name(admin_con
         f"/admin/services/service-assessment/image/{service.image_key}.webp"
     )
 
-    assert public_path in homepage
+    assert public_path in category_page
     assert public_path in detail
-    assert 'class="service-card-image"' in homepage
-    assert 'width="1200" height="900"' in homepage
+    assert 'class="service-card-image"' in category_page
+    assert 'width="1200" height="900"' in category_page
     assert 'class="service-detail-image"' in detail
     assert 'width="1200" height="900"' in detail
     image_rule = stylesheet.split(
@@ -558,7 +561,7 @@ def test_admin_uploads_metadata_free_service_image_with_unrelated_name(admin_con
     assert "object-fit:" not in image_rule
     assert "width: min(100%, 16rem);" in stylesheet
     assert "width: min(100%, 32rem);" in stylesheet
-    assert original_filename not in homepage
+    assert original_filename not in category_page
     assert public_image.status_code == 200
     assert public_image.mimetype == "image/webp"
     assert public_image.headers["Content-Disposition"] == 'inline; filename="service-image.webp"'

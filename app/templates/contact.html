@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+
+{% block title %}Contact | Servicesite{% endblock %}
+
+{% block content %}
+  <header class="page-hero info-hero">
+    <p class="eyebrow"><span class="eyebrow-line" aria-hidden="true"></span>Contact</p>
+    <h1>Start with the right channel.</h1>
+    <p class="lede">Choose the path that matches your question. Do not send credentials, target details, or confidential evidence before a written scope and secure exchange method are agreed.</p>
+  </header>
+
+  <section class="contact-layout" aria-labelledby="contact-channel-title">
+    <div class="contact-channel card">
+      <p class="eyebrow">Public contact channel</p>
+      {% if contact_method and contact_address %}
+        <h2 id="contact-channel-title">{{ contact_method }}</h2>
+        <p class="contact-address monospace">{{ contact_address }}</p>
+        <p>Verify the address through this page before beginning a conversation. Initial messages should contain only the minimum context needed to route the request.</p>
+      {% else %}
+        <h2 id="contact-channel-title">Direct channel not yet published</h2>
+        <p>The operator has not configured a public contact address. You can still browse services, create an account, or review your existing orders.</p>
+      {% endif %}
+    </div>
+
+    <div class="contact-paths">
+      <article>
+        <span>New engagement</span>
+        <h2>Start with the catalog</h2>
+        <p>Choose the closest service category and review the available engagements before making contact.</p>
+        <a href="{{ url_for('public.index') }}#services">Browse categories <span aria-hidden="true">&#8594;</span></a>
+      </article>
+      <article>
+        <span>Existing purchase</span>
+        <h2>Use your account record</h2>
+        <p>Open your account to confirm the order and payment state. Never post a private status link in a public message.</p>
+        <a href="{{ url_for('customer.account') if g.customer else url_for('customer.login', next=url_for('customer.account')) }}">Open account <span aria-hidden="true">&#8594;</span></a>
+      </article>
+      <article>
+        <span>Careers</span>
+        <h2>Read the join guidance</h2>
+        <p>Review the expectations for practitioners before sending a concise, sanitized introduction.</p>
+        <a href="{{ url_for('public.join') }}">Visit Join us <span aria-hidden="true">&#8594;</span></a>
+      </article>
+    </div>
+  </section>
+
+  <aside class="privacy-callout">
+    <strong>No contact form by design.</strong>
+    <p>This page does not collect or store inquiry messages in the site database. A public channel can be configured separately when the operator is ready to receive requests.</p>
+  </aside>
+{% endblock %}

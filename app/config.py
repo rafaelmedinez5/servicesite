@@ -102,6 +102,8 @@ class Settings:
     admin_username: str
     admin_recovery_pin: str | None = field(repr=False)
     admin_session_hours: int
+    public_contact_method: str | None
+    public_contact_address: str | None
     xmr_wallet_rpc_url: str
     xmr_wallet_rpc_user: str = field(repr=False)
     xmr_wallet_rpc_password: str = field(repr=False)
@@ -157,6 +159,22 @@ class Settings:
             minimum=1,
             maximum=24,
         )
+        raw_public_contact_method = os.getenv("PUBLIC_CONTACT_METHOD", "").strip()
+        raw_public_contact_address = os.getenv("PUBLIC_CONTACT_ADDRESS", "").strip()
+        if bool(raw_public_contact_method) != bool(raw_public_contact_address):
+            raise RuntimeError(
+                "PUBLIC_CONTACT_METHOD and PUBLIC_CONTACT_ADDRESS must be set together"
+            )
+        if len(raw_public_contact_method) > 80:
+            raise RuntimeError("PUBLIC_CONTACT_METHOD must contain at most 80 characters")
+        if len(raw_public_contact_address) > 500 or any(
+            character in "\r\n\x00" for character in raw_public_contact_address
+        ):
+            raise RuntimeError(
+                "PUBLIC_CONTACT_ADDRESS must be one line of at most 500 characters"
+            )
+        public_contact_method = raw_public_contact_method or None
+        public_contact_address = raw_public_contact_address or None
 
         xmr_wallet_rpc_url = os.getenv(
             "XMR_WALLET_RPC_URL", "http://127.0.0.1:28088/json_rpc"
@@ -211,6 +229,8 @@ class Settings:
             admin_username=admin_username,
             admin_recovery_pin=admin_recovery_pin,
             admin_session_hours=admin_session_hours,
+            public_contact_method=public_contact_method,
+            public_contact_address=public_contact_address,
             xmr_wallet_rpc_url=xmr_wallet_rpc_url,
             xmr_wallet_rpc_user=xmr_wallet_rpc_user,
             xmr_wallet_rpc_password=xmr_wallet_rpc_password,

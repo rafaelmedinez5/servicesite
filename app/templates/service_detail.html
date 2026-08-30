@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "_service_card.html" import service_card %}
 
 {% block title %}{{ service.service_name }} | Servicesite{% endblock %}
 
@@ -6,7 +7,7 @@
   <nav class="breadcrumb" aria-label="Breadcrumb">
     <a href="{{ url_for('public.index') }}#services">Services</a>
     <span aria-hidden="true">/</span>
-    <span>{{ service.category_name }}</span>
+    <a href="{{ url_for('public.category_detail', category_slug=category_slug) }}">{{ service.category_name }}</a>
     <span aria-hidden="true">/</span>
     <span aria-current="page">{{ service.service_name }}</span>
   </nav>
@@ -36,38 +37,20 @@
         </dl>
       </header>
 
-      {% if service.category_description %}
-        <section class="detail-section" aria-labelledby="category-context-title">
-          <p class="detail-number" aria-hidden="true">01</p>
-          <div>
-            <p class="eyebrow">Category context</p>
-            <h2 id="category-context-title">{{ service.category_name }}</h2>
-            <p>{{ service.category_description }}</p>
+      {% if related_services %}
+        <section class="related-services" aria-labelledby="related-services-title">
+          <header class="section-heading">
+            <p class="eyebrow">Recommended services</p>
+            <h2 id="related-services-title">Continue exploring.</h2>
+            <p>Services from the same category are prioritized, followed by other available engagements.</p>
+          </header>
+          <div class="service-grid">
+            {% for related_service in related_services %}
+              {{ service_card(related_service, 3) }}
+            {% endfor %}
           </div>
         </section>
       {% endif %}
-
-      <section class="detail-section" aria-labelledby="purchase-flow-title">
-        <p class="detail-number" aria-hidden="true">{% if service.category_description %}02{% else %}01{% endif %}</p>
-        <div>
-          <p class="eyebrow">Purchase flow</p>
-          <h2 id="purchase-flow-title">Know what happens after you continue.</h2>
-          <ol class="detail-steps">
-            <li>
-              <strong>Price lock</strong>
-              <span>The listed USD price is converted to an exact XMR amount for the displayed payment window.</span>
-            </li>
-            <li>
-              <strong>Private payment tracking</strong>
-              <span>Your invoice receives a unique Monero address and a private confirmation-status link.</span>
-            </li>
-            <li>
-              <strong>Authorization review</strong>
-              <span>Payment does not authorize testing. Written scope approval is required before work begins.</span>
-            </li>
-          </ol>
-        </div>
-      </section>
     </div>
 
     <aside class="purchase-panel" aria-labelledby="purchase-title">
@@ -106,7 +89,7 @@
         <li>Exact amount shown before payment</li>
         <li>Private payment-status page</li>
       </ul>
-      <a class="back-link" href="{{ url_for('public.index') }}#category-{{ service.category_id }}">&#8592; Back to {{ service.category_name }}</a>
+      <a class="back-link" href="{{ url_for('public.category_detail', category_slug=category_slug) }}">&#8592; Back to {{ service.category_name }}</a>
     </aside>
   </section>
 {% endblock %}

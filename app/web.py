@@ -21,7 +21,7 @@ from flask import (
     url_for,
 )
 
-from app.catalog import PurchasableService
+from app.catalog import CategoryRecord, PurchasableService
 from app.payments.invoice import (
     Invoice,
     InvoiceCreator,
@@ -62,6 +62,7 @@ class RateProvider(Protocol):
 class PublicCategory:
     id: str
     name: str
+    slug: str
     description: str
     services: tuple[PurchasableService, ...]
 
@@ -79,6 +80,7 @@ class CustomerPaymentState:
 def index():
     g.no_store = True
     try:
+        category_records = _published_category_records()
         services = _repository().list_purchasable_services()
     except (PersistenceError, sqlite3.Error):
         return _error_page(
@@ -88,7 +90,61 @@ def index():
         )
     return render_template(
         "index.html",
-        categories=_group_services(services),
+        categories=_group_services(category_records, services),
+    )
+
+
+@public.get("/categories/<category_slug>")
+def category_detail(category_slug: str):
+    g.no_store = True
+    if not category_slug or len(category_slug) > 120:
+        abort(404)
+    try:
+        category = next(
+            (
+                item
+                for item in _published_category_records()
+                if item.slug == category_slug
+            ),
+            None,
+        )
+        services = _repository().list_purchasable_services()
+    except (PersistenceError, sqlite3.Error):
+        return _error_page(
+            "Category temporarily unavailable",
+            "This service category cannot be loaded right now. Please try again later.",
+            503,
+        )
+    if category is None:
+        abort(404)
+    return render_template(
+        "category_detail.html",
+        category=category,
+        services=tuple(
+            service for service in services if service.category_id == category.id
+        ),
+    )
+
+
+@public.get("/about")
+def about():
+    g.no_store = True
+    return render_template("about.html")
+
+
+@public.get("/join")
+def join():
+    g.no_store = True
+    return render_template("join.html")
+
+
+@public.get("/contact")
+def contact():
+    g.no_store = True
+    return render_template(
+        "contact.html",
+        contact_method=current_app.config.get("PUBLIC_CONTACT_METHOD"),
+        contact_address=current_app.config.get("PUBLIC_CONTACT_ADDRESS"),
     )
 
 
@@ -107,9 +163,31 @@ def service_detail(service_slug: str):
         )
     if service is None:
         abort(404)
+    try:
+        category = next(
+            (
+                item
+                for item in _published_category_records()
+                if item.id == service.category_id
+            ),
+            None,
+        )
+        related_services = _related_services(
+            service, _repository().list_purchasable_services()
+        )
+    except (PersistenceError, sqlite3.Error):
+        return _error_page(
+            "Service temporarily unavailable",
+            "Recommendations cannot be loaded right now. Please try again later.",
+            503,
+        )
+    if category is None:
+        abort(404)
     return render_template(
         "service_detail.html",
         service=service,
+        category_slug=category.slug,
+        related_services=related_services,
         checkout_nonce=issue_checkout_nonce() if g.customer is not None else None,
     )
 
@@ -272,6 +350,14 @@ def register_web(app) -> None:
     app.jinja_env.globals["csrf_token"] = csrf_token
     app.jinja_env.filters["usd"] = _format_usd
     app.jinja_env.filters["display_datetime"] = _format_datetime
+
+    @app.context_processor
+    def inject_public_navigation():
+        try:
+            categories = _published_category_records()
+        except (PersistenceError, sqlite3.Error):
+            categories = ()
+        return {"navigation_categories": categories}
 
     @app.after_request
     def apply_security_headers(response):
@@ -456,27 +542,51 @@ def _invoice_creator() -> InvoiceCreator:
     )
 
 
-def _group_services(services: list[PurchasableService]) -> tuple[PublicCategory, ...]:
-    grouped: list[PublicCategory] = []
+def _published_category_records() -> tuple[CategoryRecord, ...]:
+    return tuple(
+        category
+        for category in _repository().list_categories(include_archived=False)
+        if category.published and not category.archived
+    )
+
+
+def _group_services(
+    categories: tuple[CategoryRecord, ...], services: list[PurchasableService]
+) -> tuple[PublicCategory, ...]:
+    services_by_category: dict[str, list[PurchasableService]] = {}
     for service in services:
-        if not grouped or grouped[-1].id != service.category_id:
-            grouped.append(
-                PublicCategory(
-                    id=service.category_id,
-                    name=service.category_name,
-                    description=service.category_description,
-                    services=(service,),
-                )
-            )
-        else:
-            current = grouped[-1]
-            grouped[-1] = PublicCategory(
-                id=current.id,
-                name=current.name,
-                description=current.description,
-                services=(*current.services, service),
-            )
-    return tuple(grouped)
+        services_by_category.setdefault(service.category_id, []).append(service)
+    return tuple(
+        PublicCategory(
+            id=category.id,
+            name=category.name,
+            slug=category.slug,
+            description=category.description,
+            services=tuple(services_by_category.get(category.id, ())),
+        )
+        for category in categories
+    )
+
+
+def _related_services(
+    selected: PurchasableService,
+    services: list[PurchasableService],
+    *,
+    limit: int = 3,
+) -> tuple[PurchasableService, ...]:
+    candidates = [
+        service
+        for service in services
+        if service.service_id != selected.service_id
+        and service.category_id == selected.category_id
+    ]
+    candidates.extend(
+        service
+        for service in services
+        if service.service_id != selected.service_id
+        and service.category_id != selected.category_id
+    )
+    return tuple(candidates[:limit])
 
 
 def _format_usd(price_usd_cents: int) -> str:
