@@ -469,6 +469,7 @@ def test_admin_creates_edits_and_archives_catalog_without_float_money(admin_cont
     assert created_service.status_code == 303
     assert service.price_usd_cents == 10_025
     assert "Blue Team" in homepage
+    assert "Configuration Review" in homepage
     assert "Configuration Review" in category_body
     assert "$100.25 USD" in category_body
 

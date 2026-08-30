@@ -194,17 +194,19 @@ def test_public_catalog_renders_only_published_services(web_context):
     assert "Find the gaps before they become incidents." in body
     assert 'id="services"' in body
     assert 'id="process"' in body
-    assert "Start with the area you need to strengthen." in body
+    assert "Choose the engagement that fits." in body
     assert "Three clear steps." in body
     assert "Engagement protocol" not in body
     assert 'href="/categories/security-services"' in body
-    assert "Explore category" in body
+    assert "View category" in body
     assert "checkout_nonce" not in body
     assert "Security Services" in body
-    assert "Security Assessment" not in body
+    assert "Security Assessment" in body
     assert "service-hidden" not in body
     assert 'class="nav-dropdown"' in body
     assert 'class="mobile-menu"' in body
+    assert '<a href="/#services">Services</a>' not in body
+    assert 'aria-label="Servicesite home"' in body
     assert "<script" not in body.lower()
 
 

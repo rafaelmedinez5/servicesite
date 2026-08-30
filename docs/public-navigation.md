@@ -1,14 +1,17 @@
 # Public pages and navigation
 
-The public homepage is a category directory. Each published, non-archived
-category has a dedicated `/categories/<slug>` page containing its published,
-non-archived services. Service detail pages recommend up to three other
-services, prioritizing the current category before the rest of the catalog.
+The public homepage shows every published, non-archived category and its
+published services. Each category also has a dedicated `/categories/<slug>`
+page for focused browsing and direct links. Service detail pages recommend up
+to three other services, prioritizing the current category before the rest of
+the catalog.
 
 The desktop header keeps categories inside an accessible `details` dropdown.
-At tablet and mobile widths, the primary links, category links, cart, and
-account actions move into a `details`-based menu. Both controls work without
-JavaScript and preserve the application's no-script content security policy.
+The brand links directly to the homepage, so the header does not duplicate it
+with a Services link. At tablet and mobile widths, the primary links, category
+links, cart, and account actions move into a `details`-based menu. Both controls
+work without JavaScript and preserve the application's no-script content
+security policy.
 
 The About and Join pages describe the authorization and practitioner boundaries.
 The Contact page deliberately does not accept or store messages. An operator can
