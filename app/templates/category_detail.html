@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% from "_service_card.html" import service_card %}
+
+{% block title %}{{ category.name }} | Servicesite{% endblock %}
+
+{% block content %}
+  <nav class="breadcrumb" aria-label="Breadcrumb">
+    <a href="{{ url_for('public.index') }}">Home</a>
+    <span aria-hidden="true">/</span>
+    <a href="{{ url_for('public.index') }}#services">Services</a>
+    <span aria-hidden="true">/</span>
+    <span aria-current="page">{{ category.name }}</span>
+  </nav>
+
+  <header class="page-hero category-hero">
+    <p class="eyebrow"><span class="eyebrow-line" aria-hidden="true"></span>Service category</p>
+    <h1>{{ category.name }}</h1>
+    <p class="lede">{{ category.description or "Review the available services in this category." }}</p>
+    <p class="category-count">{{ services|length }} {{ "service" if services|length == 1 else "services" }} currently available</p>
+  </header>
+
+  {% if services %}
+    <section aria-labelledby="category-services-title">
+      <header class="section-heading">
+        <p class="eyebrow">Available engagements</p>
+        <h2 id="category-services-title">Choose a service to review.</h2>
+      </header>
+      <div class="service-grid">
+        {% for service in services %}
+          {{ service_card(service, 3) }}
+        {% endfor %}
+      </div>
+    </section>
+  {% else %}
+    <section class="empty-state card" aria-labelledby="category-empty-title">
+      <p class="eyebrow">Catalog update</p>
+      <h2 id="category-empty-title">No services are published here yet.</h2>
+      <p>This category is available, but its service listings are still being prepared.</p>
+      <a class="button secondary" href="{{ url_for('public.index') }}#services">Browse other categories</a>
+    </section>
+  {% endif %}
+{% endblock %}

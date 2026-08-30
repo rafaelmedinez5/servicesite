@@ -37,6 +37,34 @@ def test_default_bind_is_servicesite_loopback_port(monkeypatch):
     assert settings.app_port == 5100
 
 
+def test_public_contact_channel_is_optional(monkeypatch):
+    monkeypatch.delenv("PUBLIC_CONTACT_METHOD", raising=False)
+    monkeypatch.delenv("PUBLIC_CONTACT_ADDRESS", raising=False)
+
+    settings = Settings.from_env()
+
+    assert settings.public_contact_method is None
+    assert settings.public_contact_address is None
+
+
+def test_public_contact_channel_requires_method_and_address(monkeypatch):
+    monkeypatch.setenv("PUBLIC_CONTACT_METHOD", "Session")
+    monkeypatch.delenv("PUBLIC_CONTACT_ADDRESS", raising=False)
+
+    with pytest.raises(RuntimeError, match="must be set together"):
+        Settings.from_env()
+
+
+def test_public_contact_channel_accepts_a_configured_pair(monkeypatch):
+    monkeypatch.setenv("PUBLIC_CONTACT_METHOD", "Session")
+    monkeypatch.setenv("PUBLIC_CONTACT_ADDRESS", "05-test-public-address")
+
+    settings = Settings.from_env()
+
+    assert settings.public_contact_method == "Session"
+    assert settings.public_contact_address == "05-test-public-address"
+
+
 def test_non_loopback_bind_is_rejected(monkeypatch):
     monkeypatch.setenv("APP_HOST", "0.0.0.0")
 

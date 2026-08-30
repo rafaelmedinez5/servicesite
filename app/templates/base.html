@@ -15,7 +15,22 @@
       </a>
       <nav class="site-nav" aria-label="Primary navigation">
         <a href="{{ url_for('public.index') }}#services">Services</a>
-        <a href="{{ url_for('public.index') }}#process">Process</a>
+        <details class="nav-dropdown">
+          <summary>Categories <span aria-hidden="true">+</span></summary>
+          <div class="nav-dropdown-panel">
+            <p>Browse by category</p>
+            {% if navigation_categories %}
+              {% for category in navigation_categories %}
+                <a href="{{ url_for('public.category_detail', category_slug=category.slug) }}">{{ category.name }}</a>
+              {% endfor %}
+            {% else %}
+              <span class="nav-empty">No categories published</span>
+            {% endif %}
+          </div>
+        </details>
+        <a href="{{ url_for('public.about') }}">About</a>
+        <a href="{{ url_for('public.join') }}">Join</a>
+        <a href="{{ url_for('public.contact') }}">Contact</a>
       </nav>
       <div class="account-nav">
         <a class="cart-nav-link" href="{{ url_for('shopping.cart') }}">Cart{% if cart_quantity %} <span class="cart-count">{{ cart_quantity }}</span>{% endif %}</a>
@@ -30,7 +45,40 @@
           <a class="nav-cta" href="{{ url_for('customer.register') }}">Create account</a>
         {% endif %}
       </div>
-      <span class="network-label"><span class="network-dot" aria-hidden="true"></span>XMR only</span>
+      <details class="mobile-menu">
+        <summary><span class="menu-icon" aria-hidden="true"><i></i><i></i><i></i></span><span>Menu</span></summary>
+        <div class="mobile-menu-panel">
+          <nav class="mobile-primary-links" aria-label="Mobile navigation">
+            <a href="{{ url_for('public.index') }}#services">Services</a>
+            <a href="{{ url_for('public.about') }}">About</a>
+            <a href="{{ url_for('public.join') }}">Join</a>
+            <a href="{{ url_for('public.contact') }}">Contact</a>
+          </nav>
+          <div class="mobile-category-links">
+            <p>Categories</p>
+            {% if navigation_categories %}
+              {% for category in navigation_categories %}
+                <a href="{{ url_for('public.category_detail', category_slug=category.slug) }}">{{ category.name }}</a>
+              {% endfor %}
+            {% else %}
+              <span class="nav-empty">No categories published</span>
+            {% endif %}
+          </div>
+          <div class="mobile-account-links">
+            <a href="{{ url_for('shopping.cart') }}">Cart{% if cart_quantity %} <span class="cart-count">{{ cart_quantity }}</span>{% endif %}</a>
+            {% if g.customer %}
+              <a href="{{ url_for('customer.account') }}">@{{ g.customer.username }}</a>
+              <form method="post" action="{{ url_for('customer.logout') }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <button class="nav-button" type="submit">Log out</button>
+              </form>
+            {% else %}
+              <a href="{{ url_for('customer.login') }}">Log in</a>
+              <a href="{{ url_for('customer.register') }}">Create account</a>
+            {% endif %}
+          </div>
+        </div>
+      </details>
     </header>
     <main class="page-shell">
       {% with messages = get_flashed_messages(with_categories=true) %}
@@ -49,6 +97,11 @@
         <a class="footer-brand" href="{{ url_for('public.index') }}">Servicesite</a>
         <p>Authorized security services with private, Monero-only checkout.</p>
       </div>
+      <nav class="footer-links" aria-label="Footer navigation">
+        <a href="{{ url_for('public.about') }}">About</a>
+        <a href="{{ url_for('public.join') }}">Join</a>
+        <a href="{{ url_for('public.contact') }}">Contact</a>
+      </nav>
       <p class="legal-note">Payments do not authorize testing. Engagement scope and written authorization are reviewed separately.</p>
     </footer>
   </body>

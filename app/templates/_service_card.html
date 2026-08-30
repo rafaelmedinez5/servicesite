@@ -1,0 +1,19 @@
+{% macro service_card(service, heading_level=3) -%}
+  <article class="service-card">
+    <div>
+      {% if service.image_key %}
+        <img class="service-card-image" src="{{ url_for('public.service_image', service_slug=service.service_slug, image_key=service.image_key) }}" alt="" width="1200" height="900" loading="lazy" decoding="async">
+      {% endif %}
+      <p class="service-duration">{{ service.duration_label or "Custom engagement" }}</p>
+      <h{{ heading_level }}>{{ service.service_name }}</h{{ heading_level }}>
+      <p>{{ service.service_description }}</p>
+    </div>
+    <div class="service-action">
+      <div>
+        <span>Price</span>
+        <p class="price">{{ service.price_usd_cents|usd }}</p>
+      </div>
+      <a class="button" href="{{ url_for('public.service_detail', service_slug=service.service_slug) }}">View service <span aria-hidden="true">&#8594;</span></a>
+    </div>
+  </article>
+{%- endmacro %}
