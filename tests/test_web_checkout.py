@@ -205,6 +205,8 @@ def test_public_catalog_renders_only_published_services(web_context):
     assert "service-hidden" not in body
     assert 'class="nav-dropdown"' in body
     assert 'class="mobile-menu"' in body
+    assert 'class="header-actions"' in body
+    assert body.index(">About</a>") < body.index('class="header-actions"')
     assert '<a href="/#services">Services</a>' not in body
     assert 'aria-label="Servicesite home"' in body
     assert "<script" not in body.lower()

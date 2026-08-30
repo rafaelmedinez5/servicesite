@@ -14,6 +14,11 @@
         <span>Servicesite</span>
       </a>
       <nav class="site-nav" aria-label="Primary navigation">
+        <a href="{{ url_for('public.about') }}">About</a>
+        <a href="{{ url_for('public.join') }}">Join</a>
+        <a href="{{ url_for('public.contact') }}">Contact</a>
+      </nav>
+      <div class="header-actions">
         <details class="nav-dropdown">
           <summary>Categories <span aria-hidden="true">+</span></summary>
           <div class="nav-dropdown-panel">
@@ -27,21 +32,25 @@
             {% endif %}
           </div>
         </details>
-        <a href="{{ url_for('public.about') }}">About</a>
-        <a href="{{ url_for('public.join') }}">Join</a>
-        <a href="{{ url_for('public.contact') }}">Contact</a>
-      </nav>
-      <div class="account-nav">
         <a class="cart-nav-link" href="{{ url_for('shopping.cart') }}">Cart{% if cart_quantity %} <span class="cart-count">{{ cart_quantity }}</span>{% endif %}</a>
         {% if g.customer %}
-          <a href="{{ url_for('customer.account') }}">@{{ g.customer.username }}</a>
-          <form method="post" action="{{ url_for('customer.logout') }}">
-            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-            <button class="nav-button" type="submit">Log out</button>
-          </form>
+          <details class="account-dropdown">
+            <summary><span class="account-name">@{{ g.customer.username }}</span><span class="account-chevron" aria-hidden="true">&#8964;</span></summary>
+            <div class="account-dropdown-panel">
+              <p>Customer menu</p>
+              <a href="{{ url_for('customer.account') }}">Account overview</a>
+              <a href="{{ url_for('customer.account') }}#orders">Transactions</a>
+              <form method="post" action="{{ url_for('customer.logout') }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <button class="nav-button" type="submit">Log out</button>
+              </form>
+            </div>
+          </details>
         {% else %}
-          <a href="{{ url_for('customer.login') }}">Log in</a>
-          <a class="nav-cta" href="{{ url_for('customer.register') }}">Create account</a>
+          <div class="account-nav">
+            <a href="{{ url_for('customer.login') }}">Log in</a>
+            <a class="nav-cta" href="{{ url_for('customer.register') }}">Create account</a>
+          </div>
         {% endif %}
       </div>
       <details class="mobile-menu">

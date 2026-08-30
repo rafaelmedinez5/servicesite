@@ -110,7 +110,12 @@ def test_registration_normalizes_username_hashes_password_and_starts_session(
     assert check_password_hash(account.password_hash, "a unique customer password")
     account_page = client.get("/account")
     assert account_page.status_code == 200
-    assert "Signed in as @new.customer" in account_page.get_data(as_text=True)
+    account_body = account_page.get_data(as_text=True)
+    assert "Signed in as @new.customer" in account_body
+    assert 'class="account-dropdown"' in account_body
+    assert 'href="/account">Account overview</a>' in account_body
+    assert 'href="/account#orders">Transactions</a>' in account_body
+    assert 'action="/logout"' in account_body
     cookie = response.headers["Set-Cookie"]
     assert "HttpOnly" in cookie
     assert "SameSite=Strict" in cookie
