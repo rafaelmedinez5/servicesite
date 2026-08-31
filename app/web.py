@@ -5,6 +5,7 @@ import secrets
 import sqlite3
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
 from typing import Callable, Protocol
 from urllib.parse import quote, urlencode
 
@@ -52,6 +53,7 @@ from app.web_security import (
 
 
 public = Blueprint("public", __name__)
+PUBLIC_PGP_KEY = Path(__file__).with_name("public_key.asc").read_text(encoding="ascii")
 
 
 class RateProvider(Protocol):
@@ -151,7 +153,13 @@ def contact():
 @public.get("/pgp-key")
 def pgp_key():
     g.no_store = True
-    return render_template("pgp_key.html")
+    return Response(
+        PUBLIC_PGP_KEY,
+        content_type="text/plain; charset=utf-8",
+        headers={
+            "Content-Disposition": 'inline; filename="servicesite-public-key.asc"'
+        },
+    )
 
 
 @public.get("/services/<service_slug>")

@@ -44,6 +44,11 @@ protected application environment:
 PUBLIC_ONION_ADDRESS=<56-character-v3-hostname>.onion
 ```
 
-The value is normalized to a hostname and rendered as plain text. The PGP page
-does not publish a placeholder key; it clearly reports that the operator's
-armored public key is pending until the real key is supplied.
+The value is normalized to a hostname and rendered as plain text. `/pgp-key`
+serves the operator's comment-free ASCII-armored public key directly as
+`text/plain`, with an inline filename of `servicesite-public-key.asc`. Verify
+the key fingerprint through a trusted channel before relying on it:
+
+```text
+AA00 8926 6838 A407 387E E758 B460 0837 717D B3C9
+```
