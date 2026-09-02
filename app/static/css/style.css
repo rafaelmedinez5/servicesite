@@ -1378,11 +1378,6 @@ dd {
   font-style: normal;
 }
 
-.pgp-key-status {
-  max-width: 48rem;
-  padding: clamp(1.5rem, 4vw, 2.3rem);
-}
-
 .flash-stack {
   display: grid;
   gap: 0.65rem;

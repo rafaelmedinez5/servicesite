@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import re
+import secrets
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
@@ -17,6 +18,7 @@ from app.persistence import SQLiteDatabase, ServicesiteRepository
 
 
 NOW = datetime(2026, 8, 17, 20, 0, tzinfo=timezone.utc)
+TEST_PASSWORD = secrets.token_urlsafe(32)
 TOKEN_PATTERN = re.compile(r'name="(?P<name>csrf_token|checkout_nonce)" value="(?P<value>[^"]+)"')
 
 
@@ -63,7 +65,7 @@ class WebContext:
 @pytest.fixture
 def web_context(tmp_path, monkeypatch):
     monkeypatch.setenv("ENVIRONMENT", "test")
-    monkeypatch.setenv("SECRET_KEY", "test-only-secret-key")
+    monkeypatch.setenv("SECRET_KEY", secrets.token_hex(32))
     database = SQLiteDatabase(tmp_path / "web.db")
     database.initialize()
     repository = ServicesiteRepository(database)
@@ -72,7 +74,7 @@ def web_context(tmp_path, monkeypatch):
     repository.create_customer_account(
         customer_id="customer-test-00000001",
         username="test.customer",
-        password_hash=generate_password_hash("correct horse battery staple"),
+        password_hash=generate_password_hash(TEST_PASSWORD),
         now=NOW,
     )
     wallet = FakeWallet()
@@ -157,7 +159,7 @@ def _login_customer(client):
         data={
             "csrf_token": tokens["csrf_token"],
             "username": "test.customer",
-            "password": "correct horse battery staple",
+            "password": TEST_PASSWORD,
         },
     )
     assert login.status_code == 303
@@ -238,12 +240,11 @@ def test_unknown_and_unpublished_category_pages_return_404(web_context):
     assert web_context.client.get("/categories/security-services").status_code == 404
 
 
-def test_information_and_pgp_pages_are_public_and_script_free(web_context):
+def test_information_pages_are_public_and_script_free(web_context):
     for path, expected in (
         ("/about", "Security work should begin with clarity."),
         ("/join", "Do careful work with people who value evidence."),
         ("/contact", "Direct channel not yet published"),
-        ("/pgp-key", "Our PGP key."),
     ):
         response = web_context.client.get(path)
         body = response.get_data(as_text=True)
@@ -255,6 +256,24 @@ def test_information_and_pgp_pages_are_public_and_script_free(web_context):
         assert "Payments do not authorize testing" not in body
         assert "<script" not in body.lower()
         assert response.headers["Cache-Control"] == "no-store, private, max-age=0"
+
+
+def test_pgp_key_is_public_plain_text_without_comments(web_context):
+    response = web_context.client.get("/pgp-key")
+    body = response.get_data(as_text=True)
+
+    assert response.status_code == 200
+    assert response.mimetype == "text/plain"
+    assert response.mimetype_params["charset"] == "utf-8"
+    assert response.headers["Content-Disposition"] == (
+        'inline; filename="servicesite-public-key.asc"'
+    )
+    assert body.startswith("-----BEGIN PGP PUBLIC KEY BLOCK-----\n\n")
+    assert body.endswith("-----END PGP PUBLIC KEY BLOCK-----\n")
+    assert "Comment:" not in body
+    assert "PRIVATE KEY" not in body
+    assert "<html" not in body.lower()
+    assert response.headers["Cache-Control"] == "no-store, private, max-age=0"
 
 
 def test_contact_page_displays_configured_public_channel(web_context):
