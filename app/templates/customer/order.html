@@ -24,6 +24,7 @@
       <div><dt>Payment window ends</dt><dd>{{ invoice.expires_at|display_datetime }}</dd></div>
     </dl>
     {% include "_order_items.html" %}
+    {% include "_checkout_details.html" %}
     <p class="fulfillment-note">{{ customer_state.fulfillment_text }}</p>
     <div class="button-row">
       {% if invoice.status.value == "awaiting_payment" %}<a class="button" href="{{ url_for('public.checkout', invoice_id=invoice.id, status_token=invoice.status_token) }}">Open payment invoice</a>{% endif %}

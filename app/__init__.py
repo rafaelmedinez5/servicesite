@@ -7,6 +7,7 @@ from pathlib import Path
 from flask import Flask, Request, abort, request
 
 from app.admin import register_admin
+from app.checkout_details import MAX_CHECKOUT_BODY_BYTES
 from app.config import Settings
 from app.customer_auth import register_customer_auth
 from app.internal import register_internal
@@ -17,6 +18,12 @@ from app.web import register_web
 
 
 class _InMemoryUploadRequest(Request):
+    @property
+    def max_content_length(self):
+        if self.endpoint == "shopping.checkout_cart":
+            return MAX_CHECKOUT_BODY_BYTES
+        return super().max_content_length
+
     def _get_file_stream(
         self,
         total_content_length,
@@ -96,6 +103,8 @@ def create_app(test_config: dict | None = None) -> Flask:
             if request.endpoint == "admin.service_image_upload"
             else 16 * 1024
         )
+        if request.endpoint == "shopping.checkout_cart":
+            limit = MAX_CHECKOUT_BODY_BYTES
         if content_length > limit:
             abort(413)
         return None

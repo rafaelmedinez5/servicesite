@@ -23,22 +23,20 @@ from flask import (
 )
 
 from app.catalog import CategoryRecord, PurchasableService
+from app.orders import CartError
 from app.payments.invoice import (
     Invoice,
     InvoiceCreator,
-    InvoiceError,
     PaymentStatus,
     ServiceUnavailableError,
 )
 from app.payments.xmr_rate import (
     CoinGeckoRateClient,
     CoinGeckoRateConfig,
-    XmrRateError,
 )
 from app.payments.xmr_wallet_rpc import (
     WalletRpcConfig,
     XmrWalletRpcClient,
-    XmrWalletRpcError,
     atomic_to_xmr_str,
 )
 from app.persistence import FulfillmentStatus, PersistenceError, ServicesiteRepository
@@ -276,31 +274,23 @@ def create_checkout():
         )
 
     try:
-        quote_snapshot = _rate_provider().get_quote()
-        invoice = _invoice_creator().create_invoice(
-            selected_service.service_id, quote_snapshot, customer_id=g.customer.id
+        _repository().change_cart_item(
+            g.customer.id, selected_service.service_id, 1, ensure_present=True
         )
-    except ServiceUnavailableError:
+    except CartError:
         return _error_page(
-            "Service changed",
-            "The selected service changed during checkout. No invoice was created.",
+            "Review your cart",
+            "This service could not be added. Review your cart for unavailable items or its item limit.",
             409,
         )
-    except (XmrRateError, XmrWalletRpcError, InvoiceError, PersistenceError, sqlite3.Error):
+    except (PersistenceError, sqlite3.Error):
         return _error_page(
             "Checkout temporarily unavailable",
             "A payment invoice could not be created. No payment is required.",
             503,
         )
 
-    return redirect(
-        url_for(
-            "public.checkout",
-            invoice_id=invoice.id,
-            status_token=invoice.status_token,
-        ),
-        code=303,
-    )
+    return redirect(url_for("shopping.checkout_review"), code=303)
 
 
 @public.get("/checkout/<invoice_id>/<status_token>")

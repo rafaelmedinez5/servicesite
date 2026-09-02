@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 import re
+import secrets
 from dataclasses import replace
 from datetime import timedelta
 
 import pytest
 
+from app.checkout_details import CheckoutDetails
 from app.orders import CartChangedError, CheckoutInProgressError
 from app.payments.invoice import InvoiceCreator, PaymentStatus
 from app.payments.xmr_rate import XmrRateUnavailableError
@@ -20,9 +22,14 @@ FORM_TOKENS = re.compile(
 CUSTOMER_ID = "customer-test-00000001"
 
 
-def _tokens(response):
-    assert response.status_code == 200
-    return dict(FORM_TOKENS.findall(response.get_data(as_text=True)))
+def _tokens(response, *, status_code=200):
+    assert response.status_code == status_code
+    body = response.get_data(as_text=True)
+    data = dict(FORM_TOKENS.findall(body))
+    if 'name="delivery_method"' in body:
+        data.update({"delivery_method": "email", "delivery_address": "buyer@example.com"})
+        data.update({name: "Review the authorized test environment." for name in re.findall(r'name="(request_[^"]+)"', body)})
+    return data
 
 
 def _add(context, service_id="service-assessment", quantity=1):
@@ -45,7 +52,7 @@ def _second_service(context):
 
 
 def _checkout(context):
-    data = _tokens(context.client.get("/cart"))
+    data = _tokens(context.client.get("/cart/checkout"))
     response = context.client.post("/cart/checkout", data=data)
     assert response.status_code == 303
     invoice = context.repository.get_invoice(response.headers["Location"].split("/")[2])
@@ -130,7 +137,7 @@ def test_cart_creates_one_owned_invoice_with_immutable_items(web_context):
 
 def test_client_supplied_prices_and_owner_are_not_checkout_authority(web_context):
     _add(web_context, quantity=2)
-    data = _tokens(web_context.client.get("/cart"))
+    data = _tokens(web_context.client.get("/cart/checkout"))
     data.update({"total_usd_cents": "1", "quantity": "1", "customer_id": "another-customer-00001"})
     response = web_context.client.post("/cart/checkout", data=data)
     assert response.status_code == 303
@@ -163,9 +170,10 @@ def test_orders_and_carts_are_isolated_between_customers(web_context):
     invoice, response, _ = _checkout(web_context)
     other = web_context.app.test_client()
     token = _tokens(other.get("/register"))["csrf_token"]
+    password = secrets.token_urlsafe(32)
     other.post("/register", data={
         "csrf_token": token, "username": "other.customer",
-        "password": "a different strong password", "confirm_password": "a different strong password",
+        "password": password, "confirm_password": password,
     })
     assert other.get(f"/account/orders/{invoice.id}").status_code == 404
     assert invoice.id not in other.get("/account").get_data(as_text=True)
@@ -179,7 +187,7 @@ def test_orders_and_carts_are_isolated_between_customers(web_context):
 @pytest.mark.parametrize("change", ["price", "quantity", "archive"])
 def test_stale_cart_review_is_rejected_before_rate_or_wallet_calls(web_context, change):
     _add(web_context)
-    data = _tokens(web_context.client.get("/cart"))
+    data = _tokens(web_context.client.get("/cart/checkout"))
     if change == "price":
         web_context.repository.update_service_price("service-assessment", price_usd_cents=5_000, now=NOW)
     elif change == "quantity":
@@ -195,7 +203,7 @@ def test_stale_cart_review_is_rejected_before_rate_or_wallet_calls(web_context, 
 
 def test_rate_failure_preserves_cart_and_releases_claim_for_retry(web_context):
     _add(web_context)
-    data = _tokens(web_context.client.get("/cart"))
+    data = _tokens(web_context.client.get("/cart/checkout"))
     web_context.rate_provider.error = XmrRateUnavailableError("private provider error")
     response = web_context.client.post("/cart/checkout", data=data)
     assert response.status_code == 503
@@ -208,7 +216,7 @@ def test_rate_failure_preserves_cart_and_releases_claim_for_retry(web_context):
 
 def test_replayed_original_session_cookie_cannot_create_another_invoice(web_context):
     _add(web_context)
-    data = _tokens(web_context.client.get("/cart"))
+    data = _tokens(web_context.client.get("/cart/checkout"))
     replay_client = web_context.app.test_client()
     with web_context.client.session_transaction() as original:
         saved_session = dict(original)
@@ -225,7 +233,7 @@ def test_wallet_outage_preserves_cart_without_partial_order(web_context):
     def unavailable_wallet(label):
         raise XmrWalletRpcError("private wallet failure")
     web_context.wallet.create_subaddress = unavailable_wallet
-    response = web_context.client.post("/cart/checkout", data=_tokens(web_context.client.get("/cart")))
+    response = web_context.client.post("/cart/checkout", data=_tokens(web_context.client.get("/cart/checkout")))
     assert response.status_code == 503
     assert "private wallet failure" not in response.get_data(as_text=True)
     assert web_context.repository.count_invoices() == 0
@@ -256,7 +264,7 @@ def test_catalog_change_during_wallet_call_rolls_back_order(web_context):
         web_context.repository.update_service_price("service-assessment", price_usd_cents=5_000, now=NOW)
         return original(label)
     web_context.wallet.create_subaddress = changed_catalog
-    response = web_context.client.post("/cart/checkout", data=_tokens(web_context.client.get("/cart")))
+    response = web_context.client.post("/cart/checkout", data=_tokens(web_context.client.get("/cart/checkout")))
     assert response.status_code == 409
     assert web_context.repository.count_invoices() == 0
     assert not web_context.repository.list_customer_orders(CUSTOMER_ID)
@@ -271,7 +279,7 @@ def test_insert_failure_rolls_back_invoice_and_preserves_cart(web_context, monke
         original(connection, invoice)
         raise PersistenceError("private database error")
     monkeypatch.setattr(persistence, "_insert_invoice_row", fail_after_insert)
-    response = web_context.client.post("/cart/checkout", data=_tokens(web_context.client.get("/cart")))
+    response = web_context.client.post("/cart/checkout", data=_tokens(web_context.client.get("/cart/checkout")))
     assert response.status_code == 503
     assert web_context.repository.count_invoices() == 0
     assert not web_context.repository.list_customer_orders(CUSTOMER_ID)
@@ -294,12 +302,13 @@ def test_sqlite_claim_prevents_overlapping_checkout_and_stale_lease_commit(web_c
     creator = InvoiceCreator(repo, web_context.wallet, required_confirmations=10,
         sweep_required=False, now_factory=lambda: NOW)
     quote = web_context.rate_provider.get_quote()
+    details = CheckoutDetails("email", "buyer@example.com", (("service-assessment", "Authorized review."),))
     with pytest.raises(CartChangedError):
         creator.create_cart_invoice(CUSTOMER_ID, lines, quote,
-            cart_version=cart.version, claim_token=first_token)
+            cart_version=cart.version, claim_token=first_token, checkout_details=details)
     assert repo.count_invoices() == 0
     creator.create_cart_invoice(CUSTOMER_ID, lines, quote,
-        cart_version=cart.version, claim_token=second_token)
+        cart_version=cart.version, claim_token=second_token, checkout_details=details)
     assert repo.count_invoices() == 1
 
 

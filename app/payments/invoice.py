@@ -9,6 +9,7 @@ from enum import StrEnum
 from typing import Callable, Protocol
 
 from app.catalog import PurchasableService
+from app.checkout_details import CheckoutDetails
 from app.orders import MAX_CART_SERVICES, OrderLine
 from app.payments.xmr_wallet_rpc import (
     ATOMIC_UNITS_PER_XMR,
@@ -203,6 +204,7 @@ class InvoiceRepository(Protocol):
     def insert_order_invoice(
         self, invoice: Invoice, lines: tuple[OrderLine, ...], *, customer_id: str,
         cart_version: int | None = None, claim_token: str | None = None,
+        checkout_details: CheckoutDetails | None = None,
     ) -> None: ...
 
 
@@ -257,7 +259,7 @@ class InvoiceCreator:
 
     def create_cart_invoice(
         self, customer_id: str, lines: tuple[OrderLine, ...], quote: XmrQuote,
-        *, cart_version: int, claim_token: str,
+        *, cart_version: int, claim_token: str, checkout_details: CheckoutDetails,
     ) -> Invoice:
         if not isinstance(customer_id, str) or not 16 <= len(customer_id) <= 64:
             raise InvoiceValidationError("customer ID is invalid")
@@ -271,15 +273,20 @@ class InvoiceCreator:
                 raise InvoiceValidationError("a validated order line is required")
             if self.repository.get_purchasable_service(line.service.service_id) != line.service:
                 raise ServiceUnavailableError("a cart service changed")
+        if not isinstance(checkout_details, CheckoutDetails):
+            raise InvoiceValidationError("validated checkout details are required")
+        checkout_details.require_services(tuple(line.service.service_id for line in lines))
         return self._create_invoice(
             lines, quote, customer_id=customer_id,
             cart_version=cart_version, claim_token=claim_token,
+            checkout_details=checkout_details,
         )
 
     def _create_invoice(
         self, lines: tuple[OrderLine, ...], quote: XmrQuote,
         *, customer_id: str | None, cart_version: int | None = None,
         claim_token: str | None = None,
+        checkout_details: CheckoutDetails | None = None,
     ) -> Invoice:
         if not isinstance(quote, XmrQuote):
             raise InvoiceValidationError("a validated XMR quote is required")
@@ -356,6 +363,7 @@ class InvoiceCreator:
             self.repository.insert_order_invoice(
                 invoice, lines, customer_id=customer_id,
                 cart_version=cart_version, claim_token=claim_token,
+                checkout_details=checkout_details,
             )
         return invoice
 

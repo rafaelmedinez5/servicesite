@@ -34,6 +34,7 @@ app/
   admin.py                authenticated catalog, purchase, and fulfillment routes
   customer_auth.py        customer registration, login, logout, and session loading
   orders.py               cart snapshots, quantities, and order line values
+  checkout_details.py     validated per-item requests and delivery contacts
   shopping.py             saved cart and customer-owned order routes
   catalog.py              validated minimal category/service records
   config.py               typed startup and XMR configuration validation
@@ -63,6 +64,7 @@ docs/
   web-checkout.md
   customer-accounts.md
   cart-orders.md
+  checkout-review.md
   xmr-reconciliation.md
   xmr-source-inventory.md
   xmr-wallet-rpc.md
@@ -162,17 +164,21 @@ Signed-in customers can add services, adjust quantities, and create one XMR
 invoice for the whole cart. `/account` lists their 100 most recent orders;
 order details remain ownership-checked. Direct single-service purchases also
 appear in this history. Existing bearer payment links continue to work.
+All new browser purchases review per-item requests and an email or Telegram
+delivery contact before invoice creation. Buy-now keeps existing cart items
+and quantities. See `docs/checkout-review.md`.
 
 The cart release introduced the schema 5-to-6 migration. Existing accounts and
 invoices are preserved. See `docs/cart-orders.md`.
 
 ## Current database migration
 
-**Database migration required: schema 6 to 7.** Schema 7 adds only the nullable
-random service-image key; image bytes remain outside SQLite. Back up the
-database, stop the web service, install the updated requirements, run the
-documented initializer, and then restart. See `docs/admin.md` and the exact
-operator procedure in `docs/deploy-xmr.md`.
+**Database migration required: schema 7 to 8.** Schema 8 adds two tables for
+order delivery details and per-item requests. Existing invoices, accounts,
+carts, service images, and payment state are preserved. Back up the database,
+stop the web service, pull the update, run the documented initializer, and
+restart only after success. There are no new dependencies. See
+`docs/checkout-review.md` and the operator procedure in `docs/deploy-xmr.md`.
 
 ## Next task
 

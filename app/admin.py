@@ -567,13 +567,14 @@ def purchase_detail(invoice_id: str):
         purchase = _repository().get_admin_purchase(invoice_id)
         items = _repository().get_invoice_items(invoice_id)
         customer_username = _repository().get_order_username(invoice_id)
+        checkout_details = _repository().get_order_checkout_details(invoice_id)
     except (PersistenceError, sqlite3.Error):
         abort(503)
     if purchase is None:
         abort(404)
     return render_template(
         "admin/purchase_detail.html", purchase=purchase,
-        items=items, customer_username=customer_username,
+        items=items, customer_username=customer_username, checkout_details=checkout_details,
     )
 
 
