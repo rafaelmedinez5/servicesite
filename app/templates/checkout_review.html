@@ -1,0 +1,56 @@
+{% set private_page = true %}
+{% extends "base.html" %}
+{% block title %}Checkout | Servicesite{% endblock %}
+{% block content %}
+  <header class="shopping-heading flow-heading">
+    <p class="eyebrow">Checkout</p>
+    <h1>Tell us what you need.</h1>
+    <p>Add a request for each service and choose where we should contact you for delivery.</p>
+  </header>
+  {% if error %}<p class="form-error shopping-error" role="alert">{{ error }}</p>{% endif %}
+  <form class="cart-layout checkout-review-form" method="post" enctype="multipart/form-data" action="{{ url_for('shopping.checkout_cart') }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <input type="hidden" name="checkout_nonce" value="{{ checkout_nonce }}">
+    <input type="hidden" name="cart_version" value="{{ cart.version }}">
+    <input type="hidden" name="cart_fingerprint" value="{{ cart.fingerprint }}">
+    <div class="cart-items">
+      {% for item in cart.items %}
+        {% set field = 'request_' ~ item.service_id %}
+        <section class="card checkout-item" aria-labelledby="item-title-{{ loop.index }}">
+          <p class="eyebrow">{{ item.service.category_name }}</p>
+          <h2 id="item-title-{{ loop.index }}">{{ item.name }}</h2>
+          <p>Quantity {{ item.quantity }} &middot; {{ item.total_usd_cents|usd }}</p>
+          <label for="request-{{ loop.index }}">Your request for {{ item.name }}</label>
+          <textarea id="request-{{ loop.index }}" name="{{ field }}" rows="5" maxlength="4000" required aria-describedby="request-help-{{ loop.index }}{% if errors.get(field) %} request-error-{{ loop.index }}{% endif %}" {% if errors.get(field) %}aria-invalid="true"{% endif %}>{{ values.get(field, '') }}</textarea>
+          <p id="request-help-{{ loop.index }}" class="field-help">Describe your goals and authorized scope. {% if item.quantity > 1 %}Cover all {{ item.quantity }} units in this request. {% endif %}Up to 4,000 characters. Do not include passwords or private keys.</p>
+          {% if errors.get(field) %}<p id="request-error-{{ loop.index }}" class="field-error">{{ errors[field] }}</p>{% endif %}
+        </section>
+      {% endfor %}
+      <section class="card checkout-item" aria-labelledby="delivery-title">
+        <h2 id="delivery-title">Delivery details</h2>
+        <label for="delivery-method">Delivery method</label>
+        <select id="delivery-method" name="delivery_method" required {% if errors.get('delivery_method') %}aria-invalid="true" aria-describedby="delivery-method-error"{% endif %}>
+          <option value="">Choose a method</option>
+          <option value="email" {% if values.get('delivery_method') == 'email' %}selected{% endif %}>Email</option>
+          <option value="telegram" {% if values.get('delivery_method') == 'telegram' %}selected{% endif %}>Telegram</option>
+        </select>
+        {% if errors.get('delivery_method') %}<p id="delivery-method-error" class="field-error">{{ errors.delivery_method }}</p>{% endif %}
+        <label for="delivery-address">Email address or Telegram username</label>
+        <input id="delivery-address" name="delivery_address" type="text" maxlength="254" required value="{{ values.get('delivery_address', '') }}" autocomplete="off" autocapitalize="none" spellcheck="false" aria-describedby="delivery-help{% if errors.get('delivery_address') %} delivery-address-error{% endif %}" {% if errors.get('delivery_address') %}aria-invalid="true"{% endif %}>
+        <p id="delivery-help" class="field-help">Email: name@example.com. Telegram: @username, 5–32 letters, numbers or underscores, starting with a letter. Use an account you control and check that the operator can contact you.</p>
+        {% if errors.get('delivery_address') %}<p id="delivery-address-error" class="field-error">{{ errors.delivery_address }}</p>{% endif %}
+        <p class="field-help">These details are saved with your order for you and the administrator. Address format is checked; ownership and reachability are not verified.</p>
+      </section>
+      <a class="text-link" href="{{ url_for('shopping.cart') }}">&#8592; Edit cart items or quantities</a>
+    </div>
+    <aside class="purchase-panel cart-summary" aria-labelledby="checkout-total-title">
+      <p class="eyebrow">Summary</p>
+      <h2 id="checkout-total-title">Order total</h2>
+      <p>{{ cart.quantity }} item{{ 's' if cart.quantity != 1 else '' }}</p>
+      <div class="purchase-price"><span>USD total</span><strong>{{ cart.total_usd_cents|usd }}</strong></div>
+      <p>The next page shows your exact XMR amount and unique payment address.</p>
+      <button type="submit">Create payment invoice <span aria-hidden="true">&#8594;</span></button>
+      <p class="cart-scope-note">Payment does not replace written scope authorization. Fulfillment begins only after payment and scope review.</p>
+    </aside>
+  </form>
+{% endblock %}

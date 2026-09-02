@@ -58,8 +58,8 @@
         <p class="terminal-label">Secure checkout</p>
         <span>XMR only</span>
       </div>
-      <h2 id="purchase-title">{{ "Create your invoice" if g.customer else "Sign in to continue" }}</h2>
-      <p>{% if g.customer %}Continue when you are ready to lock the XMR amount for this service.{% else %}Create an account or log in before starting secure checkout.{% endif %}</p>
+      <h2 id="purchase-title">{{ "Ready to proceed?" if g.customer else "Sign in to continue" }}</h2>
+      <p>{% if g.customer %}Review your services, requests and delivery details before creating a payment invoice.{% else %}Create an account or log in before starting secure checkout.{% endif %}</p>
       <div class="purchase-price">
         <span>Service price</span>
         <strong>{{ service.price_usd_cents|usd }}</strong>
@@ -78,6 +78,7 @@
           <input type="hidden" name="service_id" value="{{ service.service_id }}">
           <button class="button secondary" type="submit">Buy this service now</button>
         </form>
+        <p class="cart-scope-note">Any services already in your cart will be included at checkout.</p>
       {% else %}
         <div class="purchase-auth-actions">
           <a class="button" href="{{ url_for('customer.login', next=request.path) }}">Log in to purchase <span aria-hidden="true">&#8594;</span></a>

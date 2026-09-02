@@ -16,9 +16,10 @@ database, CoinGecko key, payment, or polling job was accessed.
 | `GET` | `/cart` | Review saved services, quantities, and current prices | Customer session |
 | `POST` | `/cart/add` | Add a service to the customer's cart | Customer session plus CSRF |
 | `POST` | `/cart/items/<service_id>` | Set quantity or remove an item | Customer session plus CSRF |
-| `POST` | `/cart/checkout` | Create one invoice for the complete cart | Customer session, CSRF, nonce, revision, and SQLite claim |
+| `GET` | `/cart/checkout` | Review items and enter requests and delivery details | Customer session |
+| `POST` | `/cart/checkout` | Validate details and create one invoice for the complete cart | Customer session, CSRF, nonce, revision, and SQLite claim |
 | `GET` | `/account/orders/<invoice_id>` | Order items and payment/fulfillment progress | Owning customer session |
-| `POST` | `/checkout` | Validate form, obtain quote, create one invoice | Customer session, CSRF, and single-use form nonce |
+| `POST` | `/checkout` | Add selected service if missing and redirect to checkout review | Customer session, CSRF, and single-use form nonce |
 | `GET` | `/checkout/<invoice_id>/<status_token>` | Locked amount, unique address, expiry, and links | Invoice bearer token |
 | `GET` | `/checkout/<invoice_id>/<status_token>/qr.png` | Monero payment QR | Invoice bearer token |
 | `GET` | `/status/<invoice_id>/<status_token>` | Customer-safe payment state | Invoice bearer token |
@@ -51,7 +52,9 @@ There is no hard-coded or cached indefinite fallback.
 - Each signed-in service-detail response issues a separate, single-use checkout
   nonce. Catalog pages and administrator browsing do not issue checkout tokens
   or create invoices directly.
-  Replaying a successful detail-page form cannot create a second invoice.
+  Replaying a successful detail-page form cannot add another item. The detail
+  form no longer creates an invoice. The review page issues its own single-use
+  invoice nonce.
 - Unknown, unpublished, archived, or category-hidden service slugs return the
   same generic 404 response and do not reveal catalog state.
 - Service identity and current publication state are revalidated server-side,
@@ -60,6 +63,10 @@ There is no hard-coded or cached indefinite fallback.
   before rate or wallet access. A SQLite lease serializes checkout for that
   revision; stale workers cannot commit after a lease takeover. Prices,
   quantities, and ownership are never accepted from client-supplied totals.
+- Per-line requests and delivery contacts are validated before external calls
+  and saved atomically with the order. They are escaped on customer-owned and
+  admin order views and omitted from bearer invoice/status views. See
+  `checkout-review.md` for validation, privacy, and migration details.
 - Checkout, QR, status, private errors, and redirects use `no-store` and
   `X-Robots-Tag: noindex, nofollow, noarchive`.
 - All responses deny scripts, framing, cross-origin referrers, MIME sniffing,

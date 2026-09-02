@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import Iterator
 
 from app.catalog import AdminServiceRecord, CategoryRecord, PurchasableService, ServiceRecord
+from app.checkout_details import CheckoutDetails
 from app.orders import (
     MAX_CART_SERVICES, CartChangedError, CartError, CartItem, CartSnapshot,
     CheckoutInProgressError, OrderLine, validate_quantity,
@@ -24,7 +25,7 @@ from app.payments.invoice import (
 from app.payments.xmr_wallet_rpc import MAX_ATOMIC_UNITS
 
 
-SCHEMA_VERSION = 7
+SCHEMA_VERSION = 8
 
 
 class PersistenceError(RuntimeError):
@@ -161,6 +162,7 @@ class SQLiteDatabase:
                     "4",
                     "5",
                     "6",
+                    "7",
                     str(SCHEMA_VERSION),
                 }:
                     raise SchemaVersionError("database schema version is unsupported")
@@ -170,7 +172,7 @@ class SQLiteDatabase:
                 if previous_version in {"1", "2", "3", "4", "5", "6"}:
                     _ensure_service_image_column(connection)
                 connection.executescript(_SCHEMA_SQL)
-                if previous_version in {"1", "2", "3", "4", "5", "6"}:
+                if previous_version in {"1", "2", "3", "4", "5", "6", "7"}:
                     connection.execute(
                         "UPDATE schema_meta SET value=? WHERE key='schema_version'",
                         (str(SCHEMA_VERSION),),
@@ -549,7 +551,8 @@ class ServicesiteRepository:
             return _fetch_cart(connection, customer_id)
 
     def change_cart_item(
-        self, customer_id: str, service_id: str, quantity: int, *, add: bool = False
+        self, customer_id: str, service_id: str, quantity: int, *, add: bool = False,
+        ensure_present: bool = False,
     ) -> None:
         _validate_customer_id(customer_id)
         validate_quantity(quantity, allow_zero=not add)
@@ -558,6 +561,8 @@ class ServicesiteRepository:
             existing = next((item for item in cart.items if item.service_id == service_id), None)
             if quantity and _fetch_purchasable_service(connection, service_id) is None:
                 raise CartError("this service is no longer available")
+            if ensure_present and existing:
+                return
             if add and existing:
                 quantity += existing.quantity
                 validate_quantity(quantity)
@@ -620,12 +625,17 @@ class ServicesiteRepository:
     def insert_order_invoice(
         self, invoice: Invoice, lines: tuple[OrderLine, ...], *, customer_id: str,
         cart_version: int | None = None, claim_token: str | None = None,
+        checkout_details: CheckoutDetails | None = None,
     ) -> None:
         _validate_customer_id(customer_id)
         if not lines or len(lines) > MAX_CART_SERVICES:
             raise CartError("order size is invalid")
         if sum(line.total_usd_cents for line in lines) != invoice.price_usd_cents:
             raise InvoicePersistenceError("order total does not match its invoice")
+        if cart_version is not None and checkout_details is None:
+            raise InvoicePersistenceError("cart checkout details are required")
+        if checkout_details is not None:
+            checkout_details.require_services(tuple(line.service.service_id for line in lines))
         try:
             with self.database.transaction(immediate=True) as connection:
                 for line in lines:
@@ -663,6 +673,16 @@ class ServicesiteRepository:
                             service.category_description, service.price_usd_cents, line.quantity,
                         ),
                     )
+                if checkout_details is not None:
+                    connection.execute(
+                        "INSERT INTO order_checkout_details(invoice_id, delivery_method, delivery_address) "
+                        "VALUES (?, ?, ?)",
+                        (invoice.id, checkout_details.delivery_method, checkout_details.delivery_address),
+                    )
+                    connection.executemany(
+                        "INSERT INTO order_item_requests(invoice_id, service_id, request_text) VALUES (?, ?, ?)",
+                        [(invoice.id, service_id, text) for service_id, text in checkout_details.item_requests],
+                    )
                 if cart_version is not None:
                     connection.execute("DELETE FROM cart_items WHERE customer_id=?", (customer_id,))
                     connection.execute(
@@ -687,6 +707,22 @@ class ServicesiteRepository:
             ), row["quantity"]) for row in rows)
         finally:
             connection.close()
+
+    def get_order_checkout_details(self, invoice_id: str) -> CheckoutDetails | None:
+        with self.database.transaction() as connection:
+            row = connection.execute(
+                "SELECT delivery_method, delivery_address FROM order_checkout_details WHERE invoice_id=?",
+                (invoice_id,),
+            ).fetchone()
+            if row is None:
+                return None
+            requests = connection.execute(
+                "SELECT service_id, request_text FROM order_item_requests WHERE invoice_id=? ORDER BY service_id",
+                (invoice_id,),
+            ).fetchall()
+            return CheckoutDetails(row["delivery_method"], row["delivery_address"], tuple(
+                (item["service_id"], item["request_text"]) for item in requests
+            ))
 
     def list_customer_orders(self, customer_id: str) -> list[AdminPurchaseRecord]:
         connection = self.database.connect()
@@ -1896,6 +1932,20 @@ CREATE TABLE IF NOT EXISTS invoice_items (
 CREATE INDEX IF NOT EXISTS idx_customer_orders_customer ON customer_orders(customer_id);
 CREATE INDEX IF NOT EXISTS idx_invoice_items_service ON invoice_items(service_id, invoice_id);
 CREATE INDEX IF NOT EXISTS idx_invoice_items_category ON invoice_items(category_id, invoice_id);
+
+CREATE TABLE IF NOT EXISTS order_checkout_details (
+    invoice_id TEXT PRIMARY KEY REFERENCES customer_orders(invoice_id) ON DELETE RESTRICT,
+    delivery_method TEXT NOT NULL CHECK (delivery_method IN ('email', 'telegram')),
+    delivery_address TEXT NOT NULL CHECK (length(delivery_address) BETWEEN 1 AND 254)
+);
+
+CREATE TABLE IF NOT EXISTS order_item_requests (
+    invoice_id TEXT NOT NULL REFERENCES order_checkout_details(invoice_id) ON DELETE RESTRICT,
+    service_id TEXT NOT NULL,
+    request_text TEXT NOT NULL CHECK (length(request_text) BETWEEN 1 AND 4000),
+    PRIMARY KEY (invoice_id, service_id),
+    FOREIGN KEY (invoice_id, service_id) REFERENCES invoice_items(invoice_id, service_id) ON DELETE RESTRICT
+);
 
 CREATE TABLE IF NOT EXISTS invoice_poll_claims (
     invoice_id TEXT PRIMARY KEY REFERENCES invoices(id) ON DELETE CASCADE,

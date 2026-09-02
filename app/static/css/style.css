@@ -1509,6 +1509,16 @@ dd {
   align-items: start;
 }
 .cart-items { display: grid; gap: 1rem; min-width: 0; }
+.checkout-review-form { margin: 0; }
+.checkout-item { padding: clamp(1.25rem, 3vw, 2rem); min-width: 0; }
+.checkout-item h2 { font-size: 1.5rem; }
+.checkout-item label { display: block; margin: 1.2rem 0 0.5rem; font-weight: 700; }
+.checkout-item input, .checkout-item textarea, .checkout-item select { font: inherit; }
+.checkout-item .field-help { font-size: 0.875rem; margin: 0.65rem 0 0; }
+.field-error { color: #ffd7dc; margin: 0.6rem 0; font-size: 0.875rem; }
+.checkout-item [aria-invalid="true"] { border-color: var(--danger); }
+.order-checkout-details { margin-top: 2rem; border-top: 1px solid var(--border); padding-top: 1.5rem; }
+.order-request-text { white-space: pre-wrap; overflow-wrap: anywhere; }
 .cart-item {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;

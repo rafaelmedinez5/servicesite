@@ -165,10 +165,25 @@ def _login_customer(client):
     assert login.status_code == 303
 
 
-def _create_invoice(context):
+def _start_checkout(context):
     data = _form_tokens(context.client)
     data["service_id"] = "service-assessment"
     response = context.client.post("/checkout", data=data)
+    assert response.status_code == 303
+    assert response.headers["Location"] == "/cart/checkout"
+    review = context.client.get(response.headers["Location"])
+    body = review.get_data(as_text=True)
+    data = dict(re.findall(
+        r'name="(csrf_token|checkout_nonce|cart_version|cart_fingerprint)" value="([^"]+)"', body
+    ))
+    data.update({"delivery_method": "email", "delivery_address": "buyer@example.com"})
+    data.update({name: "Review the authorized test environment." for name in re.findall(r'name="(request_[^"]+)"', body)})
+    return data
+
+
+def _create_invoice(context):
+    data = _start_checkout(context)
+    response = context.client.post("/cart/checkout", data=data)
     assert response.status_code == 303
     invoice = context.repository.get_invoice(response.headers["Location"].split("/")[2])
     assert invoice is not None
@@ -396,6 +411,11 @@ def test_successful_submit_creates_one_invoice_and_nonce_cannot_be_replayed(web_
 
     assert first.status_code == 303
     assert replay.status_code == 400
+    assert first.headers["Location"] == "/cart/checkout"
+    assert web_context.repository.count_invoices() == 0
+    assert web_context.rate_provider.calls == 0
+    assert web_context.wallet.calls == []
+    invoice, _ = _create_invoice(web_context)
     assert web_context.repository.count_invoices() == 1
     orders = web_context.repository.list_customer_orders("customer-test-00000001")
     assert len(orders) == 1
@@ -408,10 +428,9 @@ def test_unavailable_rate_fails_without_wallet_or_invoice(web_context):
     web_context.app.extensions["servicesite_rate_provider"] = FakeRateProvider(
         XmrRateUnavailableError("test-only provider outage")
     )
-    data = _form_tokens(web_context.client)
-    data["service_id"] = "service-assessment"
+    data = _start_checkout(web_context)
 
-    response = web_context.client.post("/checkout", data=data)
+    response = web_context.client.post("/cart/checkout", data=data)
 
     assert response.status_code == 503
     assert "provider outage" not in response.get_data(as_text=True)
@@ -423,10 +442,9 @@ def test_stale_injected_quote_is_rechecked_before_wallet_or_invoice(web_context)
     web_context.app.extensions["servicesite_rate_provider"] = FakeRateProvider(
         quote_age=timedelta(seconds=301)
     )
-    data = _form_tokens(web_context.client)
-    data["service_id"] = "service-assessment"
+    data = _start_checkout(web_context)
 
-    response = web_context.client.post("/checkout", data=data)
+    response = web_context.client.post("/cart/checkout", data=data)
 
     assert response.status_code == 503
     assert web_context.repository.count_invoices() == 0

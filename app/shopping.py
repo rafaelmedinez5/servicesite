@@ -6,6 +6,7 @@ from datetime import datetime, timezone
 
 from flask import Blueprint, abort, current_app, flash, g, redirect, render_template, request, url_for
 
+from app.checkout_details import CheckoutValidationError, parse_checkout_details
 from app.orders import CartChangedError, CartError, CheckoutInProgressError
 from app.payments.invoice import InvoiceError, PaymentStatus, ServiceUnavailableError
 from app.payments.xmr_rate import XmrRateError
@@ -73,6 +74,13 @@ def update_item(service_id: str):
     return redirect(url_for("shopping.cart"), code=303)
 
 
+@shopping.get("/cart/checkout")
+def checkout_review():
+    if not _repository().get_cart(g.customer.id).ready:
+        return redirect(url_for("shopping.cart"), code=303)
+    return _render_checkout_review()
+
+
 @shopping.post("/cart/checkout")
 def checkout_cart():
     try:
@@ -82,7 +90,7 @@ def checkout_cart():
             raise FormSecurityError("invalid cart revision")
         version = int(raw_version)
     except FormSecurityError:
-        return _render_cart(error="This checkout form expired. Review the cart and try again.", status_code=400)
+        return _render_checkout_review(error="This checkout form expired. Review the cart and try again.", status_code=400)
 
     repository = _repository()
     claim_token = secrets.token_urlsafe(24)
@@ -94,18 +102,22 @@ def checkout_cart():
             claim_token=claim_token, now=_now(),
         )
         claimed = True
+        details = parse_checkout_details(request.form, tuple(line.service.service_id for line in lines))
         quote = _rate_provider().get_quote()
         invoice = _invoice_creator().create_cart_invoice(
             g.customer.id, lines, quote, cart_version=version, claim_token=claim_token,
+            checkout_details=details,
         )
         completed = True
+    except CheckoutValidationError as exc:
+        return _render_checkout_review(error=str(exc), errors=exc.errors, status_code=400)
     except (CartChangedError, CheckoutInProgressError, CatalogChangedError, ServiceUnavailableError):
-        return _render_cart(
+        return _render_checkout_review(
             error="The cart changed or checkout is already in progress. Review the current items and your orders before trying again.",
             status_code=409,
         )
     except (XmrRateError, XmrWalletRpcError, InvoiceError, PersistenceError, sqlite3.Error):
-        return _render_cart(
+        return _render_checkout_review(
             error="An invoice could not be created. Your cart is still saved; no payment is required.",
             status_code=503,
         )
@@ -129,6 +141,7 @@ def order_detail(invoice_id: str):
     purchase = repository.get_admin_purchase(invoice.id)
     return render_template(
         "customer/order.html", invoice=invoice, items=repository.get_invoice_items(invoice.id),
+        checkout_details=repository.get_order_checkout_details(invoice.id),
         xmr_amount=atomic_to_xmr_str(invoice.expected_atomic),
         customer_state=customer_payment_state(
             invoice, fulfilled=purchase.fulfillment_status is FulfillmentStatus.FULFILLED
@@ -165,7 +178,17 @@ def _render_cart(*, error: str | None = None, status_code: int = 200):
     snapshot = _repository().get_cart(g.customer.id)
     return render_template(
         "cart.html", cart=snapshot, error=error,
-        checkout_nonce=issue_checkout_nonce() if snapshot.ready else None,
+    ), status_code
+
+
+def _render_checkout_review(*, error: str | None = None, errors=None, status_code: int = 200):
+    snapshot = _repository().get_cart(g.customer.id)
+    if not snapshot.ready:
+        return _render_cart(error=error, status_code=status_code)
+    return render_template(
+        "checkout_review.html", cart=snapshot, error=error, errors=errors or {},
+        values=request.form if request.method == "POST" else {},
+        checkout_nonce=issue_checkout_nonce(),
     ), status_code
 
 

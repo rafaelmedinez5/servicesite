@@ -2,16 +2,18 @@
 
 ## Database migration required
 
-This release requires **schema 5 → 6**. Pulling source or restarting the web
+The current checkout release requires **schema 7 → 8** (see
+`checkout-review.md`). The original cart release introduced schema 5 → 6.
+Pulling source or restarting the web
 service does not run the migration automatically.
 
 Use the existing operator procedure in `deploy-xmr.md`: take and verify a SQLite
 online backup, stop the web service, load the protected production environment,
 run `SQLiteDatabase.initialize()`, and restart only after it succeeds. Do not
 delete or recreate the production database. The initializer also supports
-recognized schema versions 1 through 4 and is safe to rerun.
+recognized schema versions 1 through 7 and is safe to rerun.
 
-The additive migration creates:
+The original cart migration created:
 
 - `customer_carts`: one revision counter per customer;
 - `cart_items`: service IDs and quantities owned by that customer;
@@ -33,14 +35,17 @@ and must be removed before checkout.
 
 Checkout sums current integer USD cents, then converts that total once into
 the exact XMR atomic amount. It creates one invoice with one unique address.
-The cart clears only when invoice, ownership, and all item snapshots have been
-committed together. Direct single-service checkout remains available and also
-creates a customer-owned order.
+The cart clears only when invoice, ownership, item snapshots, delivery contact,
+and requests have been committed together. `/cart/checkout` first collects a
+request for each service line and a validly formatted email or Telegram contact.
+Buy-now adds the selected service if missing, preserves existing quantities,
+and opens this review page without creating an invoice.
 
 `/account` lists the 100 most recent owned orders. Each order detail checks the
 signed-in customer ID and returns the same 404 for an unknown or other
-customer's order. Private bearer payment/status links continue to work without
-login for compatibility. Customers should keep those links private.
+customer's order. Private bearer payment/status links require a signed-in site
+session and never show requests or delivery contacts. Customers should keep
+those links private.
 
 ## Price and concurrency guarantees
 

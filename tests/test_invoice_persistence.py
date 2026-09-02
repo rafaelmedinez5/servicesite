@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import inspect
+import secrets
 import sqlite3
 import stat
 from dataclasses import dataclass
@@ -180,6 +181,8 @@ def test_fresh_schema_initialization_is_idempotent_and_uses_wal(tmp_path):
         "cart_checkout_claims",
         "customer_orders",
         "invoice_items",
+        "order_checkout_details",
+        "order_item_requests",
     }
     assert journal_mode.lower() == "wal"
     assert stat.S_IMODE(database_path.stat().st_mode) == 0o600
@@ -349,7 +352,7 @@ def test_schema_five_upgrade_preserves_accounts_and_legacy_invoices(tmp_path):
     invoice = _creator(repository, FakeWallet()).create_invoice("service-assessment", _quote())
     account = repository.create_customer_account(
         customer_id="existing-customer-00000001", username="existing.customer",
-        password_hash=generate_password_hash("existing customer password"), now=NOW,
+        password_hash=generate_password_hash(secrets.token_urlsafe(32)), now=NOW,
     )
     with database.transaction() as connection:
         for table in ("invoice_items", "customer_orders", "cart_checkout_claims", "cart_items", "customer_carts"):

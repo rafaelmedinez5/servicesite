@@ -1,0 +1,13 @@
+{% if checkout_details %}
+  <section class="order-checkout-details" aria-label="Requests and delivery details">
+    <h3>Requests and delivery</h3>
+    <dl class="details-list">
+      <div><dt>Delivery method</dt><dd>{{ 'Email' if checkout_details.delivery_method == 'email' else 'Telegram' }}</dd></div>
+      <div><dt>Delivery contact</dt><dd class="breakable">{{ checkout_details.delivery_address }}</dd></div>
+    </dl>
+    {% for item in items %}
+      <h4>{{ item.service.service_name }}</h4>
+      <p class="order-request-text">{{ checkout_details.requests_by_service[item.service.service_id] }}</p>
+    {% endfor %}
+  </section>
+{% endif %}

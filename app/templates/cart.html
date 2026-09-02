@@ -51,14 +51,8 @@
         </div>
         {% if cart.ready %}
           <div class="purchase-price"><span>USD total</span><strong>{{ cart.total_usd_cents|usd }}</strong></div>
-          <p>The exact XMR amount and unique payment address are created when you continue.</p>
-          <form method="post" action="{{ url_for('shopping.checkout_cart') }}">
-            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-            <input type="hidden" name="checkout_nonce" value="{{ checkout_nonce }}">
-            <input type="hidden" name="cart_version" value="{{ cart.version }}">
-            <input type="hidden" name="cart_fingerprint" value="{{ cart.fingerprint }}">
-            <button type="submit">Create XMR invoice <span aria-hidden="true">&#8594;</span></button>
-          </form>
+          <p>Add your requests and delivery details at checkout. No invoice is created yet.</p>
+          <a class="button" href="{{ url_for('shopping.checkout_review') }}">Continue to checkout <span aria-hidden="true">&#8594;</span></a>
         {% else %}
           <p class="unavailable-note">Remove unavailable services before checkout. No invoice has been created.</p>
         {% endif %}
