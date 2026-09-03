@@ -27,6 +27,25 @@ Catalog edits never change an existing invoice snapshot. Archival replaces
 deletion. Fulfillment is a separate state and cannot settle an invoice or begin
 an authorized security engagement by itself.
 
+## Account delivery
+
+For an order that selected My account, the settled purchase detail requires a
+customer-facing delivery message before it can be marked fulfilled. Enter the
+completed delivery for the entire order (up to 12,000 characters), optionally
+as a manually PGP-encrypted message. The application does not encrypt it for you.
+The internal fulfillment note remains a separate, administrator-only field.
+
+Publish delivery and mark fulfilled saves both changes atomically. Validation
+and storage failures preserve entered text in the response; repeat submissions
+cannot replace an already-published delivery. There is no edit or upload flow
+in this release. Customers read the message from their own order page, reached
+through Account → Your orders. Other customers and bearer payment links cannot
+read it. Email/Telegram orders retain their existing manual fulfillment flow.
+
+**Schema 9 migration is required** before running this update. It preserves
+existing checkout rows while adding account delivery and optional requests.
+See `checkout-review.md` for migration commands and verification boundaries.
+
 ## Service-image privacy boundary
 
 An authenticated service edit page accepts one JPEG, PNG, or WebP file up to

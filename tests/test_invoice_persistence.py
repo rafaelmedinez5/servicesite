@@ -183,6 +183,7 @@ def test_fresh_schema_initialization_is_idempotent_and_uses_wal(tmp_path):
         "invoice_items",
         "order_checkout_details",
         "order_item_requests",
+        "account_deliveries",
     }
     assert journal_mode.lower() == "wal"
     assert stat.S_IMODE(database_path.stat().st_mode) == 0o600

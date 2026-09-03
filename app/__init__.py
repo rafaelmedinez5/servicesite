@@ -10,6 +10,7 @@ from app.admin import register_admin
 from app.checkout_details import MAX_CHECKOUT_BODY_BYTES
 from app.config import Settings
 from app.customer_auth import register_customer_auth
+from app.deliveries import MAX_DELIVERY_BODY_BYTES
 from app.internal import register_internal
 from app.persistence import SQLiteDatabase, ServicesiteRepository
 from app.service_images import MAX_UPLOAD_BYTES, ServiceImageStore
@@ -22,6 +23,8 @@ class _InMemoryUploadRequest(Request):
     def max_content_length(self):
         if self.endpoint == "shopping.checkout_cart":
             return MAX_CHECKOUT_BODY_BYTES
+        if self.endpoint == "admin.purchase_fulfill":
+            return MAX_DELIVERY_BODY_BYTES
         return super().max_content_length
 
     def _get_file_stream(
@@ -105,6 +108,8 @@ def create_app(test_config: dict | None = None) -> Flask:
         )
         if request.endpoint == "shopping.checkout_cart":
             limit = MAX_CHECKOUT_BODY_BYTES
+        if request.endpoint == "admin.purchase_fulfill":
+            limit = MAX_DELIVERY_BODY_BYTES
         if content_length > limit:
             abort(413)
         return None

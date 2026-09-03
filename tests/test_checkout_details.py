@@ -83,10 +83,9 @@ def test_checkout_review_is_private_script_free_and_has_one_field_per_line(web_c
 @pytest.mark.parametrize(("field", "value"), [
     ("delivery_method", ""), ("delivery_method", "sms"),
     ("delivery_address", ""), ("delivery_address", "invalid"),
-    ("request_service-assessment", ""), ("request_service-assessment", "   \n "),
     ("request_service-assessment", "x" * 4001),
     ("request_service-assessment", "review\x00request"),
-], ids=["missing-method", "unknown-method", "missing-address", "invalid-address", "missing-request", "blank-request", "long-request", "control-character"])
+], ids=["missing-method", "unknown-method", "missing-address", "invalid-address", "long-request", "control-character"])
 def test_invalid_checkout_retains_cart_and_values_without_external_calls(web_context, field, value):
     data = _start_checkout(web_context)
     data[field] = value
