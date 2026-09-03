@@ -1,0 +1,11 @@
+{% if checkout_details and checkout_details.delivery_method == 'account' %}
+  <section class="order-checkout-details" id="delivery" aria-labelledby="delivery-heading">
+    <h3 id="delivery-heading">Account delivery</h3>
+    {% if account_delivery %}
+      <p>Delivered {{ account_delivery.delivered_at|display_datetime }}</p>
+      <div class="order-request-text">{{ account_delivery.body }}</div>
+    {% else %}
+      <p>No delivery yet. After payment and service completion, your delivery will appear here.</p>
+    {% endif %}
+  </section>
+{% endif %}

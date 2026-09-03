@@ -19,8 +19,10 @@ class CheckoutValidationError(ValueError):
 
 
 def validate_delivery(method: str, address: str) -> str:
-    if method not in {"email", "telegram"}:
-        raise ValueError("Choose email or Telegram.")
+    if method not in {"account", "email", "telegram"}:
+        raise ValueError("Choose My account, email or Telegram.")
+    if method == "account":
+        return ""  # Do not retain an external contact for account delivery.
     address = address.strip()
     if method == "telegram":
         username = address.removeprefix("@")
@@ -43,8 +45,8 @@ def validate_delivery(method: str, address: str) -> str:
 
 def validate_request(value: str) -> str:
     value = value.replace("\r\n", "\n").replace("\r", "\n").strip()
-    if not value or len(value) > MAX_REQUEST_LENGTH:
-        raise ValueError(f"Describe your request in 1–{MAX_REQUEST_LENGTH:,} characters.")
+    if len(value) > MAX_REQUEST_LENGTH:
+        raise ValueError(f"Keep your request within {MAX_REQUEST_LENGTH:,} characters.")
     if any((ord(char) < 32 and char not in "\n\t") or ord(char) == 127 for char in value):
         raise ValueError("Remove unsupported control characters from your request.")
     return value
@@ -61,7 +63,7 @@ class CheckoutDetails:
             self.delivery_method, self.delivery_address
         ))
         if not 1 <= len(self.item_requests) <= 20:
-            raise ValueError("A request is required for each order item.")
+            raise ValueError("Each order item needs a request entry, which may be blank.")
         normalized = tuple((service_id, validate_request(text)) for service_id, text in self.item_requests)
         if len({service_id for service_id, _ in normalized}) != len(normalized):
             raise ValueError("Each order item must have exactly one request.")
@@ -83,7 +85,7 @@ def parse_checkout_details(values: Mapping[str, str], service_ids: tuple[str, ..
     try:
         address = validate_delivery(method, address)
     except ValueError as exc:
-        errors["delivery_method" if method not in {"email", "telegram"} else "delivery_address"] = str(exc)
+        errors["delivery_method" if method not in {"account", "email", "telegram"} else "delivery_address"] = str(exc)
     item_requests = []
     for service_id in service_ids:
         name = "request_" + service_id

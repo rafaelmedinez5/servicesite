@@ -12,6 +12,7 @@ from typing import Iterator
 
 from app.catalog import AdminServiceRecord, CategoryRecord, PurchasableService, ServiceRecord
 from app.checkout_details import CheckoutDetails
+from app.deliveries import AccountDelivery, DeliveryValidationError, validate_delivery_body
 from app.orders import (
     MAX_CART_SERVICES, CartChangedError, CartError, CartItem, CartSnapshot,
     CheckoutInProgressError, OrderLine, validate_quantity,
@@ -25,7 +26,7 @@ from app.payments.invoice import (
 from app.payments.xmr_wallet_rpc import MAX_ATOMIC_UNITS
 
 
-SCHEMA_VERSION = 8
+SCHEMA_VERSION = 9
 
 
 class PersistenceError(RuntimeError):
@@ -163,6 +164,7 @@ class SQLiteDatabase:
                     "5",
                     "6",
                     "7",
+                    "8",
                     str(SCHEMA_VERSION),
                 }:
                     raise SchemaVersionError("database schema version is unsupported")
@@ -172,7 +174,9 @@ class SQLiteDatabase:
                 if previous_version in {"1", "2", "3", "4", "5", "6"}:
                     _ensure_service_image_column(connection)
                 connection.executescript(_SCHEMA_SQL)
-                if previous_version in {"1", "2", "3", "4", "5", "6", "7"}:
+                if previous_version in {"1", "2", "3", "4", "5", "6", "7", "8"}:
+                    connection.execute("BEGIN IMMEDIATE")
+                    _upgrade_checkout_constraints(connection)
                     connection.execute(
                         "UPDATE schema_meta SET value=? WHERE key='schema_version'",
                         (str(SCHEMA_VERSION),),
@@ -856,7 +860,7 @@ class ServicesiteRepository:
             connection.close()
 
     def mark_purchase_fulfilled(
-        self, invoice_id: str, *, note: str, now: datetime
+        self, invoice_id: str, *, note: str, now: datetime, delivery_body: str = ""
     ) -> AdminPurchaseRecord:
         _require_aware_datetime(now, "fulfillment time")
         if not isinstance(note, str) or len(note.strip()) > 2_000:
@@ -874,6 +878,17 @@ class ServicesiteRepository:
                 )
             if FulfillmentStatus(row["fulfillment_status"]) is FulfillmentStatus.FULFILLED:
                 return _row_to_admin_purchase(row)
+            details = connection.execute(
+                "SELECT delivery_method FROM order_checkout_details WHERE invoice_id=?", (invoice_id,)
+            ).fetchone()
+            if details is not None and details["delivery_method"] == "account":
+                body = validate_delivery_body(delivery_body)
+                connection.execute(
+                    "INSERT INTO account_deliveries(invoice_id, body, delivered_at) VALUES (?, ?, ?)",
+                    (invoice_id, body, _serialize_datetime(now)),
+                )
+            elif delivery_body.strip():
+                raise DeliveryValidationError("This order did not select account delivery.")
             connection.execute(
                 """
                 UPDATE invoices
@@ -886,6 +901,18 @@ class ServicesiteRepository:
                 "SELECT * FROM invoices WHERE id=?", (invoice_id,)
             ).fetchone()
             return _row_to_admin_purchase(updated)
+
+    def get_account_delivery(self, invoice_id: str) -> AccountDelivery | None:
+        with self.database.transaction() as connection:
+            row = connection.execute(
+                "SELECT d.body, d.delivered_at FROM account_deliveries d "
+                "JOIN invoices i ON i.id=d.invoice_id "
+                "JOIN order_checkout_details c ON c.invoice_id=i.id "
+                "WHERE d.invoice_id=? AND c.delivery_method='account' "
+                "AND i.status='settled' AND i.fulfillment_status='fulfilled'",
+                (invoice_id,),
+            ).fetchone()
+            return AccountDelivery(row["body"], _parse_datetime(row["delivered_at"])) if row else None
 
     def admin_login_allowed(self, *, now: datetime) -> bool:
         _require_aware_datetime(now, "login attempt time")
@@ -1771,6 +1798,37 @@ def _ensure_service_image_column(connection: sqlite3.Connection) -> None:
         )
 
 
+def _upgrade_checkout_constraints(connection: sqlite3.Connection) -> None:
+    # SQLite CHECK constraints need a table rebuild. The caller holds one
+    # transaction for both copies, replacement, FK verification and version bump.
+    connection.execute("""CREATE TABLE order_checkout_details_upgrade (
+        invoice_id TEXT PRIMARY KEY REFERENCES customer_orders(invoice_id) ON DELETE RESTRICT,
+        delivery_method TEXT NOT NULL CHECK (delivery_method IN ('account', 'email', 'telegram')),
+        delivery_address TEXT NOT NULL,
+        CHECK ((delivery_method='account' AND delivery_address='') OR
+               (delivery_method IN ('email', 'telegram') AND length(delivery_address) BETWEEN 1 AND 254))
+    )""")
+    connection.execute("""CREATE TABLE order_item_requests_upgrade (
+        invoice_id TEXT NOT NULL REFERENCES order_checkout_details_upgrade(invoice_id) ON DELETE RESTRICT,
+        service_id TEXT NOT NULL,
+        request_text TEXT NOT NULL CHECK (length(request_text) BETWEEN 0 AND 4000),
+        PRIMARY KEY (invoice_id, service_id),
+        FOREIGN KEY (invoice_id, service_id) REFERENCES invoice_items(invoice_id, service_id) ON DELETE RESTRICT
+    )""")
+    connection.execute(
+        "INSERT INTO order_checkout_details_upgrade SELECT invoice_id, delivery_method, delivery_address FROM order_checkout_details"
+    )
+    connection.execute(
+        "INSERT INTO order_item_requests_upgrade SELECT invoice_id, service_id, request_text FROM order_item_requests"
+    )
+    connection.execute("DROP TABLE order_item_requests")
+    connection.execute("DROP TABLE order_checkout_details")
+    connection.execute("ALTER TABLE order_checkout_details_upgrade RENAME TO order_checkout_details")
+    connection.execute("ALTER TABLE order_item_requests_upgrade RENAME TO order_item_requests")
+    if connection.execute("PRAGMA foreign_key_check").fetchone() is not None:
+        raise SchemaVersionError("checkout migration failed its foreign-key check")
+
+
 _SCHEMA_SQL = """
 CREATE TABLE IF NOT EXISTS categories (
     id TEXT PRIMARY KEY,
@@ -1935,16 +1993,24 @@ CREATE INDEX IF NOT EXISTS idx_invoice_items_category ON invoice_items(category_
 
 CREATE TABLE IF NOT EXISTS order_checkout_details (
     invoice_id TEXT PRIMARY KEY REFERENCES customer_orders(invoice_id) ON DELETE RESTRICT,
-    delivery_method TEXT NOT NULL CHECK (delivery_method IN ('email', 'telegram')),
-    delivery_address TEXT NOT NULL CHECK (length(delivery_address) BETWEEN 1 AND 254)
+    delivery_method TEXT NOT NULL CHECK (delivery_method IN ('account', 'email', 'telegram')),
+    delivery_address TEXT NOT NULL,
+    CHECK ((delivery_method='account' AND delivery_address='') OR
+           (delivery_method IN ('email', 'telegram') AND length(delivery_address) BETWEEN 1 AND 254))
 );
 
 CREATE TABLE IF NOT EXISTS order_item_requests (
     invoice_id TEXT NOT NULL REFERENCES order_checkout_details(invoice_id) ON DELETE RESTRICT,
     service_id TEXT NOT NULL,
-    request_text TEXT NOT NULL CHECK (length(request_text) BETWEEN 1 AND 4000),
+    request_text TEXT NOT NULL CHECK (length(request_text) BETWEEN 0 AND 4000),
     PRIMARY KEY (invoice_id, service_id),
     FOREIGN KEY (invoice_id, service_id) REFERENCES invoice_items(invoice_id, service_id) ON DELETE RESTRICT
+);
+
+CREATE TABLE IF NOT EXISTS account_deliveries (
+    invoice_id TEXT PRIMARY KEY REFERENCES customer_orders(invoice_id) ON DELETE RESTRICT,
+    body TEXT NOT NULL CHECK (length(body) BETWEEN 1 AND 12000),
+    delivered_at TEXT NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS invoice_poll_claims (

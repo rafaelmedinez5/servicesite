@@ -22,6 +22,7 @@ from flask import (
 from werkzeug.security import check_password_hash, generate_password_hash
 
 from app.catalog import CatalogValidationError, CategoryRecord, ServiceRecord
+from app.deliveries import DeliveryValidationError
 from app.payments.invoice import PaymentStatus
 from app.payments.xmr_wallet_rpc import atomic_to_xmr_str
 from app.persistence import (
@@ -563,11 +564,16 @@ def purchases():
 
 @admin.get("/purchases/<invoice_id>")
 def purchase_detail(invoice_id: str):
+    return _render_purchase_detail(invoice_id)
+
+
+def _render_purchase_detail(invoice_id: str, *, error=None, delivery_body="", note="", status_code=200):
     try:
         purchase = _repository().get_admin_purchase(invoice_id)
         items = _repository().get_invoice_items(invoice_id)
         customer_username = _repository().get_order_username(invoice_id)
         checkout_details = _repository().get_order_checkout_details(invoice_id)
+        account_delivery = _repository().get_account_delivery(invoice_id)
     except (PersistenceError, sqlite3.Error):
         abort(503)
     if purchase is None:
@@ -575,7 +581,8 @@ def purchase_detail(invoice_id: str):
     return render_template(
         "admin/purchase_detail.html", purchase=purchase,
         items=items, customer_username=customer_username, checkout_details=checkout_details,
-    )
+        account_delivery=account_delivery, delivery_error=error, delivery_body=delivery_body, note=note,
+    ), status_code
 
 
 @admin.post("/purchases/<invoice_id>/fulfill")
@@ -583,14 +590,24 @@ def purchase_fulfill(invoice_id: str):
     _require_admin_csrf()
     try:
         _repository().mark_purchase_fulfilled(
-            invoice_id, note=request.form.get("note", ""), now=_now()
+            invoice_id, note=request.form.get("note", ""), now=_now(),
+            delivery_body=request.form.get("delivery_body", ""),
+        )
+    except DeliveryValidationError as exc:
+        return _render_purchase_detail(
+            invoice_id, error=str(exc), delivery_body=request.form.get("delivery_body", ""),
+            note=request.form.get("note", ""), status_code=400,
         )
     except FulfillmentNotAllowedError:
         flash("Payment must be settled before fulfillment.", "error")
     except InvoiceNotFoundError:
         abort(404)
     except (PersistenceError, sqlite3.Error):
-        flash("The fulfillment update could not be saved.", "error")
+        return _render_purchase_detail(
+            invoice_id, error="The fulfillment update could not be saved. Please try again.",
+            delivery_body=request.form.get("delivery_body", ""), note=request.form.get("note", ""),
+            status_code=503,
+        )
     else:
         flash("Purchase marked fulfilled.", "success")
     return redirect(url_for("admin.purchase_detail", invoice_id=invoice_id), code=303)

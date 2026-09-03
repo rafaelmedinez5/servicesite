@@ -35,6 +35,7 @@ app/
   customer_auth.py        customer registration, login, logout, and session loading
   orders.py               cart snapshots, quantities, and order line values
   checkout_details.py     validated per-item requests and delivery contacts
+  deliveries.py           validated customer-facing account delivery messages
   shopping.py             saved cart and customer-owned order routes
   catalog.py              validated minimal category/service records
   config.py               typed startup and XMR configuration validation
@@ -164,17 +165,21 @@ Signed-in customers can add services, adjust quantities, and create one XMR
 invoice for the whole cart. `/account` lists their 100 most recent orders;
 order details remain ownership-checked. Direct single-service purchases also
 appear in this history. Existing bearer payment links continue to work.
-All new browser purchases review per-item requests and an email or Telegram
-delivery contact before invoice creation. Buy-now keeps existing cart items
-and quantities. See `docs/checkout-review.md`.
+All new browser purchases review optional per-item requests and a delivery
+method before invoice creation. Email and Telegram require a valid contact;
+My account needs no external contact and displays the administrator's completed
+delivery under the customer's order. Checkout suggests a public PGP key or a
+manually encrypted request. Buy-now keeps existing cart items and quantities.
+See `docs/checkout-review.md`.
 
 The cart release introduced the schema 5-to-6 migration. Existing accounts and
 invoices are preserved. See `docs/cart-orders.md`.
 
 ## Current database migration
 
-**Database migration required: schema 7 to 8.** Schema 8 adds two tables for
-order delivery details and per-item requests. Existing invoices, accounts,
+**Database migration required: schema 8 to 9.** Schema 9 rebuilds the checkout
+detail tables to permit blank requests and account delivery, preserving their
+rows, and adds an account-delivery message table. Existing invoices, accounts,
 carts, service images, and payment state are preserved. Back up the database,
 stop the web service, pull the update, run the documented initializer, and
 restart only after success. There are no new dependencies. See

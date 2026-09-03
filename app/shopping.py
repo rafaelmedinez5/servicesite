@@ -142,6 +142,7 @@ def order_detail(invoice_id: str):
     return render_template(
         "customer/order.html", invoice=invoice, items=repository.get_invoice_items(invoice.id),
         checkout_details=repository.get_order_checkout_details(invoice.id),
+        account_delivery=repository.get_account_delivery(invoice.id),
         xmr_amount=atomic_to_xmr_str(invoice.expected_atomic),
         customer_state=customer_payment_state(
             invoice, fulfilled=purchase.fulfillment_status is FulfillmentStatus.FULFILLED

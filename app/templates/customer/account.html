@@ -22,7 +22,7 @@
   <section class="account-orders" id="orders" aria-labelledby="orders-title">
     <p class="eyebrow">Purchase history</p>
     <h2 id="orders-title">Your orders</h2>
-    <p>Your recent orders, payment progress, and fulfillment status appear here.</p>
+    <p>Open an order to view its payment progress and delivery.</p>
     {% if orders %}
       <div class="order-history">
         {% for order in orders %}
@@ -31,6 +31,7 @@
               <p>{{ order.created_at|display_datetime }}</p>
               <h3><a href="{{ url_for('shopping.order_detail', invoice_id=order.invoice_id) }}">{{ order.service_name }}</a></h3>
               <small class="monospace">{{ order.invoice_id[:12] }}…</small>
+              <a class="text-link" href="{{ url_for('shopping.order_detail', invoice_id=order.invoice_id) }}">View order and delivery</a>
             </div>
             <dl class="order-history-facts">
               <div><dt>Total</dt><dd>{{ order.price_usd_cents|usd }}</dd></div>
