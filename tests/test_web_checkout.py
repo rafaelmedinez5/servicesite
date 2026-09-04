@@ -209,11 +209,15 @@ def test_public_catalog_renders_only_published_services(web_context):
     body = response.get_data(as_text=True)
 
     assert response.status_code == 200
-    assert "Find the gaps before they become incidents." in body
+    assert "Find the fracture before the fall." in body
+    assert "Операция без следов" in body
+    assert "Operation Without Traces" in body
+    assert "reproducible evidence" in body
     assert 'id="services"' in body
-    assert "Choose the engagement that fits." in body
+    assert "Choose the engagement that fits your objective." in body
     assert "Three clear steps." not in body
     assert "Engagement protocol" not in body
+    assert "How we operate" not in body
     assert 'href="/categories/security-services"' in body
     assert "View category" in body
     assert "checkout_nonce" not in body
@@ -257,7 +261,7 @@ def test_unknown_and_unpublished_category_pages_return_404(web_context):
 
 def test_information_pages_are_public_and_script_free(web_context):
     for path, expected in (
-        ("/about", "Security work should begin with clarity."),
+        ("/about", "Sektor-7 operates between protocol and permission."),
         ("/join", "Do careful work with people who value evidence."),
         ("/contact", "Direct channel not yet published"),
     ):
@@ -282,6 +286,15 @@ def test_information_pages_are_public_and_script_free(web_context):
     assert 'href="/pgp-key">Open our PGP key' in contact
     assert "Every initial message must be PGP-encrypted" in contact
     assert "PGP protects message content" in contact
+
+    about = web_context.client.get("/about").get_data(as_text=True)
+    assert "Authorization is non-negotiable" in about
+    assert "Payment confirms interest, not access" in about
+    assert "Evidence over noise" in about
+    assert "Privacy by default" in about
+    assert "A purchase starts a conversation" in about
+    assert "plausible deniability" not in about.lower()
+    assert "without logs" not in about.lower()
 
 
 def test_pgp_key_is_public_plain_text_without_comments(web_context):
