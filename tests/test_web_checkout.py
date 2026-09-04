@@ -233,6 +233,20 @@ def test_public_catalog_renders_only_published_services(web_context):
     assert "<script" not in body.lower()
 
 
+def test_midnight_eclipse_palette_is_served(web_context):
+    response = web_context.client.get("/static/css/style.css")
+    stylesheet = response.get_data(as_text=True).lower()
+
+    assert response.status_code == 200
+    for value in (
+        "#0b0c10", "#1a1a2e", "#eaeaea", "#a8b2c1",
+        "#00f0ff", "#ff0040", "#d4af37", "rgba(0, 240, 255, 0.15)",
+    ):
+        assert value in stylesheet
+    assert "#ff9b52" not in stylesheet
+    assert "#76d7ff" not in stylesheet
+
+
 def test_category_page_lists_only_its_published_services(web_context):
     web_context.repository.insert_service(
         _service(service_id="service-hidden", published=False)
