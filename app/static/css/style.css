@@ -685,6 +685,19 @@ p {
   border-top: 1px solid var(--border);
 }
 
+.contact-paths-heading {
+  padding: 1.6rem 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.contact-paths-heading .eyebrow {
+  margin-bottom: 0.65rem;
+}
+
+.contact-paths-heading h2 {
+  margin-bottom: 0;
+}
+
 .contact-paths article {
   padding: 1.6rem 0;
   border-bottom: 1px solid var(--border);
@@ -696,6 +709,55 @@ p {
 
 .contact-paths h2 {
   font-size: clamp(1.45rem, 3vw, 2rem);
+}
+
+.secure-exchange {
+  display: grid;
+  grid-template-columns: minmax(16rem, 0.8fr) minmax(0, 1.2fr);
+  gap: clamp(2rem, 7vw, 6rem);
+  align-items: start;
+  margin-top: clamp(4rem, 8vw, 7rem);
+  padding-block: clamp(2rem, 5vw, 3.5rem);
+  border-block: 1px solid var(--border);
+}
+
+.secure-exchange h2 {
+  font-size: clamp(2rem, 4vw, 3.4rem);
+}
+
+.secure-exchange .button {
+  margin-top: 0.75rem;
+}
+
+.secure-exchange-steps {
+  display: grid;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.secure-exchange-steps li {
+  display: grid;
+  grid-template-columns: 2.75rem 1fr;
+  gap: 1rem;
+  padding: 1.25rem 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.secure-exchange-steps li:first-child {
+  padding-top: 0;
+}
+
+.secure-exchange-steps span {
+  color: var(--blue);
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+}
+
+.secure-exchange-steps p {
+  margin: 0;
 }
 
 .privacy-callout {
@@ -1702,7 +1764,8 @@ th { color: var(--muted); font-size: 0.78rem; text-transform: uppercase; }
   }
 
   .info-split,
-  .contact-layout {
+  .contact-layout,
+  .secure-exchange {
     grid-template-columns: 1fr;
   }
 

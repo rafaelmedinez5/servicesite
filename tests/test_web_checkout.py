@@ -272,6 +272,17 @@ def test_information_pages_are_public_and_script_free(web_context):
         assert "<script" not in body.lower()
         assert response.headers["Cache-Control"] == "no-store, private, max-age=0"
 
+    contact = web_context.client.get("/contact").get_data(as_text=True)
+    assert "Contact Sektor-7" in contact
+    assert "Choose your entry path" in contact
+    assert "Discuss a fresh operation" in contact
+    assert "Check status or delivery" in contact
+    assert "Start a collaboration inquiry" in contact
+    assert 'href="/join">Read Join Guidelines' in contact
+    assert 'href="/pgp-key">Open our PGP key' in contact
+    assert "Every initial message must be PGP-encrypted" in contact
+    assert "PGP protects message content" in contact
+
 
 def test_pgp_key_is_public_plain_text_without_comments(web_context):
     response = web_context.client.get("/pgp-key")
