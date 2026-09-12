@@ -118,7 +118,7 @@ def checkout_cart():
         )
     except (XmrRateError, XmrWalletRpcError, InvoiceError, PersistenceError, sqlite3.Error):
         return _render_checkout_review(
-            error="An invoice could not be created. Your cart is still saved; no payment is required.",
+            error="Payment could not be started. Your cart is still saved, and no payment is required.",
             status_code=503,
         )
     finally:

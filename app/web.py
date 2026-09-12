@@ -269,7 +269,7 @@ def create_checkout():
     except (PersistenceError, sqlite3.Error):
         return _error_page(
             "Checkout temporarily unavailable",
-            "A payment invoice could not be created. No payment is required.",
+            "Payment could not be started. No payment is required.",
             503,
         )
 
@@ -286,7 +286,7 @@ def create_checkout():
     except (PersistenceError, sqlite3.Error):
         return _error_page(
             "Checkout temporarily unavailable",
-            "A payment invoice could not be created. No payment is required.",
+            "Payment could not be started. No payment is required.",
             503,
         )
 
@@ -396,7 +396,7 @@ def register_web(app) -> None:
     def not_found(_error):
         return _error_page(
             "Page not found",
-            "The requested page is unavailable or the private link is invalid.",
+            "The requested page or link is unavailable.",
             404,
         )
 
@@ -417,13 +417,13 @@ def build_monero_uri(invoice: Invoice) -> str:
 def customer_payment_state(
     invoice: Invoice, *, fulfilled: bool = False
 ) -> CustomerPaymentState:
-    not_fulfilled = "Service fulfillment has not started."
+    not_fulfilled = "Work has not started yet."
     if invoice.status is PaymentStatus.AWAITING_PAYMENT and invoice.observed_atomic > 0:
         remaining = max(invoice.expected_atomic - invoice.observed_atomic, 0)
         return CustomerPaymentState(
             title="Partial payment received",
             message=(
-                f"The invoice still requires {atomic_to_xmr_str(remaining)} XMR. "
+                f"The remaining amount is {atomic_to_xmr_str(remaining)} XMR. "
                 "Do not send funds after the expiry time."
             ),
             tone="warning",
@@ -433,7 +433,7 @@ def customer_payment_state(
     if invoice.status is PaymentStatus.AWAITING_PAYMENT:
         return CustomerPaymentState(
             title="Awaiting payment",
-            message="No qualifying payment has been detected for this invoice.",
+            message="No payment has been detected yet.",
             tone="waiting",
             confirmation_text=None,
             fulfillment_text=not_fulfilled,
@@ -464,21 +464,21 @@ def customer_payment_state(
         )
     if invoice.status is PaymentStatus.SETTLED:
         return CustomerPaymentState(
-            title="Payment settled",
-            message="The required payment lifecycle is complete.",
+            title="Payment complete",
+            message="Your payment is complete.",
             tone="success",
             confirmation_text=(
                 f"{invoice.required_confirmations} of {invoice.required_confirmations} confirmations"
             ),
             fulfillment_text=(
-                "Service fulfillment has been marked complete."
+                "Your order has been completed."
                 if fulfilled
-                else "The purchase is eligible for manual fulfillment review."
+                else "Your order is being reviewed."
             ),
         )
     return CustomerPaymentState(
         title="Payment window expired",
-        message="This invoice can no longer accept a new payment.",
+        message="This payment window has closed.",
         tone="expired",
         confirmation_text=None,
         fulfillment_text=not_fulfilled,

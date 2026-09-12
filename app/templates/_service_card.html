@@ -4,7 +4,7 @@
       {% if service.image_key %}
         <img class="service-card-image" src="{{ url_for('public.service_image', service_slug=service.service_slug, image_key=service.image_key) }}" alt="" width="1200" height="900" loading="lazy" decoding="async">
       {% endif %}
-      <p class="service-duration">{{ service.duration_label or "Custom engagement" }}</p>
+      <p class="service-duration">{{ service.duration_label or "Custom service" }}</p>
       <h{{ heading_level }}>{{ service.service_name }}</h{{ heading_level }}>
       <p>{{ service.service_description }}</p>
     </div>

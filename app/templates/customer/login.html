@@ -6,19 +6,19 @@
 {% block content %}
   <section class="auth-layout" aria-labelledby="login-title">
     <div class="auth-intro">
-      <p class="eyebrow"><span class="eyebrow-line" aria-hidden="true"></span>Customer access</p>
+      <p class="eyebrow"><span class="eyebrow-line" aria-hidden="true"></span>Your account</p>
       <h1 id="login-title">Welcome back.</h1>
-      <p class="lede">Sign in to enter the service catalog, review engagement details, and create a Monero invoice.</p>
+      <p class="lede">Sign in to browse services, manage your cart, and follow your orders.</p>
       <ul class="auth-assurances">
-        <li><span aria-hidden="true">01</span>Account sessions expire automatically.</li>
-        <li><span aria-hidden="true">02</span>Repeated failed logins are temporarily blocked.</li>
-        <li><span aria-hidden="true">03</span>Checkout still uses a private, single-use invoice request.</li>
+        <li><span aria-hidden="true">01</span>Browse the full service catalog.</li>
+        <li><span aria-hidden="true">02</span>Keep your cart and orders in one place.</li>
+        <li><span aria-hidden="true">03</span>Return anytime to check progress.</li>
       </ul>
     </div>
 
     <div class="card auth-card">
-      <p class="terminal-label">Customer login</p>
-      <h2>Enter your credentials</h2>
+      <p class="terminal-label">Log in</p>
+      <h2>Enter your details</h2>
       {% if error %}<p class="form-error" role="alert">{{ error }}</p>{% endif %}
       <form class="admin-form" method="post" action="{{ url_for('customer.login') }}">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">

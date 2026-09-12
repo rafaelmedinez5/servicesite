@@ -209,12 +209,11 @@ def test_public_catalog_renders_only_published_services(web_context):
     body = response.get_data(as_text=True)
 
     assert response.status_code == 200
-    assert "Find the fracture before the fall." in body
-    assert "Операция без следов" in body
-    assert "Operation Without Traces" in body
-    assert "reproducible evidence" in body
+    assert "Find weaknesses before they become problems." in body
+    assert "Security services" in body
+    assert "practical recommendations" in body
     assert 'id="services"' in body
-    assert "Choose the engagement that fits your objective." in body
+    assert "Choose the service that fits your needs." in body
     assert "Three clear steps." not in body
     assert "Engagement protocol" not in body
     assert "How we operate" not in body
@@ -275,9 +274,9 @@ def test_unknown_and_unpublished_category_pages_return_404(web_context):
 
 def test_information_pages_are_public_and_script_free(web_context):
     for path, expected in (
-        ("/about", "Sektor-7 operates between protocol and permission."),
-        ("/join", "Do careful work with people who value evidence."),
-        ("/contact", "Direct channel not yet published"),
+        ("/about", "Focused security work, clearly defined."),
+        ("/join", "Work with people who value careful, useful work."),
+        ("/contact", "Contact details coming soon"),
     ):
         response = web_context.client.get(path)
         body = response.get_data(as_text=True)
@@ -292,21 +291,20 @@ def test_information_pages_are_public_and_script_free(web_context):
 
     contact = web_context.client.get("/contact").get_data(as_text=True)
     assert "Contact Sektor-7" in contact
-    assert "Choose your entry path" in contact
-    assert "Discuss a fresh operation" in contact
-    assert "Check status or delivery" in contact
-    assert "Start a collaboration inquiry" in contact
-    assert 'href="/join">Read Join Guidelines' in contact
+    assert "Choose a topic" in contact
+    assert "Ask about a service" in contact
+    assert "Check an order" in contact
+    assert "Work with us" in contact
+    assert 'href="/join">Read about joining' in contact
     assert 'href="/pgp-key">Open our PGP key' in contact
-    assert "Every initial message must be PGP-encrypted" in contact
-    assert "PGP protects message content" in contact
+    assert "Encrypt it with the PGP key" in contact
+    assert "PGP protects message contents" in contact
 
     about = web_context.client.get("/about").get_data(as_text=True)
-    assert "Authorization is non-negotiable" in about
-    assert "Payment confirms interest, not access" in about
-    assert "Evidence over noise" in about
-    assert "Privacy by default" in about
-    assert "A purchase starts a conversation" in about
+    assert "Clear authorization" in about
+    assert "Useful evidence" in about
+    assert "Respect for privacy" in about
+    assert "Every project starts with a review" in about
     assert "plausible deniability" not in about.lower()
     assert "without logs" not in about.lower()
 
@@ -506,7 +504,7 @@ def test_checkout_contains_numeric_monero_uri_and_customer_safe_fields(web_conte
     body = response.get_data(as_text=True)
 
     assert "Complete your payment." in body
-    assert "Send to this unique Monero address" in body
+    assert "Send XMR to this address" in body
     assert f"monero:{invoice.xmr_address}?tx_amount=0.500000000000" in body
     assert "tx_amount=0.500000000000+XMR" not in body
     assert "0.500000000000 XMR" in body
@@ -598,14 +596,14 @@ def test_partial_pending_expired_and_settled_customer_states(web_context):
     settled_body = web_context.client.get(_private_urls(settled)["status"]).get_data(as_text=True)
 
     assert "Partial payment received" in partial_body
-    assert "Service fulfillment has not started" in partial_body
+    assert "Work has not started yet" in partial_body
     assert "Payment detected" in pending_body
     assert "3 of 10 confirmations" in pending_body
-    assert "Service fulfillment has not started" in pending_body
+    assert "Work has not started yet" in pending_body
     assert "Payment window expired" in expired_body
-    assert "Service fulfillment has not started" in expired_body
-    assert "Payment settled" in settled_body
-    assert "eligible for manual fulfillment review" in settled_body
+    assert "Work has not started yet" in expired_body
+    assert "Payment complete" in settled_body
+    assert "Your order is being reviewed" in settled_body
     for body in (partial_body, pending_body, expired_body, settled_body):
         assert "paid_pending" not in body
         assert "sweeping_to_cold" not in body

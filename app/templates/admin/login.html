@@ -11,7 +11,7 @@
       <p>This one-time setup creates the password for <strong>{{ configured_username }}</strong>. Complete it before sharing this onion address.</p>
     {% else %}
       <h1 id="login-title">Administrator login</h1>
-      <p>Use the single administrator account configured on this server.</p>
+      <p>Sign in with your administrator account.</p>
     {% endif %}
     {% if error %}<p class="form-error" role="alert">{{ error }}</p>{% endif %}
     <form class="admin-form" method="post" action="{{ url_for('admin.login') }}">

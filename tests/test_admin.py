@@ -712,7 +712,7 @@ def test_purchase_views_filter_redact_and_fulfill_only_settled(admin_context):
     assert fulfilled.status_code == 303
     assert purchase.fulfillment_status is FulfillmentStatus.FULFILLED
     assert purchase.fulfillment_note == "Report delivered securely."
-    assert "Service fulfillment has been marked complete." in status_body
+    assert "Your order has been completed." in status_body
     assert "test-only-deposit-id" not in client.get(
         f"/admin/purchases/{invoice.id}"
     ).get_data(as_text=True)

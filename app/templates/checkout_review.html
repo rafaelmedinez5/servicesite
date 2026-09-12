@@ -49,9 +49,9 @@
       <h2 id="checkout-total-title">Order total</h2>
       <p>{{ cart.quantity }} item{{ 's' if cart.quantity != 1 else '' }}</p>
       <div class="purchase-price"><span>USD total</span><strong>{{ cart.total_usd_cents|usd }}</strong></div>
-      <p>The next page shows your exact XMR amount and unique payment address.</p>
-      <button type="submit">Create payment invoice <span aria-hidden="true">&#8594;</span></button>
-      <p class="cart-scope-note">Payment does not replace written scope authorization. Fulfillment begins only after payment and scope review.</p>
+      <p>The next page shows the exact XMR amount and payment address.</p>
+      <button type="submit">Continue to payment <span aria-hidden="true">&#8594;</span></button>
+      <p class="cart-scope-note">Payment does not authorize work. We confirm the scope before work begins.</p>
     </aside>
   </form>
 {% endblock %}

@@ -328,6 +328,6 @@ def test_admin_filters_include_every_order_line_and_fulfillment_stays_guarded(we
     repo.transition_status(invoice.id, PaymentStatus.PAID_PENDING_CONFIRMATIONS, now=NOW)
     repo.transition_status(invoice.id, PaymentStatus.SETTLED, now=NOW)
     repo.mark_purchase_fulfilled(invoice.id, note="", now=NOW)
-    assert "fulfillment has been marked complete" in web_context.client.get(
+    assert "Your order has been completed" in web_context.client.get(
         f"/account/orders/{invoice.id}"
     ).get_data(as_text=True)

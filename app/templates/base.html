@@ -40,7 +40,7 @@
               <div class="account-dropdown-panel">
                 <p>Customer menu</p>
                 <a href="{{ url_for('customer.account') }}">Account overview</a>
-                <a href="{{ url_for('customer.account') }}#orders">Transactions</a>
+                <a href="{{ url_for('customer.account') }}#orders">Orders</a>
                 <form method="post" action="{{ url_for('customer.logout') }}">
                   <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                   <button class="nav-button" type="submit">Log out</button>
