@@ -297,7 +297,7 @@ def test_information_pages_are_public_and_script_free(web_context):
     for path, expected in (
         ("/about", "Sektor-7 operates in the space between protocol and permission."),
         ("/join", "Work with people who value careful, useful work."),
-        ("/contact", "Contact details coming soon"),
+        ("/contact", "We do not use forms. We do not store inquiries."),
     ):
         response = web_context.client.get(path)
         body = response.get_data(as_text=True)
@@ -312,14 +312,21 @@ def test_information_pages_are_public_and_script_free(web_context):
 
     contact = web_context.client.get("/contact").get_data(as_text=True)
     assert "Contact Sektor-7" in contact
-    assert "Choose a topic" in contact
-    assert "Ask about a service" in contact
-    assert "Check an order" in contact
-    assert "Work with us" in contact
-    assert 'href="/join">Read about joining' in contact
-    assert 'href="/pgp-key">Open our PGP key' in contact
-    assert "Encrypt it with the PGP key" in contact
-    assert "PGP protects message contents" in contact
+    assert "Every communication channel is deliberate, secure, and ephemeral" in contact
+    assert "Choose your entry path" in contact
+    assert "New Engagement" in contact
+    assert "Discuss a fresh operation" in contact
+    assert "Existing Purchase" in contact
+    assert "Check status or delivery" in contact
+    assert "Careers / Join" in contact
+    assert "Collaboration inquiry" in contact
+    assert 'href="/join">Join Guidelines</a>' in contact
+    assert "All initial messages must be PGP-encrypted using" in contact
+    assert 'href="/pgp-key">our public key</a> (available below)' in contact
+    assert "Include only a high-level summary — no operational details" in contact
+    assert "secure, one-time channel for further communication" in contact
+    assert 'class="contact-table"' in contact
+    assert 'class="contact-layout"' not in contact
 
     join = web_context.client.get("/join").get_data(as_text=True)
     assert 'class="join-wordmark"' in join
@@ -338,6 +345,11 @@ def test_information_pages_are_public_and_script_free(web_context):
     assert '>Establish contact <span aria-hidden="true">→</span></a>' in about
     assert 'class="about-manifesto"' in about
     assert 'class="principle-grid"' not in about
+    for marker in ("01", "02", "03", "04"):
+        assert f'class="about-marker" aria-hidden="true">{marker}</span>' in about
+    for emoji in ("🔒", "📊", "🕶️", "🧱", "🧩", "🔐"):
+        assert emoji not in about
+        assert emoji not in contact
 
 
 def test_pgp_key_is_public_plain_text_without_comments(web_context):
@@ -368,7 +380,7 @@ def test_contact_page_displays_configured_public_channel(web_context):
 
     assert "Session" in body
     assert "05-test-public-address" in body
-    assert "Direct channel not yet published" not in body
+    assert 'class="contact-published-channel"' in body
 
 
 def test_footer_displays_configured_onion_address(web_context):
