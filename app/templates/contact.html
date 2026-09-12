@@ -3,67 +3,57 @@
 {% block title %}Contact | Sektor-7{% endblock %}
 
 {% block content %}
-  <header class="page-hero info-hero">
-    <p class="eyebrow"><span class="eyebrow-line" aria-hidden="true"></span>Contact</p>
-    <h1>Contact Sektor-7.</h1>
-    <p class="lede">Choose the option that best matches why you are getting in touch.</p>
-  </header>
-
-  <section class="contact-layout" aria-labelledby="contact-channel-title">
-    <div class="contact-channel card">
-      <p class="eyebrow">Contact channel</p>
+  <article class="contact-manifesto">
+    <header class="contact-manifesto-hero">
+      <h1>Contact Sektor-7</h1>
+      <p>We do not use forms. We do not store inquiries. Every communication channel is deliberate, secure, and ephemeral.</p>
       {% if contact_method and contact_address %}
-        <h2 id="contact-channel-title">{{ contact_method }}</h2>
-        <p class="contact-address monospace">{{ contact_address }}</p>
-        <p>Use the address shown here and encrypt your first message with our PGP key. Keep it brief so we can direct it properly.</p>
-      {% else %}
-        <h2 id="contact-channel-title">Contact details coming soon</h2>
-        <p>A contact address is not available yet. You can still read about us or review the join page.</p>
+        <aside class="contact-published-channel" aria-label="Contact channel">
+          <strong>{{ contact_method }}</strong>
+          <code>{{ contact_address }}</code>
+        </aside>
       {% endif %}
-    </div>
+    </header>
 
-    <section class="contact-paths" aria-labelledby="entry-path-title">
-      <header class="contact-paths-heading">
-        <p class="eyebrow">How can we help?</p>
-        <h2 id="entry-path-title">Choose a topic.</h2>
-      </header>
-      <article>
-        <span>New project</span>
-        <h2>Ask about a service</h2>
-        <p>Review the available services, then send a short summary of what you need. We will confirm the next steps before asking for details.</p>
-        <a href="{{ (url_for('public.index') + '#services') if g.site_authenticated else url_for('customer.login', next=url_for('public.index')) }}">{{ "Browse categories" if g.site_authenticated else "Log in to browse" }} <span aria-hidden="true">&#8594;</span></a>
-      </article>
-      <article>
-        <span>Current order</span>
-        <h2>Check an order</h2>
-        <p>Sign in to see payment and delivery updates. Contact us if you need help with an existing order.</p>
-        <a href="{{ url_for('customer.account') if g.customer else url_for('customer.login', next=url_for('customer.account')) }}">Open account <span aria-hidden="true">&#8594;</span></a>
-      </article>
-      <article>
-        <span>Join the team</span>
-        <h2>Work with us</h2>
-        <p>Read the join page, then send a short introduction and tell us where your experience is strongest.</p>
-        <a href="{{ url_for('public.join') }}">Read about joining <span aria-hidden="true">&#8594;</span></a>
-      </article>
+    <section class="contact-entry" aria-labelledby="contact-entry-title">
+      <h2 id="contact-entry-title">Choose your entry path</h2>
+      <div class="contact-table-wrap">
+        <table class="contact-table">
+          <thead>
+            <tr>
+              <th scope="col">Channel</th>
+              <th scope="col">Purpose</th>
+              <th scope="col">Instructions</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td data-label="Channel"><strong>New Engagement</strong></td>
+              <td data-label="Purpose">Discuss a fresh operation</td>
+              <td data-label="Instructions">Review service categories first. Then send a concise, sanitized request via our PGP-encrypted public channel. Do not include targets, credentials, or sensitive data until scope is signed.</td>
+            </tr>
+            <tr>
+              <td data-label="Channel"><strong>Existing Purchase</strong></td>
+              <td data-label="Purpose">Check status or delivery</td>
+              <td data-label="Instructions">Log in to your account. All payment confirmations, delivery updates, and final reports are accessible only through your private dashboard. Never post your private status link publicly.</td>
+            </tr>
+            <tr>
+              <td data-label="Channel"><strong>Careers / Join</strong></td>
+              <td data-label="Purpose">Collaboration inquiry</td>
+              <td data-label="Instructions">Read our <a href="{{ url_for('public.join') }}">Join Guidelines</a> before submitting. We value skill, discretion, and adaptability. Send a short, sanitized introduction with your area of expertise.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
     </section>
-  </section>
 
-  <section class="secure-exchange" aria-labelledby="secure-exchange-title">
-    <div>
-      <p class="eyebrow">Before you write</p>
-      <h2 id="secure-exchange-title">Keep your first message brief.</h2>
-      <p>Encrypt it with the PGP key published on this site.</p>
-      <a class="button" href="{{ url_for('public.pgp_key') }}">Open our PGP key <span aria-hidden="true">&#8594;</span></a>
-    </div>
-    <ol class="secure-exchange-steps">
-      <li><span>01</span><p>Start with a short summary of what you need.</p></li>
-      <li><span>02</span><p>Use the key linked from this page.</p></li>
-      <li><span>03</span><p>We will reply with the next steps.</p></li>
-    </ol>
-  </section>
-
-  <aside class="privacy-callout">
-    <strong>This page does not accept messages.</strong>
-    <p>Use the contact channel above. PGP protects message contents, but it does not hide the service used to send them.</p>
-  </aside>
+    <section class="contact-secure" aria-labelledby="contact-secure-title">
+      <h2 id="contact-secure-title">Secure exchange</h2>
+      <ul>
+        <li>All initial messages must be PGP-encrypted using <a href="{{ url_for('public.pgp_key') }}">our public key</a> (available below).</li>
+        <li>Include only a high-level summary — no operational details.</li>
+        <li>If we proceed, you will receive a secure, one-time channel for further communication.</li>
+      </ul>
+    </section>
+  </article>
 {% endblock %}
