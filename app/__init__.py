@@ -16,6 +16,7 @@ from app.persistence import SQLiteDatabase, ServicesiteRepository
 from app.service_images import MAX_UPLOAD_BYTES, ServiceImageStore
 from app.shopping import register_shopping
 from app.web import register_web
+from app.inquiries import register_inquiries
 
 
 class _InMemoryUploadRequest(Request):
@@ -34,8 +35,6 @@ class _InMemoryUploadRequest(Request):
         filename=None,
         content_length=None,
     ):
-        # The only file-upload surface is the bounded, admin-only service-image
-        # route. Keep its source bytes out of Werkzeug's temporary-file spool.
         return io.BytesIO()
 
 
@@ -90,9 +89,7 @@ def create_app(test_config: dict | None = None) -> Flask:
         SESSION_COOKIE_HTTPONLY=True,
         SESSION_COOKIE_SAMESITE="Strict",
         SESSION_COOKIE_SECURE=app.config["ENVIRONMENT"] == "production",
-        PERMANENT_SESSION_LIFETIME=timedelta(
-            hours=app.config["ADMIN_SESSION_HOURS"]
-        ),
+        PERMANENT_SESSION_LIFETIME=timedelta(hours=app.config["ADMIN_SESSION_HOURS"]),
         SESSION_REFRESH_EACH_REQUEST=False,
     )
 
@@ -123,22 +120,17 @@ def create_app(test_config: dict | None = None) -> Flask:
         ServiceImageStore(app.config["SERVICE_IMAGE_DIR"]),
     )
     if app.config.get("SERVICESITE_RATE_PROVIDER") is not None:
-        app.extensions["servicesite_rate_provider"] = app.config[
-            "SERVICESITE_RATE_PROVIDER"
-        ]
+        app.extensions["servicesite_rate_provider"] = app.config["SERVICESITE_RATE_PROVIDER"]
     if app.config.get("SERVICESITE_WALLET_CLIENT") is not None:
-        app.extensions["servicesite_wallet_client"] = app.config[
-            "SERVICESITE_WALLET_CLIENT"
-        ]
+        app.extensions["servicesite_wallet_client"] = app.config["SERVICESITE_WALLET_CLIENT"]
     if app.config.get("SERVICESITE_NOW_FACTORY") is not None:
-        app.extensions["servicesite_now_factory"] = app.config[
-            "SERVICESITE_NOW_FACTORY"
-        ]
+        app.extensions["servicesite_now_factory"] = app.config["SERVICESITE_NOW_FACTORY"]
     if app.config.get("SERVICESITE_RECONCILIATION_SERVICE") is not None:
         app.extensions["servicesite_reconciliation_service"] = app.config[
             "SERVICESITE_RECONCILIATION_SERVICE"
         ]
 
+    register_inquiries(app)
     register_web(app)
     register_customer_auth(app)
     register_shopping(app)

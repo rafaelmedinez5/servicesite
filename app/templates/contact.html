@@ -6,54 +6,40 @@
   <article class="contact-manifesto">
     <header class="contact-manifesto-hero">
       <h1>Contact Sektor-7</h1>
-      <p>We do not use forms. We do not store inquiries. Every communication channel is deliberate, secure, and ephemeral.</p>
-      {% if contact_method and contact_address %}
-        <aside class="contact-published-channel" aria-label="Contact channel">
-          <strong>{{ contact_method }}</strong>
-          <code>{{ contact_address }}</code>
-        </aside>
-      {% endif %}
+      <p>Use the secure public channel for encrypted communication, or submit a short account-linked request below for administrative review.</p>
+      {% if contact_method and contact_address %}<aside class="contact-published-channel" aria-label="Contact channel"><strong>{{ contact_method }}</strong><code>{{ contact_address }}</code></aside>{% endif %}
     </header>
 
     <section class="contact-entry" aria-labelledby="contact-entry-title">
       <h2 id="contact-entry-title">Choose your entry path</h2>
-      <div class="contact-table-wrap">
-        <table class="contact-table">
-          <thead>
-            <tr>
-              <th scope="col">Channel</th>
-              <th scope="col">Purpose</th>
-              <th scope="col">Instructions</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr>
-              <td data-label="Channel"><strong>New Engagement</strong></td>
-              <td data-label="Purpose">Discuss a fresh operation</td>
-              <td data-label="Instructions">Review service categories first. Then send a concise, sanitized request via our PGP-encrypted public channel. Do not include targets, credentials, or sensitive data until scope is signed.</td>
-            </tr>
-            <tr>
-              <td data-label="Channel"><strong>Existing Purchase</strong></td>
-              <td data-label="Purpose">Check status or delivery</td>
-              <td data-label="Instructions">Log in to your account. All payment confirmations, delivery updates, and final reports are accessible only through your private dashboard. Never post your private status link publicly.</td>
-            </tr>
-            <tr>
-              <td data-label="Channel"><strong>Careers / Join</strong></td>
-              <td data-label="Purpose">Collaboration inquiry</td>
-              <td data-label="Instructions">Read our <a href="{{ url_for('public.join') }}">Join Guidelines</a> before submitting. We value skill, discretion, and adaptability. Send a short, sanitized introduction with your area of expertise.</td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
+      <div class="contact-table-wrap"><table class="contact-table"><thead><tr><th scope="col">Channel</th><th scope="col">Purpose</th><th scope="col">Instructions</th></tr></thead><tbody>
+        <tr><td data-label="Channel"><strong>New Engagement</strong></td><td data-label="Purpose">Discuss a fresh operation</td><td data-label="Instructions">Review service categories first. Keep the first message concise and sanitized. Do not include live targets, credentials, private keys, or sensitive client data.</td></tr>
+        <tr><td data-label="Channel"><strong>Existing Purchase</strong></td><td data-label="Purpose">Check status or delivery</td><td data-label="Instructions">Log in to your account. Payment confirmations, delivery updates, and final reports remain in your private dashboard.</td></tr>
+        <tr><td data-label="Channel"><strong>Careers / Join</strong></td><td data-label="Purpose">Collaboration inquiry</td><td data-label="Instructions">Read our <a href="{{ url_for('public.join') }}">Join Guidelines</a> and use the dedicated application form there.</td></tr>
+      </tbody></table></div>
     </section>
 
-    <section class="contact-secure" aria-labelledby="contact-secure-title">
-      <h2 id="contact-secure-title">Secure exchange</h2>
-      <ul>
-        <li>All initial messages must be PGP-encrypted using <a href="{{ url_for('public.pgp_key') }}">our public key</a> (available below).</li>
-        <li>Include only a high-level summary — no operational details.</li>
-        <li>If we proceed, you will receive a secure, one-time channel for further communication.</li>
-      </ul>
+    <section class="contact-secure" aria-labelledby="contact-secure-title"><h2 id="contact-secure-title">Secure exchange</h2><ul><li>For sensitive follow-up, use <a href="{{ url_for('public.pgp_key') }}">our public PGP key</a>.</li><li>Initial form messages should contain only a high-level summary.</li><li>Never submit passwords, private keys, wallet seeds, credentials, or confidential target data.</li></ul></section>
+
+    <section class="card" aria-labelledby="contact-form-title">
+      <p class="eyebrow">Account request</p><h2 id="contact-form-title">Send a contact request</h2>
+      {% if g.customer %}
+        {% if not inquiry_store_ready %}<p class="form-error" role="alert">Contact requests are temporarily unavailable while the database update is pending.</p>
+        {% else %}
+          <p>Submitted as <strong>@{{ g.customer.username }}</strong>. Up to five requests per hour are accepted from one account.</p>
+          {% if inquiry_error %}<p class="form-error" role="alert">{{ inquiry_error }}</p>{% endif %}
+          <form class="admin-form" method="post" action="{{ url_for('public.contact_submit') }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <label>Topic<select name="topic" required><option value="">Choose a topic</option>{% for value, label in inquiry_contact_topics.items() %}<option value="{{ value }}" {% if inquiry_values.get('topic') == value %}selected{% endif %}>{{ label }}</option>{% endfor %}</select></label>
+            <label>Reply method<select name="reply_method" required><option value="">Choose email or Telegram</option><option value="email" {% if inquiry_values.get('reply_method') == 'email' %}selected{% endif %}>Email</option><option value="telegram" {% if inquiry_values.get('reply_method') == 'telegram' %}selected{% endif %}>Telegram</option></select></label>
+            <label>Reply address<input name="reply_address" value="{{ inquiry_values.get('reply_address', '') }}" maxlength="254" autocomplete="off" required><small>Enter an email address or Telegram username that matches the method above.</small></label>
+            <label>Message<textarea name="message" minlength="10" maxlength="4000" rows="8" required>{{ inquiry_values.get('message', '') }}</textarea><small>10–4,000 characters. Keep the initial request sanitized.</small></label>
+            <button type="submit">Submit request <span aria-hidden="true">&#8594;</span></button>
+          </form>
+        {% endif %}
+      {% else %}
+        <p>You need an account before a request can be stored. This links the request to a known account and reduces anonymous spam.</p><div class="button-row"><a class="button" href="{{ url_for('customer.login', next=url_for('public.contact')) }}">Log in</a><a class="button secondary" href="{{ url_for('customer.register', next=url_for('public.contact')) }}">Create account</a></div>
+      {% endif %}
     </section>
   </article>
 {% endblock %}

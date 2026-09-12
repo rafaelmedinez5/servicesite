@@ -7,85 +7,61 @@
     <header class="join-manifesto-hero">
       <img class="join-wordmark" src="{{ url_for('static', filename='branding/sektor7-wordmark.png') }}" alt="Sektor-7" width="640" height="144" decoding="async">
       <h1>Join Sektor-7</h1>
-      <p class="join-kicker">
-        <strong lang="ru">Мы не набираем. Мы отбираем.</strong>
-        <em>We don't recruit. We select.</em>
-      </p>
+      <p class="join-kicker"><strong lang="ru">Мы не набираем. Мы отбираем.</strong><em>We don't recruit. We select.</em></p>
     </header>
 
-    <section class="join-opening" aria-label="Introduction">
-      <span class="join-marker" aria-hidden="true">01</span>
-      <div>
-        <p>Sektor-7 is not an open community or a general chat server.</p>
-        <p>We are a focused collective of security researchers, developers, and infrastructure specialists who value discretion, authorization, and demonstrated skill.</p>
-        <p>If you are reading this page, you may be curious — or you may have the experience we are looking for.</p>
-      </div>
-    </section>
+    <section class="join-opening" aria-label="Introduction"><span class="join-marker" aria-hidden="true">01</span><div><p>Sektor-7 is not an open community or a general chat server.</p><p>We are a focused collective of security researchers, developers, and infrastructure specialists who value discretion, authorization, and demonstrated skill.</p><p>If you are reading this page, you may be curious — or you may have the experience we are looking for.</p></div></section>
 
     <section class="join-section" aria-labelledby="join-roles-title">
-      <header class="join-section-heading">
-        <span class="join-marker" aria-hidden="true">02</span>
-        <div>
-          <h2 id="join-roles-title">Who we look for</h2>
-          <p>We are less interested in conventional resumes than demonstrated, ethical work.</p>
-        </div>
-      </header>
-      <div class="join-table-wrap">
-        <table class="join-role-table">
-          <thead><tr><th scope="col">Role</th><th scope="col">What we value</th><th scope="col">What does not fit</th></tr></thead>
-          <tbody>
-            <tr><td data-label="Role"><strong>Vulnerability Researcher</strong></td><td data-label="What we value">Exploit analysis, reverse engineering, fuzzing, and strong C, C++, or assembly fundamentals.</td><td data-label="What does not fit">Unverified claims or copied work.</td></tr>
-            <tr><td data-label="Role"><strong>Detection Engineer</strong></td><td data-label="What we value">Malware analysis in controlled environments, behavior research, and practical detection content.</td><td data-label="What does not fit">Unsafe handling or unauthorized deployment.</td></tr>
-            <tr><td data-label="Role"><strong>Infrastructure Specialist</strong></td><td data-label="What we value">Onion-service architecture, hardened hosting, network isolation, and secure messaging.</td><td data-label="What does not fit">Weak isolation or undocumented changes.</td></tr>
-            <tr><td data-label="Role"><strong>OSINT Analyst</strong></td><td data-label="What we value">Lawful research, source validation, careful data correlation, and clear confidence levels.</td><td data-label="What does not fit">Invasive collection or unsupported conclusions.</td></tr>
-            <tr><td data-label="Role"><strong>Security Awareness Specialist</strong></td><td data-label="What we value">Authorized simulations, pretext review, and phishing-resistance training.</td><td data-label="What does not fit">Deceptive activity outside written scope.</td></tr>
-            <tr><td data-label="Role"><strong>Monero / Payment Operations</strong></td><td data-label="What we value">Wallet operations, cold-storage procedures, reconciliation, and operational security.</td><td data-label="What does not fit">Careless key handling or weak accounting.</td></tr>
-          </tbody>
-        </table>
-      </div>
+      <header class="join-section-heading"><span class="join-marker" aria-hidden="true">02</span><div><h2 id="join-roles-title">Who we look for</h2><p>We are less interested in conventional resumes than demonstrated, ethical work.</p></div></header>
+      <div class="join-table-wrap"><table class="join-role-table"><thead><tr><th scope="col">Role</th><th scope="col">What we value</th><th scope="col">What does not fit</th></tr></thead><tbody>
+        <tr><td data-label="Role"><strong>Vulnerability Researcher</strong></td><td data-label="What we value">Exploit analysis, reverse engineering, fuzzing, and strong C, C++, or assembly fundamentals.</td><td data-label="What does not fit">Unverified claims or copied work.</td></tr>
+        <tr><td data-label="Role"><strong>Detection Engineer</strong></td><td data-label="What we value">Malware analysis in controlled environments, behavior research, and practical detection content.</td><td data-label="What does not fit">Unsafe handling or unauthorized deployment.</td></tr>
+        <tr><td data-label="Role"><strong>Infrastructure Specialist</strong></td><td data-label="What we value">Onion-service architecture, hardened hosting, network isolation, and secure messaging.</td><td data-label="What does not fit">Weak isolation or undocumented changes.</td></tr>
+        <tr><td data-label="Role"><strong>OSINT Analyst</strong></td><td data-label="What we value">Lawful research, source validation, careful data correlation, and clear confidence levels.</td><td data-label="What does not fit">Invasive collection or unsupported conclusions.</td></tr>
+        <tr><td data-label="Role"><strong>Security Awareness Specialist</strong></td><td data-label="What we value">Authorized simulations, pretext review, and phishing-resistance training.</td><td data-label="What does not fit">Deceptive activity outside written scope.</td></tr>
+        <tr><td data-label="Role"><strong>Monero / Payment Operations</strong></td><td data-label="What we value">Wallet operations, cold-storage procedures, reconciliation, and operational security.</td><td data-label="What does not fit">Careless key handling or weak accounting.</td></tr>
+      </tbody></table></div>
     </section>
 
     <section class="join-section" aria-labelledby="join-apply-title">
       <header class="join-section-heading"><span class="join-marker" aria-hidden="true">03</span><div><h2 id="join-apply-title">How to apply</h2></div></header>
       <aside class="join-apply-note"><strong>Do not send only “I want to join.”</strong><p>That does not give us enough to review.</p></aside>
       <ol class="join-steps">
-        <li class="join-step"><span aria-hidden="true">01</span><div><h3>Prove your skill.</h3><p>Send a sanitized, redacted example of your work. No targets, credentials, or live data — only proof of your process and ability.</p></div></li>
-        <li class="join-step"><span aria-hidden="true">02</span><div><h3>Encrypt your message.</h3><p>Use our <a href="{{ url_for('public.pgp_key') }}">PGP key</a>. Unencrypted applications will not be reviewed.</p></div></li>
-        <li class="join-step"><span aria-hidden="true">03</span><div><h3>Be concise.</h3><p>Tell us:</p><ul><li>What you can do</li><li>What tools you use</li><li>What you want from us</li></ul></div></li>
-        <li class="join-step"><span aria-hidden="true">04</span><div><h3>Wait.</h3><p>If we are interested, you will receive a response within seven days through a secure channel. If you hear nothing, there is no current fit.</p></div></li>
+        <li class="join-step"><span aria-hidden="true">01</span><div><h3>Prove your skill.</h3><p>Give a sanitized, redacted summary of your work. No targets, credentials, live data, private keys, or client material.</p></div></li>
+        <li class="join-step"><span aria-hidden="true">02</span><div><h3>Keep the first message sanitized.</h3><p>Use the account-linked form below for the initial application. Use our <a href="{{ url_for('public.pgp_key') }}">PGP key</a> only when sensitive follow-up is necessary.</p></div></li>
+        <li class="join-step"><span aria-hidden="true">03</span><div><h3>Be concise.</h3><p>Tell us what you can do, what tools you use, and what you want from us.</p></div></li>
+        <li class="join-step"><span aria-hidden="true">04</span><div><h3>Wait.</h3><p>If we are interested, you will receive a response through the reply channel you provide.</p></div></li>
       </ol>
     </section>
 
-    <section class="join-section" aria-labelledby="join-offer-title">
-      <header class="join-section-heading"><span class="join-marker" aria-hidden="true">04</span><div><h2 id="join-offer-title">What we offer</h2></div></header>
-      <div class="join-table-wrap join-offer-wrap">
-        <table class="join-offer-table">
-          <thead><tr><th scope="col">For you</th><th scope="col">For us</th></tr></thead>
-          <tbody>
-            <tr class="join-offer-row"><td data-label="For you">Access to authorized, high-value engagements</td><td data-label="For us">Respect for scope and client authorization</td></tr>
-            <tr class="join-offer-row"><td data-label="For you">Compensation on selected projects</td><td data-label="For us">Discretion and reliable communication</td></tr>
-            <tr class="join-offer-row"><td data-label="For you">Infrastructure and tooling support</td><td data-label="For us">Careful execution and documentation</td></tr>
-            <tr class="join-offer-row"><td data-label="For you">Clear expectations and boundaries</td><td data-label="For us">Accountability without ego</td></tr>
-          </tbody>
-        </table>
-      </div>
-    </section>
+    <section class="join-section" aria-labelledby="join-offer-title"><header class="join-section-heading"><span class="join-marker" aria-hidden="true">04</span><div><h2 id="join-offer-title">What we offer</h2></div></header><div class="join-table-wrap join-offer-wrap"><table class="join-offer-table"><thead><tr><th scope="col">For you</th><th scope="col">For us</th></tr></thead><tbody><tr class="join-offer-row"><td data-label="For you">Access to authorized, high-value engagements</td><td data-label="For us">Respect for scope and client authorization</td></tr><tr class="join-offer-row"><td data-label="For you">Compensation on selected projects</td><td data-label="For us">Discretion and reliable communication</td></tr><tr class="join-offer-row"><td data-label="For you">Infrastructure and tooling support</td><td data-label="For us">Careful execution and documentation</td></tr><tr class="join-offer-row"><td data-label="For you">Clear expectations and boundaries</td><td data-label="For us">Accountability without ego</td></tr></tbody></table></div></section>
 
-    <section class="join-section" aria-labelledby="join-important-title">
-      <header class="join-section-heading"><span class="join-marker" aria-hidden="true">05</span><div><h2 id="join-important-title">Important</h2></div></header>
-      <div class="join-standards">
-        <article class="join-standard"><h3>Authorized work only.</h3><p>Every project requires verified ownership, written permission, and a defined scope.</p></article>
-        <article class="join-standard"><h3>No drama.</h3><p>Handle disagreements privately and professionally. No leaks, harassment, or public disputes.</p></article>
-        <article class="join-standard"><h3>Clear commitments.</h3><p>Accept only work you can complete responsibly. Raise blockers early and respect agreed boundaries.</p></article>
-      </div>
-    </section>
+    <section class="join-section" aria-labelledby="join-important-title"><header class="join-section-heading"><span class="join-marker" aria-hidden="true">05</span><div><h2 id="join-important-title">Important</h2></div></header><div class="join-standards"><article class="join-standard"><h3>Authorized work only.</h3><p>Every project requires verified ownership, written permission, and a defined scope.</p></article><article class="join-standard"><h3>No drama.</h3><p>Handle disagreements privately and professionally. No leaks, harassment, or public disputes.</p></article><article class="join-standard"><h3>Clear commitments.</h3><p>Accept only work you can complete responsibly. Raise blockers early and respect agreed boundaries.</p></article></div></section>
 
     <section class="join-applicant-contact" aria-labelledby="join-contact-title">
-      <header class="join-section-heading"><span class="join-marker" aria-hidden="true">06</span><div><h2 id="join-contact-title">Contact for applicants only</h2></div></header>
-      <div class="join-contact-grid">
-        <div><p>Use the same <a href="{{ url_for('public.pgp_key') }}">PGP key</a> as our <a href="{{ url_for('public.contact') }}">main contact page</a>.</p><p>Subject line: <code>APPLICATION — [your specialty]</code></p></div>
-        <div><p>Initial messages must contain only:</p><ul><li>Your specialty</li><li>A brief, sanitized summary of your capabilities</li><li>A secure way to follow up</li></ul><p class="join-contact-boundary">No client data. No live targets. No confidential attachments.</p></div>
-      </div>
+      <header class="join-section-heading"><span class="join-marker" aria-hidden="true">06</span><div><h2 id="join-contact-title">Application</h2></div></header>
+      {% if g.customer %}
+        {% if not inquiry_store_ready %}<p class="form-error" role="alert">Applications are temporarily unavailable while the database update is pending.</p>
+        {% elif inquiry_join_submitted %}<div class="card"><h3>Application already submitted</h3><p>Your account has already submitted a Join application. A second application cannot be created from the same account.</p></div>
+        {% else %}
+          <div class="card"><p>Submitted as <strong>@{{ g.customer.username }}</strong>. This application can be submitted only once from this account.</p>{% if inquiry_error %}<p class="form-error" role="alert">{{ inquiry_error }}</p>{% endif %}
+            <form class="admin-form" method="post" action="{{ url_for('public.join_submit') }}">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <label>Specialty<select name="specialty" required><option value="">Choose a specialty</option>{% for value, label in inquiry_join_specialties.items() %}<option value="{{ value }}" {% if inquiry_values.get('specialty') == value %}selected{% endif %}>{{ label }}</option>{% endfor %}</select></label>
+              <label>Reply method<select name="reply_method" required><option value="">Choose email or Telegram</option><option value="email" {% if inquiry_values.get('reply_method') == 'email' %}selected{% endif %}>Email</option><option value="telegram" {% if inquiry_values.get('reply_method') == 'telegram' %}selected{% endif %}>Telegram</option></select></label>
+              <label>Reply address<input name="reply_address" value="{{ inquiry_values.get('reply_address', '') }}" maxlength="254" autocomplete="off" required></label>
+              <label>Skills summary<textarea name="skills" minlength="20" maxlength="4000" rows="7" required>{{ inquiry_values.get('skills', '') }}</textarea></label>
+              <label>Tools you use<textarea name="tools" minlength="1" maxlength="1000" rows="4" required>{{ inquiry_values.get('tools', '') }}</textarea></label>
+              <label>What you want from Sektor-7<textarea name="motivation" minlength="20" maxlength="4000" rows="7" required>{{ inquiry_values.get('motivation', '') }}</textarea></label>
+              <p class="join-contact-boundary">Do not submit passwords, credentials, private keys, wallet seeds, client data, live targets, or confidential attachments.</p>
+              <button type="submit">Submit application <span aria-hidden="true">&#8594;</span></button>
+            </form>
+          </div>
+        {% endif %}
+      {% else %}
+        <div class="card"><p>You must sign in before applying. This is what allows the site to enforce one application per account.</p><div class="button-row"><a class="button" href="{{ url_for('customer.login', next=url_for('public.join')) }}">Log in</a><a class="button secondary" href="{{ url_for('customer.register', next=url_for('public.join')) }}">Create account</a></div></div>
+      {% endif %}
     </section>
   </article>
 {% endblock %}
