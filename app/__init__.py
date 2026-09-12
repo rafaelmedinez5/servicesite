@@ -6,17 +6,18 @@ from pathlib import Path
 
 from flask import Flask, Request, abort, request
 
-from app.admin import register_admin
+from app.admin import _usd_input, admin
 from app.checkout_details import MAX_CHECKOUT_BODY_BYTES
 from app.config import Settings
 from app.customer_auth import register_customer_auth
 from app.deliveries import MAX_DELIVERY_BODY_BYTES
 from app.internal import register_internal
+from app.inquiries import register_inquiries
+from app.payments.xmr_wallet_rpc import atomic_to_xmr_str
 from app.persistence import SQLiteDatabase, ServicesiteRepository
 from app.service_images import MAX_UPLOAD_BYTES, ServiceImageStore
 from app.shopping import register_shopping
 from app.web import register_web
-from app.inquiries import register_inquiries
 
 
 class _InMemoryUploadRequest(Request):
@@ -50,6 +51,7 @@ def create_app(test_config: dict | None = None) -> Flask:
         APP_PORT=settings.app_port,
         DB_PATH=settings.database_path,
         ADMIN_USERNAME=settings.admin_username,
+        ADMIN_PATH=settings.admin_path,
         ADMIN_RECOVERY_PIN=settings.admin_recovery_pin,
         ADMIN_SESSION_HOURS=settings.admin_session_hours,
         PUBLIC_CONTACT_METHOD=settings.public_contact_method,
@@ -134,7 +136,9 @@ def create_app(test_config: dict | None = None) -> Flask:
     register_web(app)
     register_customer_auth(app)
     register_shopping(app)
-    register_admin(app)
+    app.register_blueprint(admin, url_prefix=app.config["ADMIN_PATH"])
+    app.jinja_env.filters["atomic_xmr"] = atomic_to_xmr_str
+    app.jinja_env.filters["usd_input"] = _usd_input
     register_internal(app)
 
     @app.get("/health")
