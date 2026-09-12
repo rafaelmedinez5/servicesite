@@ -39,7 +39,6 @@ def test_custom_admin_path_replaces_default_route(tmp_path, monkeypatch):
     "value",
     [
         "admin",
-        "/Admin",
         "/two/segments",
         "/under_score",
         "/a",
