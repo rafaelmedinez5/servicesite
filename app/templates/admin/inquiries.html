@@ -1,0 +1,35 @@
+{% set private_page = true %}
+{% extends "base.html" %}
+
+{% block title %}Inquiries | Sektor-7{% endblock %}
+
+{% block content %}
+  {% include "admin/_nav.html" %}
+  <section class="admin-heading"><p class="eyebrow">Operations</p><h1>Contact & Join requests</h1><p>Account-linked requests are shown here for administrative review. User-supplied text is rendered as plain escaped text.</p></section>
+
+  <section class="card" aria-labelledby="join-requests-title">
+    <h2 id="join-requests-title">Join applications</h2>
+    {% for application in applications %}
+      <article class="card">
+        <h3>@{{ application.username }} — {{ join_specialties.get(application.specialty, application.specialty) }}</h3>
+        <p><strong>Reply:</strong> {{ application.reply_method }} · <code>{{ application.reply_address }}</code></p>
+        <p><strong>Submitted:</strong> {{ application.created_at|display_datetime }}</p>
+        <h4>Skills</h4><pre class="inquiry-text">{{ application.skills }}</pre>
+        <h4>Tools</h4><pre class="inquiry-text">{{ application.tools }}</pre>
+        <h4>Motivation</h4><pre class="inquiry-text">{{ application.motivation }}</pre>
+      </article>
+    {% else %}<p>No Join applications have been submitted.</p>{% endfor %}
+  </section>
+
+  <section class="card" aria-labelledby="contact-requests-title">
+    <h2 id="contact-requests-title">Contact requests</h2>
+    {% for inquiry in contacts %}
+      <article class="card">
+        <h3>@{{ inquiry.username }} — {{ contact_topics.get(inquiry.topic, inquiry.topic) }}</h3>
+        <p><strong>Reply:</strong> {{ inquiry.reply_method }} · <code>{{ inquiry.reply_address }}</code></p>
+        <p><strong>Submitted:</strong> {{ inquiry.created_at|display_datetime }}</p>
+        <pre class="inquiry-text">{{ inquiry.message }}</pre>
+      </article>
+    {% else %}<p>No contact requests have been submitted.</p>{% endfor %}
+  </section>
+{% endblock %}
