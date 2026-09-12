@@ -296,7 +296,7 @@ def test_unknown_and_unpublished_category_pages_return_404(web_context):
 def test_information_pages_are_public_and_script_free(web_context):
     for path, expected in (
         ("/about", "Sektor-7 operates in the space between protocol and permission."),
-        ("/join", "Work with people who value careful, useful work."),
+        ("/join", "Мы не набираем. Мы отбираем."),
         ("/contact", "We do not use forms. We do not store inquiries."),
     ):
         response = web_context.client.get(path)
@@ -331,6 +331,29 @@ def test_information_pages_are_public_and_script_free(web_context):
     join = web_context.client.get("/join").get_data(as_text=True)
     assert 'class="join-wordmark"' in join
     assert 'src="/static/branding/sektor7-wordmark.png"' in join
+    assert "We don't recruit. We select." in join
+    assert 'class="join-role-table"' in join
+    for role in (
+        "Vulnerability Researcher",
+        "Detection Engineer",
+        "Infrastructure Specialist",
+        "OSINT Analyst",
+        "Security Awareness Specialist",
+        "Monero / Payment Operations",
+    ):
+        assert role in join
+    assert join.count('class="join-step"') == 4
+    assert join.count('class="join-offer-row"') == 4
+    assert join.count('class="join-standard"') == 3
+    assert 'href="/pgp-key">PGP key</a>' in join
+    for unsafe_phrase in (
+        "FUD droppers",
+        "phishing kit design",
+        "Loyalty without questions",
+        "No law enforcement",
+        "we will not be gentle",
+    ):
+        assert unsafe_phrase not in join
 
     about = web_context.client.get("/about").get_data(as_text=True)
     assert "Authorization is non-negotiable" in about
