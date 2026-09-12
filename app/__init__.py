@@ -82,6 +82,9 @@ def create_app(test_config: dict | None = None) -> Flask:
     if test_config:
         app.config.update(test_config)
 
+    if app.config["ENVIRONMENT"] == "production" and app.config["ADMIN_PATH"] == "/admin":
+        raise RuntimeError("Production ADMIN_PATH must not use the default /admin route")
+
     app.config["SERVICE_IMAGE_DIR"] = app.config.get("SERVICE_IMAGE_DIR") or str(
         Path(app.config["DB_PATH"]).parent / "service-images"
     )
