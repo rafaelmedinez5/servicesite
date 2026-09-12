@@ -10,6 +10,24 @@ from urllib.parse import SplitResult, urlsplit
 
 LOOPBACK_HOSTS = {"127.0.0.1", "::1", "localhost"}
 ONION_V3_HOST_PATTERN = re.compile(r"[a-z2-7]{56}\.onion")
+ADMIN_PATH_PATTERN = re.compile(r"/[a-z0-9][a-z0-9-]{1,62}[a-z0-9]")
+RESERVED_ADMIN_PATHS = {
+    "/about",
+    "/account",
+    "/cart",
+    "/categories",
+    "/checkout",
+    "/contact",
+    "/health",
+    "/internal",
+    "/join",
+    "/login",
+    "/pgp-key",
+    "/register",
+    "/services",
+    "/static",
+    "/status",
+}
 PLACEHOLDER_SECRET_VALUES = {
     "",
     "change-me",
@@ -86,6 +104,18 @@ def _is_placeholder(value: str) -> bool:
     return value.strip().lower() in PLACEHOLDER_SECRET_VALUES
 
 
+def _parse_admin_path(raw_value: str) -> str:
+    value = raw_value.strip().lower()
+    if ADMIN_PATH_PATTERN.fullmatch(value) is None or value.endswith("-"):
+        raise RuntimeError(
+            "ADMIN_PATH must be one lowercase URL segment, 3-64 characters after '/', "
+            "using only letters, numbers, or hyphens"
+        )
+    if value in RESERVED_ADMIN_PATHS:
+        raise RuntimeError("ADMIN_PATH conflicts with an existing application route")
+    return value
+
+
 def _parse_onion_host(name: str, raw_value: str) -> str | None:
     value = raw_value.strip().lower()
     if not value:
@@ -130,6 +160,7 @@ class Settings:
     app_port: int
     database_path: str
     admin_username: str
+    admin_path: str
     admin_recovery_pin: str | None = field(repr=False)
     admin_session_hours: int
     public_contact_method: str | None
@@ -177,6 +208,7 @@ class Settings:
         admin_username = os.getenv("ADMIN_USERNAME", "admin").strip()
         if not admin_username or len(admin_username) > 64:
             raise RuntimeError("ADMIN_USERNAME must contain 1 through 64 characters")
+        admin_path = _parse_admin_path(os.getenv("ADMIN_PATH", "/admin"))
         raw_admin_recovery_pin = os.getenv("ADMIN_RECOVERY_PIN", "").strip()
         if raw_admin_recovery_pin and (
             len(raw_admin_recovery_pin) != 6
@@ -261,6 +293,7 @@ class Settings:
             ),
             database_path=database_path,
             admin_username=admin_username,
+            admin_path=admin_path,
             admin_recovery_pin=admin_recovery_pin,
             admin_session_hours=admin_session_hours,
             public_contact_method=public_contact_method,
