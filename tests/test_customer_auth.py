@@ -76,11 +76,16 @@ def test_auth_pages_are_private_and_navigation_offers_account_creation(
     assert home.status_code == 303
     assert home.headers["Location"].endswith("/login?next=/")
     login_body = login.get_data(as_text=True)
+    register_body = register.get_data(as_text=True)
     assert 'href="/login"' in login_body
     assert 'href="/register"' in login_body
     assert 'href="/about"' in login_body
     assert 'class="nav-dropdown"' not in login_body
-    assert 'pattern="[a-z0-9][a-z0-9._\\-]{1,30}[a-z0-9]"' in register.get_data(as_text=True)
+    assert 'pattern="[a-z0-9][a-z0-9._\\-]{1,30}[a-z0-9]"' in register_body
+    assert "browse services, manage your cart, and follow your orders" in login_body
+    assert "create a Monero invoice" not in login_body
+    assert "one-way hashes" not in register_body
+    assert "never cached" not in register_body
     for response in (register, login):
         assert response.status_code == 200
         assert response.headers["Cache-Control"] == "no-store, private, max-age=0"
@@ -119,7 +124,7 @@ def test_registration_normalizes_username_hashes_password_and_starts_session(
     assert "Signed in as @new.customer" in account_body
     assert 'class="account-dropdown"' in account_body
     assert 'href="/account">Account overview</a>' in account_body
-    assert 'href="/account#orders">Transactions</a>' in account_body
+    assert 'href="/account#orders">Orders</a>' in account_body
     assert 'action="/logout"' in account_body
     assert "Account security" not in account_body
     cookie = response.headers["Set-Cookie"]

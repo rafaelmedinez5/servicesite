@@ -36,13 +36,13 @@
             <dl class="order-history-facts">
               <div><dt>Total</dt><dd>{{ order.price_usd_cents|usd }}</dd></div>
               <div><dt>Payment</dt><dd>{{ order.payment_status|customer_payment_label }}</dd></div>
-              <div><dt>Fulfillment</dt><dd>{{ order.fulfillment_status.value|replace("_", " ")|title }}</dd></div>
+              <div><dt>Delivery</dt><dd>{{ "Delivered" if order.fulfillment_status.value == "fulfilled" else "Pending" }}</dd></div>
             </dl>
           </article>
         {% endfor %}
       </div>
     {% else %}
-      <div class="card empty-state"><h3>No orders yet.</h3><p>Your purchases will appear here when you create an invoice.</p></div>
+      <div class="card empty-state"><h3>No orders yet.</h3><p>Your orders will appear here after checkout.</p></div>
     {% endif %}
   </section>
 {% endblock %}

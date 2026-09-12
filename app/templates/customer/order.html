@@ -4,9 +4,9 @@
 {% block content %}
   <a class="back-link" href="{{ url_for('customer.account') }}#orders">&#8592; Your orders</a>
   <header class="shopping-heading flow-heading order-heading">
-    <p class="eyebrow">Private order</p>
+    <p class="eyebrow">Order</p>
     <h1>Order details.</h1>
-    <p>Review your items, payment progress, and fulfillment status.</p>
+    <p>Review your items, payment progress, and delivery status.</p>
   </header>
   <section class="card payment-card">
     <div class="order-title-row">
@@ -28,7 +28,7 @@
     {% include "_account_delivery.html" %}
     <p class="fulfillment-note">{{ customer_state.fulfillment_text }}</p>
     <div class="button-row">
-      {% if invoice.status.value == "awaiting_payment" %}<a class="button" href="{{ url_for('public.checkout', invoice_id=invoice.id, status_token=invoice.status_token) }}">Open payment invoice</a>{% endif %}
+      {% if invoice.status.value == "awaiting_payment" %}<a class="button" href="{{ url_for('public.checkout', invoice_id=invoice.id, status_token=invoice.status_token) }}">Continue payment</a>{% endif %}
       <a class="button secondary" href="{{ url_for('public.status', invoice_id=invoice.id, status_token=invoice.status_token) }}">Payment status</a>
     </div>
   </section>

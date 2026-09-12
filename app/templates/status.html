@@ -1,11 +1,11 @@
 {% set private_page = true %}
 {% extends "base.html" %}
 
-{% block title %}Private payment status | Servicesite{% endblock %}
+{% block title %}Payment status | Servicesite{% endblock %}
 
 {% block content %}
   <section class="private-heading flow-heading" aria-labelledby="status-title">
-    <p class="eyebrow">Private payment status</p>
+    <p class="eyebrow">Payment status</p>
     <h1 id="status-title">{{ customer_state.title }}</h1>
     <p class="lede">{{ customer_state.message }}</p>
   </section>
@@ -30,7 +30,7 @@
           <dd class="monospace">{{ xmr_amount }} XMR</dd>
         </div>
         <div>
-          <dt>Invoice ID</dt>
+          <dt>Payment reference</dt>
           <dd class="monospace breakable">{{ invoice.id }}</dd>
         </div>
         <div>
@@ -41,7 +41,7 @@
 
       {% include "_order_items.html" %}
       <div class="fulfillment-note">
-        <p class="field-label">Fulfillment</p>
+        <p class="field-label">Order update</p>
         <p>{{ customer_state.fulfillment_text }}</p>
       </div>
 
@@ -50,9 +50,9 @@
           <a class="button" href="{{ url_for('public.checkout', invoice_id=invoice.id, status_token=invoice.status_token) }}">Return to checkout</a>
         {% endif %}
       </div>
-      <aside class="privacy-note" aria-label="Private status link reminder">
-        <strong>Keep this link private.</strong>
-        <p>This URL provides access to the invoice. Support will never ask for wallet credentials or private keys.</p>
+      <aside class="privacy-note" aria-label="Status link reminder">
+        <strong>Keep this link to yourself.</strong>
+        <p>Anyone with this link can view the payment details. We will never ask for your wallet password or recovery phrase.</p>
       </aside>
     </section>
   </div>

@@ -6,20 +6,20 @@
 {% block content %}
   <section class="auth-layout" aria-labelledby="register-title">
     <div class="auth-intro">
-      <p class="eyebrow"><span class="eyebrow-line" aria-hidden="true"></span>Customer access</p>
+      <p class="eyebrow"><span class="eyebrow-line" aria-hidden="true"></span>Your account</p>
       <h1 id="register-title">Create your account.</h1>
-      <p class="lede">Use one private account to enter checkout and keep future purchases connected to a consistent identity.</p>
+      <p class="lede">Create an account to browse services, place orders, and receive updates.</p>
       <ul class="auth-assurances">
-        <li><span aria-hidden="true">01</span>Passwords are stored only as strong one-way hashes.</li>
-        <li><span aria-hidden="true">02</span>Account pages are private and never cached.</li>
-        <li><span aria-hidden="true">03</span>No email address or third-party identity provider is required.</li>
+        <li><span aria-hidden="true">01</span>No email address is required.</li>
+        <li><span aria-hidden="true">02</span>Use a password you do not use elsewhere.</li>
+        <li><span aria-hidden="true">03</span>Find order updates in your account.</li>
       </ul>
     </div>
 
     <div class="card auth-card">
-      <p class="terminal-label">New customer</p>
-      <h2>Choose your credentials</h2>
-      <p>Create a username you can remember and a unique password you store safely.</p>
+      <p class="terminal-label">Create account</p>
+      <h2>Choose a username and password</h2>
+      <p>Pick a username you will remember and a password you do not use elsewhere.</p>
       {% if error %}<p class="form-error" role="alert">{{ error }}</p>{% endif %}
       <form class="admin-form" method="post" action="{{ url_for('customer.register') }}">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
