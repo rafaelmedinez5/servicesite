@@ -86,6 +86,9 @@ def test_auth_pages_are_private_and_navigation_offers_account_creation(
     assert "create a Monero invoice" not in login_body
     assert "one-way hashes" not in register_body
     assert "never cached" not in register_body
+    for body in (register_body, login_body):
+        assert 'class="auth-brand-icon"' in body
+        assert 'src="/static/branding/sektor7-icon.png"' in body
     for response in (register, login):
         assert response.status_code == 200
         assert response.headers["Cache-Control"] == "no-store, private, max-age=0"

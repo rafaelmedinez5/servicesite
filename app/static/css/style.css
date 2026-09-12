@@ -61,24 +61,33 @@ a {
 .brand {
   display: inline-flex;
   align-items: center;
-  gap: 0.72rem;
-  color: var(--text);
-  font-size: 1rem;
-  font-weight: 800;
-  letter-spacing: -0.01em;
+  gap: 0.58rem;
   text-decoration: none;
 }
 
-.brand-mark {
-  display: inline-grid;
-  width: 2rem;
-  height: 2rem;
-  place-items: center;
-  border: 1px solid var(--border-bright);
-  background: var(--glow);
-  color: var(--blue);
-  font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
-  font-size: 0.85rem;
+.brand-icon,
+.brand-wordmark,
+.auth-brand-icon,
+.join-wordmark {
+  display: block;
+  height: auto;
+  object-fit: contain;
+}
+
+.brand-icon {
+  width: 2.1rem;
+  flex: 0 0 auto;
+}
+
+.brand-wordmark {
+  width: clamp(7.6rem, 11vw, 9.2rem);
+}
+
+.brand:hover .brand-icon,
+.brand:focus-visible .brand-icon,
+.brand:hover .brand-wordmark,
+.brand:focus-visible .brand-wordmark {
+  filter: drop-shadow(0 0 0.65rem rgba(0, 240, 255, 0.2));
 }
 
 .site-nav {
@@ -1476,6 +1485,12 @@ dd {
   align-items: center;
 }
 
+.auth-brand-icon {
+  width: clamp(4rem, 7vw, 4.5rem);
+  margin-bottom: 1.25rem;
+  filter: drop-shadow(0 0 1.1rem rgba(0, 240, 255, 0.14));
+}
+
 .auth-intro h1,
 .account-layout h1 {
   font-size: clamp(3rem, 7vw, 5.8rem);
@@ -1535,6 +1550,12 @@ dd {
 .auth-switch a {
   color: var(--text);
   font-weight: 750;
+}
+
+.join-wordmark {
+  width: min(14rem, 72%);
+  margin-bottom: 1.6rem;
+  filter: drop-shadow(0 0 1rem rgba(0, 240, 255, 0.12));
 }
 
 .account-layout {
@@ -1911,5 +1932,15 @@ th { color: var(--muted); font-size: 0.78rem; text-transform: uppercase; }
   .principle-grid article + article {
     border-top: 1px solid var(--border);
     border-left: 0;
+  }
+}
+
+@media (max-width: 480px) {
+  .brand-wordmark {
+    display: none;
+  }
+
+  .brand-icon {
+    width: 2.25rem;
   }
 }

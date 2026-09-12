@@ -228,8 +228,29 @@ def test_public_catalog_renders_only_published_services(web_context):
     assert 'class="header-actions"' in body
     assert body.index(">About</a>") < body.index('class="header-actions"')
     assert '<a href="/#services">Services</a>' not in body
-    assert 'aria-label="Servicesite home"' in body
+    assert 'aria-label="Sektor-7 home"' in body
+    assert 'src="/static/branding/sektor7-icon.png"' in body
+    assert 'src="/static/branding/sektor7-wordmark.png"' in body
+    assert 'href="/static/branding/favicon-32.png"' in body
     assert "<script" not in body.lower()
+
+
+@pytest.mark.parametrize(
+    "path",
+    (
+        "/static/branding/sektor7-icon.png",
+        "/static/branding/sektor7-wordmark.png",
+        "/static/branding/favicon-32.png",
+        "/static/branding/favicon-16.png",
+        "/static/branding/apple-touch-icon.png",
+    ),
+)
+def test_brand_png_assets_are_served(web_context, path):
+    response = web_context.client.get(path)
+
+    assert response.status_code == 200
+    assert response.mimetype == "image/png"
+    assert response.get_data().startswith(b"\x89PNG\r\n\x1a\n")
 
 
 def test_midnight_eclipse_palette_is_served(web_context):
@@ -299,6 +320,10 @@ def test_information_pages_are_public_and_script_free(web_context):
     assert 'href="/pgp-key">Open our PGP key' in contact
     assert "Encrypt it with the PGP key" in contact
     assert "PGP protects message contents" in contact
+
+    join = web_context.client.get("/join").get_data(as_text=True)
+    assert 'class="join-wordmark"' in join
+    assert 'src="/static/branding/sektor7-wordmark.png"' in join
 
     about = web_context.client.get("/about").get_data(as_text=True)
     assert "Clear authorization" in about

@@ -1,11 +1,12 @@
 {% set private_page = true %}
 {% extends "base.html" %}
 
-{% block title %}Log in | Servicesite{% endblock %}
+{% block title %}Log in | Sektor-7{% endblock %}
 
 {% block content %}
   <section class="auth-layout" aria-labelledby="login-title">
     <div class="auth-intro">
+      <img class="auth-brand-icon" src="{{ url_for('static', filename='branding/sektor7-icon.png') }}" alt="" width="512" height="512">
       <p class="eyebrow"><span class="eyebrow-line" aria-hidden="true"></span>Your account</p>
       <h1 id="login-title">Welcome back.</h1>
       <p class="lede">Sign in to browse services, manage your cart, and follow your orders.</p>
