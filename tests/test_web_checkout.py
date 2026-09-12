@@ -295,7 +295,7 @@ def test_unknown_and_unpublished_category_pages_return_404(web_context):
 
 def test_information_pages_are_public_and_script_free(web_context):
     for path, expected in (
-        ("/about", "Focused security work, clearly defined."),
+        ("/about", "Sektor-7 operates in the space between protocol and permission."),
         ("/join", "Work with people who value careful, useful work."),
         ("/contact", "Contact details coming soon"),
     ):
@@ -326,12 +326,18 @@ def test_information_pages_are_public_and_script_free(web_context):
     assert 'src="/static/branding/sektor7-wordmark.png"' in join
 
     about = web_context.client.get("/about").get_data(as_text=True)
-    assert "Clear authorization" in about
-    assert "Useful evidence" in about
-    assert "Respect for privacy" in about
-    assert "Every project starts with a review" in about
-    assert "plausible deniability" not in about.lower()
-    assert "without logs" not in about.lower()
+    assert "Authorization is non-negotiable" in about
+    assert "Payment confirms interest — not access" in about
+    assert "Evidence, not noise" in about
+    assert "Privacy by default" in about
+    assert "We do not track, log, or retain unnecessary metadata" in about
+    assert "Our Boundary" in about
+    assert "A purchase is a conversation starter, not a green light" in about
+    assert "plausible deniability for all parties involved" in about
+    assert '>Browse operations <span aria-hidden="true">→</span></a>' in about
+    assert '>Establish contact <span aria-hidden="true">→</span></a>' in about
+    assert 'class="about-manifesto"' in about
+    assert 'class="principle-grid"' not in about
 
 
 def test_pgp_key_is_public_plain_text_without_comments(web_context):
