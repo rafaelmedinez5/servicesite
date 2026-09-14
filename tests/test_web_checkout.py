@@ -20,6 +20,7 @@ from app.persistence import SQLiteDatabase, ServicesiteRepository
 NOW = datetime(2026, 8, 17, 20, 0, tzinfo=timezone.utc)
 TEST_PASSWORD = secrets.token_urlsafe(32)
 TOKEN_PATTERN = re.compile(r'name="(?P<name>csrf_token|checkout_nonce)" value="(?P<value>[^"]+)"')
+CAPTCHA_PATTERN = re.compile(r'class="captcha-question">(\d+) \+ (\d+)</strong>')
 
 
 class FakeWallet:
@@ -150,6 +151,8 @@ def _login_customer(client):
     if client.get("/account").status_code == 200:
         return
     response = client.get("/login")
+    captcha = CAPTCHA_PATTERN.search(response.get_data(as_text=True))
+    assert captcha is not None
     tokens = {
         match.group("name"): match.group("value")
         for match in TOKEN_PATTERN.finditer(response.get_data(as_text=True))
@@ -160,6 +163,7 @@ def _login_customer(client):
             "csrf_token": tokens["csrf_token"],
             "username": "test.customer",
             "password": TEST_PASSWORD,
+            "captcha_answer": str(int(captcha.group(1)) + int(captcha.group(2))),
         },
     )
     assert login.status_code == 303
@@ -209,9 +213,8 @@ def test_public_catalog_renders_only_published_services(web_context):
     body = response.get_data(as_text=True)
 
     assert response.status_code == 200
-    assert "Find weaknesses before they become problems." in body
-    assert "Security services" in body
-    assert "practical recommendations" in body
+    assert "We don't scan. We don't audit. We don't consult." in body
+    assert "Sektor-7 provides targeted, surgical security engagements" in body
     assert 'id="services"' in body
     assert "Choose the service that fits your needs." in body
     assert "Three clear steps." not in body
@@ -297,7 +300,7 @@ def test_information_pages_are_public_and_script_free(web_context):
     for path, expected in (
         ("/about", "Sektor-7 operates in the space between protocol and permission."),
         ("/join", "Мы не набираем. Мы отбираем."),
-        ("/contact", "We do not use forms. We do not store inquiries."),
+        ("/contact", "submit a short account-linked request"),
     ):
         response = web_context.client.get(path)
         body = response.get_data(as_text=True)
@@ -312,7 +315,7 @@ def test_information_pages_are_public_and_script_free(web_context):
 
     contact = web_context.client.get("/contact").get_data(as_text=True)
     assert "Contact Sektor-7" in contact
-    assert "Every communication channel is deliberate, secure, and ephemeral" in contact
+    assert "Use the secure public channel for encrypted communication" in contact
     assert "Choose your entry path" in contact
     assert "New Engagement" in contact
     assert "Discuss a fresh operation" in contact
@@ -321,10 +324,9 @@ def test_information_pages_are_public_and_script_free(web_context):
     assert "Careers / Join" in contact
     assert "Collaboration inquiry" in contact
     assert 'href="/join">Join Guidelines</a>' in contact
-    assert "All initial messages must be PGP-encrypted using" in contact
-    assert 'href="/pgp-key">our public key</a> (available below)' in contact
-    assert "Include only a high-level summary — no operational details" in contact
-    assert "secure, one-time channel for further communication" in contact
+    assert 'href="/pgp-key">our public PGP key</a>' in contact
+    assert "Initial form messages should contain only a high-level summary" in contact
+    assert "Never submit passwords, private keys, wallet seeds" in contact
     assert 'class="contact-table"' in contact
     assert 'class="contact-layout"' not in contact
 
@@ -617,6 +619,9 @@ def test_partial_pending_expired_and_settled_customer_states(web_context):
         now=NOW + timedelta(minutes=1),
     )
     partial_body = web_context.client.get(_private_urls(partial)["status"]).get_data(as_text=True)
+    web_context.repository.transition_status(
+        partial.id, PaymentStatus.EXPIRED, now=partial.expires_at
+    )
 
     pending, _ = _create_invoice(web_context)
     web_context.repository.record_observation(
@@ -632,6 +637,9 @@ def test_partial_pending_expired_and_settled_customer_states(web_context):
         now=NOW + timedelta(minutes=1),
     )
     pending_body = web_context.client.get(_private_urls(pending)["status"]).get_data(as_text=True)
+    web_context.repository.transition_status(
+        pending.id, PaymentStatus.EXPIRED, now=pending.expires_at
+    )
 
     expired, _ = _create_invoice(web_context)
     web_context.repository.transition_status(

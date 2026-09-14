@@ -48,6 +48,12 @@
       <div class="button-row">
         <a class="button" href="{{ monero_uri }}">Open wallet</a>
         <a class="button secondary" href="{{ url_for('public.status', invoice_id=invoice.id, status_token=invoice.status_token) }}">View payment status</a>
+        {% if can_cancel_order %}
+          <form method="post" action="{{ url_for('shopping.cancel_order', invoice_id=invoice.id) }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button class="button danger" type="submit">Cancel order</button>
+          </form>
+        {% endif %}
       </div>
     </section>
 

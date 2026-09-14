@@ -234,6 +234,7 @@ def test_schema_eight_upgrade_preserves_orders_requests_and_carts(web_context):
         assert connection.execute("SELECT value FROM schema_meta WHERE key='schema_version'").fetchone()[0] == str(SCHEMA_VERSION)
         assert connection.execute("PRAGMA integrity_check").fetchone()[0] == "ok"
         assert connection.execute("PRAGMA foreign_key_check").fetchall() == []
+    repo.transition_status(invoice.id, PaymentStatus.EXPIRED, now=invoice.expires_at)
     _account_order(web_context)
 
 

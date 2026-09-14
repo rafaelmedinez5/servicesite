@@ -24,7 +24,7 @@
             <td><a href="{{ url_for('admin.purchase_detail', invoice_id=purchase.invoice_id) }}"><span class="monospace">{{ purchase.invoice_id[:12] }}…</span></a></td>
             <td>{{ purchase.service_name }}<small>{{ purchase.category_name }}</small></td>
             <td>{{ purchase.price_usd_cents|usd }}</td>
-            <td>{{ purchase.payment_status.value|replace('_', ' ') }}</td>
+            <td>{{ purchase.payment_status.value|replace('_', ' ') }}{% if purchase.customer_cancelled_at %}<small>Cancelled by customer</small>{% endif %}</td>
             <td>{{ purchase.fulfillment_status.value }}</td>
             <td>{{ purchase.created_at|display_datetime }}</td>
           </tr>

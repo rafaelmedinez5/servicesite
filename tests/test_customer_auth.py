@@ -12,6 +12,7 @@ from app.persistence import SQLiteDatabase, ServicesiteRepository
 
 NOW = datetime(2026, 8, 27, 22, 0, tzinfo=timezone.utc)
 CSRF_PATTERN = re.compile(r'name="csrf_token" value="([^"]+)"')
+CAPTCHA_PATTERN = re.compile(r'class="captcha-question">(\d+) \+ (\d+)</strong>')
 
 
 @pytest.fixture
@@ -39,6 +40,12 @@ def _csrf(response) -> str:
     return match.group(1)
 
 
+def _captcha(response) -> str:
+    match = CAPTCHA_PATTERN.search(response.get_data(as_text=True))
+    assert match is not None
+    return str(int(match.group(1)) + int(match.group(2)))
+
+
 def _create_customer(repository, *, username="registered.user"):
     account = repository.create_customer_account(
         customer_id=f"customer-{username}-00000001",
@@ -57,8 +64,13 @@ def _login(
     password="correct horse battery staple",
     next_path=None,
 ):
-    token = _csrf(client.get("/login"))
-    data = {"csrf_token": token, "username": username, "password": password}
+    page = client.get("/login")
+    data = {
+        "csrf_token": _csrf(page),
+        "username": username,
+        "password": password,
+        "captcha_answer": _captcha(page),
+    }
     if next_path is not None:
         data["next"] = next_path
     return client.post("/login", data=data)
@@ -86,6 +98,8 @@ def test_auth_pages_are_private_and_navigation_offers_account_creation(
     assert "create a Monero invoice" not in login_body
     assert "one-way hashes" not in register_body
     assert "never cached" not in register_body
+    assert 'name="captcha_answer"' in login_body
+    assert CAPTCHA_PATTERN.search(login_body)
     for body in (register_body, login_body):
         assert 'class="auth-brand-icon"' in body
         assert 'src="/static/branding/sektor7-icon.png"' in body
@@ -223,6 +237,37 @@ def test_login_uses_generic_errors_supports_local_next_and_logout(customer_conte
     assert client.get("/account").headers["Location"].endswith(
         "/login?next=/account"
     )
+
+
+def test_login_captcha_is_required_correct_and_single_use(customer_context):
+    _, client, repository = customer_context
+    _create_customer(repository)
+    page = client.get("/login")
+    data = {
+        "csrf_token": _csrf(page),
+        "username": "registered.user",
+        "password": "correct horse battery staple",
+    }
+
+    missing = client.post("/login", data=data)
+    assert missing.status_code == 400
+    assert "verification answer" in missing.get_data(as_text=True)
+
+    replay = client.post(
+        "/login", data={**data, "captcha_answer": _captcha(page)}
+    )
+    assert replay.status_code == 400
+
+    fresh = client.get("/login")
+    successful = client.post(
+        "/login",
+        data={
+            **data,
+            "csrf_token": _csrf(fresh),
+            "captcha_answer": _captcha(fresh),
+        },
+    )
+    assert successful.status_code == 303
 
 
 def test_login_rejects_external_next_destination(customer_context):

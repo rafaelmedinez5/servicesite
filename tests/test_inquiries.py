@@ -13,6 +13,7 @@ from app.persistence import SQLiteDatabase, ServicesiteRepository
 
 NOW = datetime(2026, 9, 12, 20, 0, tzinfo=timezone.utc)
 CSRF_PATTERN = re.compile(r'name="csrf_token" value="([^"]+)"')
+CAPTCHA_PATTERN = re.compile(r'class="captcha-question">(\d+) \+ (\d+)</strong>')
 PASSWORD = "correct horse battery staple"
 ADMIN_PASSWORD = "administrator password for inquiry tests"
 
@@ -53,10 +54,17 @@ def _csrf(response) -> str:
 
 
 def _login_customer(client):
-    token = _csrf(client.get("/login"))
+    page = client.get("/login")
+    captcha = CAPTCHA_PATTERN.search(page.get_data(as_text=True))
+    assert captcha is not None
     response = client.post(
         "/login",
-        data={"csrf_token": token, "username": "inquiry.user", "password": PASSWORD},
+        data={
+            "csrf_token": _csrf(page),
+            "username": "inquiry.user",
+            "password": PASSWORD,
+            "captcha_answer": str(int(captcha.group(1)) + int(captcha.group(2))),
+        },
     )
     assert response.status_code == 303
 

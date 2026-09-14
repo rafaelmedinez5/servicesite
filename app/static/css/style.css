@@ -1812,6 +1812,11 @@ dd {
 
 .shopping-heading h1 { font-size: clamp(2.8rem, 6vw, 5rem); }
 .shopping-error { margin-bottom: 1.5rem; }
+.active-order-notice {
+  margin-bottom: 1.5rem;
+  border-left: 0.22rem solid var(--gold);
+}
+.active-order-notice h2 { margin-bottom: 0.65rem; }
 .order-heading { margin-top: 2rem; }
 .order-title-row {
   display: flex;
@@ -1982,6 +1987,19 @@ textarea { resize: vertical; }
 input:focus-visible,
 textarea:focus-visible,
 select:focus-visible { outline: 3px solid rgba(0, 240, 255, 0.35); outline-offset: 2px; }
+
+.captcha-field { padding-top: 0.4rem; border-top: 1px solid var(--border); }
+.captcha-prompt { display: block; color: var(--muted); font-weight: 500; }
+.captcha-question {
+  display: inline-block;
+  margin-inline: 0.25rem;
+  padding: 0.2rem 0.45rem;
+  border: 1px solid var(--border-bright);
+  background: var(--glow);
+  color: var(--cyan);
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  letter-spacing: 0.08em;
+}
 
 .check-row { grid-template-columns: auto 1fr; align-items: center; }
 .check-row input { width: 1.1rem; height: 1.1rem; }

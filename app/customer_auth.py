@@ -21,6 +21,7 @@ from flask import (
 from werkzeug.security import check_password_hash, generate_password_hash
 
 from app.admin import admin_session_authenticated
+from app.login_captcha import issue_login_captcha, verify_login_captcha
 from app.persistence import CustomerAccount, PersistenceError, ServicesiteRepository
 from app.web_security import FormSecurityError, require_csrf
 
@@ -36,7 +37,9 @@ _ANONYMOUS_ENDPOINTS = frozenset(
         "health",
         "public.about",
         "public.contact",
+        "public.contact_submit",
         "public.join",
+        "public.join_submit",
         "public.pgp_key",
         "static",
     }
@@ -74,6 +77,8 @@ def require_site_session():
     g.admin_authenticated = admin_session_authenticated()
     g.site_authenticated = g.customer is not None or g.admin_authenticated
     if g.site_authenticated:
+        return None
+    if request.endpoint is None:
         return None
     if request.endpoint in _ANONYMOUS_ENDPOINTS:
         return None
@@ -158,7 +163,11 @@ def login():
         return redirect(url_for("customer.account"), code=303)
     next_path = _safe_next(request.values.get("next"))
     if request.method == "GET":
-        return render_template("customer/login.html", next_path=next_path)
+        return render_template(
+            "customer/login.html",
+            next_path=next_path,
+            captcha_question=issue_login_captcha(),
+        )
 
     try:
         require_csrf(request.form.get("csrf_token"))
@@ -166,6 +175,14 @@ def login():
         return _login_response(
             error="The form expired. Try again.",
             status_code=400,
+            next_path=next_path,
+        )
+
+    if not verify_login_captcha(request.form.get("captcha_answer")):
+        return _login_response(
+            error="Check the verification answer and try again.",
+            status_code=400,
+            username=_normalize_username(request.form.get("username", "")) or "",
             next_path=next_path,
         )
 
@@ -361,6 +378,7 @@ def _login_response(
             error=error,
             username=username,
             next_path=next_path,
+            captcha_question=issue_login_captcha(),
         ),
         status_code,
     )
