@@ -162,7 +162,11 @@ Visible identifying details in the pixels still require manual review.
 ## Customer cart and orders
 
 Signed-in customers can add services, adjust quantities, and create one XMR
-invoice for the whole cart. `/account` lists their 100 most recent orders;
+invoice for the whole cart. A customer may have only one unfinished,
+non-cancelled payment order at a time. An unpaid order can be cancelled before
+any funds are detected; cancellation releases the checkout lock without
+deleting the invoice or stopping its original payment-monitoring window.
+`/account` lists their 100 most recent orders;
 order details remain ownership-checked. Direct single-service purchases also
 appear in this history. Existing bearer payment links continue to work.
 All new browser purchases review optional per-item requests and a delivery
@@ -177,13 +181,13 @@ invoices are preserved. See `docs/cart-orders.md`.
 
 ## Current database migration
 
-**Database migration required: schema 8 to 9.** Schema 9 rebuilds the checkout
-detail tables to permit blank requests and account delivery, preserving their
-rows, and adds an account-delivery message table. Existing invoices, accounts,
-carts, service images, and payment state are preserved. Back up the database,
-stop the web service, pull the update, run the documented initializer, and
-restart only after success. There are no new dependencies. See
-`docs/checkout-review.md` and the operator procedure in `docs/deploy-xmr.md`.
+**Database migration required: schema 9 to 10.** Schema 10 adds the customer
+order cancellation timestamp used by the one-unfinished-order checkout guard.
+Existing invoices, accounts, carts, requests, service images, and payment state
+are preserved. Back up the database, stop the web service, pull the update, run
+the documented initializer, and restart only after success. There are no new
+dependencies. See `docs/cart-orders.md` and the operator procedure in
+`docs/deploy-xmr.md`.
 
 ## Next task
 

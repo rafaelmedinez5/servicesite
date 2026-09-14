@@ -26,7 +26,14 @@ from app.payments.invoice import (
 from app.payments.xmr_wallet_rpc import MAX_ATOMIC_UNITS
 
 
-SCHEMA_VERSION = 9
+SCHEMA_VERSION = 10
+
+_ACTIVE_PAYMENT_STATUSES = (
+    PaymentStatus.AWAITING_PAYMENT,
+    PaymentStatus.PAID_PENDING_CONFIRMATIONS,
+    PaymentStatus.PAID_PENDING_SWEEP,
+    PaymentStatus.SWEEPING_TO_COLD,
+)
 
 
 class PersistenceError(RuntimeError):
@@ -59,6 +66,18 @@ class InvoicePersistenceError(PersistenceError):
 
 class FulfillmentNotAllowedError(PersistenceError):
     """A purchase cannot be fulfilled before payment settlement."""
+
+
+class ActiveOrderExistsError(PersistenceError):
+    """A customer already has an unfinished, non-cancelled order."""
+
+    def __init__(self, invoice_id: str) -> None:
+        super().__init__("an unfinished order already exists")
+        self.invoice_id = invoice_id
+
+
+class OrderCancellationNotAllowedError(PersistenceError):
+    """An order can no longer be safely cancelled by its customer."""
 
 
 class FulfillmentStatus(str, Enum):
@@ -103,6 +122,7 @@ class AdminPurchaseRecord:
     expires_at: datetime
     settled_at: datetime | None
     fulfilled_at: datetime | None
+    customer_cancelled_at: datetime | None = None
 
 
 @dataclass(frozen=True)
@@ -165,6 +185,7 @@ class SQLiteDatabase:
                     "6",
                     "7",
                     "8",
+                    "9",
                     str(SCHEMA_VERSION),
                 }:
                     raise SchemaVersionError("database schema version is unsupported")
@@ -177,6 +198,8 @@ class SQLiteDatabase:
                 if previous_version in {"1", "2", "3", "4", "5", "6", "7", "8"}:
                     connection.execute("BEGIN IMMEDIATE")
                     _upgrade_checkout_constraints(connection)
+                if previous_version in {"1", "2", "3", "4", "5", "6", "7", "8", "9"}:
+                    _ensure_customer_order_cancellation_column(connection)
                     connection.execute(
                         "UPDATE schema_meta SET value=? WHERE key='schema_version'",
                         (str(SCHEMA_VERSION),),
@@ -599,6 +622,9 @@ class ServicesiteRepository:
         _require_token(claim_token, "cart checkout claim")
         _require_aware_datetime(now, "cart checkout time")
         with self.database.transaction(immediate=True) as connection:
+            active = _fetch_active_customer_order(connection, customer_id)
+            if active is not None:
+                raise ActiveOrderExistsError(active.id)
             cart = _fetch_cart(connection, customer_id)
             if not cart.ready or cart.version != version or cart.fingerprint != fingerprint:
                 raise CartChangedError("the cart or its prices changed; review it again")
@@ -642,6 +668,9 @@ class ServicesiteRepository:
             checkout_details.require_services(tuple(line.service.service_id for line in lines))
         try:
             with self.database.transaction(immediate=True) as connection:
+                active = _fetch_active_customer_order(connection, customer_id)
+                if active is not None:
+                    raise ActiveOrderExistsError(active.id)
                 for line in lines:
                     if _fetch_purchasable_service(connection, line.service.service_id) != line.service:
                         raise CatalogChangedError("an order service changed before persistence")
@@ -732,7 +761,8 @@ class ServicesiteRepository:
         connection = self.database.connect()
         try:
             rows = connection.execute(
-                "SELECT i.* FROM invoices i JOIN customer_orders o ON o.invoice_id=i.id "
+                "SELECT i.*, o.cancelled_at AS customer_cancelled_at "
+                "FROM invoices i JOIN customer_orders o ON o.invoice_id=i.id "
                 "WHERE o.customer_id=? ORDER BY i.created_at DESC, i.id DESC LIMIT 100",
                 (customer_id,),
             ).fetchall()
@@ -750,6 +780,60 @@ class ServicesiteRepository:
             return _row_to_invoice(row) if row is not None else None
         finally:
             connection.close()
+
+    def get_active_customer_order(self, customer_id: str) -> Invoice | None:
+        _validate_customer_id(customer_id)
+        connection = self.database.connect()
+        try:
+            return _fetch_active_customer_order(connection, customer_id)
+        finally:
+            connection.close()
+
+    def is_customer_order_cancelled(self, customer_id: str, invoice_id: str) -> bool:
+        _validate_customer_id(customer_id)
+        connection = self.database.connect()
+        try:
+            row = connection.execute(
+                "SELECT cancelled_at FROM customer_orders WHERE customer_id=? AND invoice_id=?",
+                (customer_id, invoice_id),
+            ).fetchone()
+            return row is not None and row["cancelled_at"] is not None
+        finally:
+            connection.close()
+
+    def cancel_customer_order(
+        self, customer_id: str, invoice_id: str, *, now: datetime
+    ) -> None:
+        _validate_customer_id(customer_id)
+        _require_aware_datetime(now, "order cancellation time")
+        with self.database.transaction(immediate=True) as connection:
+            row = connection.execute(
+                """
+                SELECT i.status, i.observed_atomic, o.cancelled_at
+                FROM customer_orders AS o
+                JOIN invoices AS i ON i.id=o.invoice_id
+                WHERE o.customer_id=? AND o.invoice_id=?
+                """,
+                (customer_id, invoice_id),
+            ).fetchone()
+            if row is None:
+                raise InvoiceNotFoundError("invoice was not found")
+            if row["cancelled_at"] is not None:
+                return
+            if (
+                PaymentStatus(row["status"]) is not PaymentStatus.AWAITING_PAYMENT
+                or int(row["observed_atomic"]) != 0
+            ):
+                raise OrderCancellationNotAllowedError(
+                    "an order cannot be cancelled after payment is detected"
+                )
+            result = connection.execute(
+                "UPDATE customer_orders SET cancelled_at=? "
+                "WHERE customer_id=? AND invoice_id=? AND cancelled_at IS NULL",
+                (_serialize_datetime(now), customer_id, invoice_id),
+            )
+            if result.rowcount != 1:
+                raise PersistenceError("order cancellation changed concurrently")
 
     def get_order_username(self, invoice_id: str) -> str | None:
         connection = self.database.connect()
@@ -838,7 +922,9 @@ class ServicesiteRepository:
         try:
             rows = connection.execute(
                 f"""
-                SELECT * FROM invoices
+                SELECT invoices.*, customer_orders.cancelled_at AS customer_cancelled_at
+                FROM invoices
+                LEFT JOIN customer_orders ON customer_orders.invoice_id=invoices.id
                 {where}
                 ORDER BY created_at DESC, id DESC
                 LIMIT ?
@@ -853,7 +939,9 @@ class ServicesiteRepository:
         connection = self.database.connect()
         try:
             row = connection.execute(
-                "SELECT * FROM invoices WHERE id=?", (invoice_id,)
+                "SELECT invoices.*, customer_orders.cancelled_at AS customer_cancelled_at "
+                "FROM invoices LEFT JOIN customer_orders ON customer_orders.invoice_id=invoices.id "
+                "WHERE invoices.id=?", (invoice_id,)
             ).fetchone()
             return _row_to_admin_purchase(row) if row is not None else None
         finally:
@@ -1459,6 +1547,26 @@ def _fetch_cart(connection: sqlite3.Connection, customer_id: str) -> CartSnapsho
     )
 
 
+def _fetch_active_customer_order(
+    connection: sqlite3.Connection, customer_id: str
+) -> Invoice | None:
+    placeholders = ", ".join("?" for _ in _ACTIVE_PAYMENT_STATUSES)
+    row = connection.execute(
+        f"""
+        SELECT i.*
+        FROM invoices AS i
+        JOIN customer_orders AS o ON o.invoice_id=i.id
+        WHERE o.customer_id=?
+          AND o.cancelled_at IS NULL
+          AND i.status IN ({placeholders})
+        ORDER BY i.created_at DESC, i.id DESC
+        LIMIT 1
+        """,
+        (customer_id, *(status.value for status in _ACTIVE_PAYMENT_STATUSES)),
+    ).fetchone()
+    return _row_to_invoice(row) if row is not None else None
+
+
 def _insert_invoice_row(connection: sqlite3.Connection, invoice: Invoice) -> None:
     connection.execute(
         """INSERT INTO invoices(
@@ -1577,6 +1685,11 @@ def _row_to_admin_purchase(row: sqlite3.Row) -> AdminPurchaseRecord:
         expires_at=_parse_datetime(row["expires_at"]),
         settled_at=_parse_optional_datetime(row["settled_at"]),
         fulfilled_at=_parse_optional_datetime(row["fulfilled_at"]),
+        customer_cancelled_at=(
+            _parse_optional_datetime(row["customer_cancelled_at"])
+            if "customer_cancelled_at" in row.keys()
+            else None
+        ),
     )
 
 
@@ -1798,6 +1911,16 @@ def _ensure_service_image_column(connection: sqlite3.Connection) -> None:
         )
 
 
+def _ensure_customer_order_cancellation_column(
+    connection: sqlite3.Connection,
+) -> None:
+    columns = {
+        row["name"] for row in connection.execute("PRAGMA table_info(customer_orders)")
+    }
+    if "cancelled_at" not in columns:
+        connection.execute("ALTER TABLE customer_orders ADD COLUMN cancelled_at TEXT")
+
+
 def _upgrade_checkout_constraints(connection: sqlite3.Connection) -> None:
     # SQLite CHECK constraints need a table rebuild. The caller holds one
     # transaction for both copies, replacement, FK verification and version bump.
@@ -1966,7 +2089,8 @@ CREATE TABLE IF NOT EXISTS cart_checkout_claims (
 
 CREATE TABLE IF NOT EXISTS customer_orders (
     invoice_id TEXT PRIMARY KEY REFERENCES invoices(id) ON DELETE RESTRICT,
-    customer_id TEXT NOT NULL REFERENCES customer_accounts(id) ON DELETE RESTRICT
+    customer_id TEXT NOT NULL REFERENCES customer_accounts(id) ON DELETE RESTRICT,
+    cancelled_at TEXT
 );
 
 CREATE TABLE IF NOT EXISTS invoice_items (

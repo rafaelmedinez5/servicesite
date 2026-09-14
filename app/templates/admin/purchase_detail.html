@@ -5,6 +5,7 @@
 
 {% block content %}
   {% include "admin/_nav.html" %}
+  {% if purchase.customer_cancelled_at %}<p class="flash error">Customer cancelled this order on {{ purchase.customer_cancelled_at|display_datetime }}. The payment address remains monitored until its original expiry.</p>{% endif %}
   <section class="admin-heading"><p class="eyebrow">Purchase detail</p><h1>{{ purchase.service_name }}</h1><p class="monospace breakable">{{ purchase.invoice_id }}</p></section>
   <section class="card admin-detail">
     <dl class="details-list">

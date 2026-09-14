@@ -25,6 +25,9 @@ hashes.
 
 - Registration, login, and logout submissions require the signed-session CSRF
   token.
+- Customer login requires a server-authenticated, single-use arithmetic CAPTCHA
+  that expires after ten minutes. A failed CAPTCHA is rejected before any
+  username lookup or password-rate-limit mutation.
 - Successful registration or login clears prior session state before storing
   the opaque customer ID, username, and credential version.
 - Account state is reloaded from SQLite on each signed-in request; a missing or

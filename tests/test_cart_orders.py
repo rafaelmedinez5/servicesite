@@ -12,7 +12,13 @@ from app.orders import CartChangedError, CheckoutInProgressError
 from app.payments.invoice import InvoiceCreator, PaymentStatus
 from app.payments.xmr_rate import XmrRateUnavailableError
 from app.payments.xmr_wallet_rpc import XmrWalletRpcError
-from app.persistence import FulfillmentNotAllowedError, PersistenceError
+from app.persistence import (
+    ActiveOrderExistsError,
+    FulfillmentNotAllowedError,
+    OrderCancellationNotAllowedError,
+    PersistenceError,
+    SCHEMA_VERSION,
+)
 from test_web_checkout import NOW, _category, _login_customer, _service, web_context
 
 
@@ -120,7 +126,9 @@ def test_cart_creates_one_owned_invoice_with_immutable_items(web_context):
     replay = web_context.client.post("/cart/checkout", data=data)
     assert replay.status_code == 400
     assert len(web_context.wallet.calls) == 1
-    web_context.repository.update_service_price("service-second", price_usd_cents=1, now=NOW)
+    web_context.repository.update_service_price(
+        "service-second", price_usd_cents=1, now=NOW
+    )
     assert web_context.repository.get_invoice_items(invoice.id) == items
     assert web_context.repository.get_invoice(invoice.id).price_usd_cents == 25_500
     for url in (response.headers["Location"], f"/account/orders/{invoice.id}"):
@@ -133,6 +141,155 @@ def test_cart_creates_one_owned_invoice_with_immutable_items(web_context):
     account_body = web_context.client.get("/account").get_data(as_text=True)
     assert 'class="order-history"' in account_body
     assert f'/account/orders/{invoice.id}' in account_body
+
+
+def test_unfinished_order_blocks_another_checkout_before_wallet_access(web_context):
+    _add(web_context)
+    first, _, _ = _checkout(web_context)
+    _add(web_context)
+
+    review = web_context.client.get("/cart/checkout")
+    assert review.status_code == 303
+    assert review.headers["Location"].endswith(f"/account/orders/{first.id}")
+    assert len(web_context.wallet.calls) == 1
+
+    cart = web_context.repository.get_cart(CUSTOMER_ID)
+    with pytest.raises(ActiveOrderExistsError) as blocked:
+        web_context.repository.claim_cart_checkout(
+            CUSTOMER_ID,
+            version=cart.version,
+            fingerprint=cart.fingerprint,
+            claim_token="blocked-order-claim-000001",
+            now=NOW,
+        )
+    assert blocked.value.invoice_id == first.id
+    assert web_context.repository.count_invoices() == 1
+
+
+def test_customer_can_cancel_unpaid_order_then_checkout_again(web_context):
+    _add(web_context)
+    first, _, _ = _checkout(web_context)
+    order_page = web_context.client.get(f"/account/orders/{first.id}")
+    assert 'action="/account/orders/' + first.id + '/cancel"' in order_page.get_data(as_text=True)
+    assert web_context.client.post(
+        f"/account/orders/{first.id}/cancel", data={}
+    ).status_code == 400
+
+    cancelled = web_context.client.post(
+        f"/account/orders/{first.id}/cancel",
+        data={"csrf_token": _tokens(order_page)["csrf_token"]},
+    )
+    assert cancelled.status_code == 303
+    assert web_context.repository.is_customer_order_cancelled(CUSTOMER_ID, first.id)
+    assert web_context.repository.get_active_customer_order(CUSTOMER_ID) is None
+    body = web_context.client.get(f"/account/orders/{first.id}").get_data(as_text=True)
+    assert "Order cancelled" in body
+    assert "Do not send payment" in body
+    checkout_url = f"/checkout/{first.id}/{first.status_token}"
+    assert web_context.client.get(checkout_url).status_code == 303
+    assert web_context.client.get(f"{checkout_url}/qr.png").status_code == 404
+
+    _add(web_context)
+    second, _, _ = _checkout(web_context)
+    assert second.id != first.id
+    assert web_context.repository.count_invoices() == 2
+
+
+def test_customer_cannot_cancel_another_accounts_order(web_context):
+    _add(web_context)
+    invoice, _, _ = _checkout(web_context)
+    other = web_context.app.test_client()
+    register_page = other.get("/register")
+    password = secrets.token_urlsafe(32)
+    assert other.post(
+        "/register",
+        data={
+            "csrf_token": _tokens(register_page)["csrf_token"],
+            "username": "other.cancel.user",
+            "password": password,
+            "confirm_password": password,
+        },
+    ).status_code == 303
+    account_page = other.get("/account")
+
+    response = other.post(
+        f"/account/orders/{invoice.id}/cancel",
+        data={"csrf_token": _tokens(account_page)["csrf_token"]},
+    )
+    assert response.status_code == 404
+    assert not web_context.repository.is_customer_order_cancelled(
+        CUSTOMER_ID, invoice.id
+    )
+
+
+def test_order_cannot_be_cancelled_after_payment_is_detected(web_context):
+    _add(web_context)
+    invoice, _, _ = _checkout(web_context)
+    web_context.repository.record_observation(
+        invoice.id,
+        observed_atomic=1,
+        observed_confirmations=0,
+        deposit_txid="test-only-partial-payment",
+        now=NOW,
+    )
+
+    with pytest.raises(OrderCancellationNotAllowedError):
+        web_context.repository.cancel_customer_order(
+            CUSTOMER_ID, invoice.id, now=NOW
+        )
+    assert web_context.repository.get_active_customer_order(CUSTOMER_ID).id == invoice.id
+    assert not web_context.repository.is_customer_order_cancelled(CUSTOMER_ID, invoice.id)
+
+
+def test_settled_order_does_not_block_a_new_checkout(web_context):
+    _add(web_context)
+    first, _, _ = _checkout(web_context)
+    repository = web_context.repository
+    repository.record_observation(
+        first.id,
+        observed_atomic=first.expected_atomic,
+        observed_confirmations=first.required_confirmations,
+        deposit_txid="test-only-settled-order",
+        now=NOW,
+    )
+    repository.transition_status(
+        first.id, PaymentStatus.PAID_PENDING_CONFIRMATIONS, now=NOW
+    )
+    repository.transition_status(first.id, PaymentStatus.SETTLED, now=NOW)
+
+    _add(web_context)
+    review = web_context.client.get("/cart/checkout")
+    assert review.status_code == 200
+    second, _, _ = _checkout(web_context)
+    assert second.id != first.id
+
+
+def test_schema_nine_upgrade_adds_order_cancellation_without_losing_order(web_context):
+    _add(web_context)
+    invoice, _, _ = _checkout(web_context)
+    database = web_context.repository.database
+    with database.transaction() as connection:
+        connection.execute("ALTER TABLE customer_orders DROP COLUMN cancelled_at")
+        connection.execute(
+            "UPDATE schema_meta SET value='9' WHERE key='schema_version'"
+        )
+
+    database.initialize()
+    database.initialize()
+
+    with database.transaction() as connection:
+        columns = {
+            row["name"]
+            for row in connection.execute("PRAGMA table_info(customer_orders)")
+        }
+        version = connection.execute(
+            "SELECT value FROM schema_meta WHERE key='schema_version'"
+        ).fetchone()[0]
+        assert connection.execute("PRAGMA integrity_check").fetchone()[0] == "ok"
+        assert connection.execute("PRAGMA foreign_key_check").fetchall() == []
+    assert "cancelled_at" in columns
+    assert version == str(SCHEMA_VERSION)
+    assert web_context.repository.get_customer_order(CUSTOMER_ID, invoice.id) == invoice
 
 
 def test_client_supplied_prices_and_owner_are_not_checkout_authority(web_context):
@@ -223,7 +380,9 @@ def test_replayed_original_session_cookie_cannot_create_another_invoice(web_cont
     with replay_client.session_transaction() as replay:
         replay.update(saved_session)
     assert web_context.client.post("/cart/checkout", data=data).status_code == 303
-    assert replay_client.post("/cart/checkout", data=data).status_code == 409
+    blocked = replay_client.post("/cart/checkout", data=data)
+    assert blocked.status_code == 303
+    assert "/account/orders/" in blocked.headers["Location"]
     assert web_context.repository.count_invoices() == 1
     assert len(web_context.wallet.calls) == 1
 

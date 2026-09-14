@@ -13,9 +13,13 @@
       <div><p class="eyebrow">Order</p><h2>{{ invoice.service_name_snapshot }}</h2></div>
       <p class="monospace breakable">{{ invoice.id }}</p>
     </div>
-    <div class="status-summary {{ customer_state.tone }}">
+    <div class="status-summary {{ 'expired' if order_cancelled else customer_state.tone }}">
       <span class="status-dot" aria-hidden="true"></span>
-      <div><strong>{{ customer_state.title }}</strong><p>{{ customer_state.message }}</p></div>
+      {% if order_cancelled %}
+        <div><strong>Order cancelled</strong><p>This order is closed. Do not send payment to its previous address.</p></div>
+      {% else %}
+        <div><strong>{{ customer_state.title }}</strong><p>{{ customer_state.message }}</p></div>
+      {% endif %}
     </div>
     <dl class="details-list">
       <div><dt>Order total</dt><dd>{{ invoice.price_usd_cents|usd }}</dd></div>
@@ -26,10 +30,16 @@
     {% include "_order_items.html" %}
     {% include "_checkout_details.html" %}
     {% include "_account_delivery.html" %}
-    <p class="fulfillment-note">{{ customer_state.fulfillment_text }}</p>
+    <p class="fulfillment-note">{{ "No work will begin for this cancelled order." if order_cancelled else customer_state.fulfillment_text }}</p>
     <div class="button-row">
-      {% if invoice.status.value == "awaiting_payment" %}<a class="button" href="{{ url_for('public.checkout', invoice_id=invoice.id, status_token=invoice.status_token) }}">Continue payment</a>{% endif %}
-      <a class="button secondary" href="{{ url_for('public.status', invoice_id=invoice.id, status_token=invoice.status_token) }}">Payment status</a>
+      {% if not order_cancelled and invoice.status.value == "awaiting_payment" %}<a class="button" href="{{ url_for('public.checkout', invoice_id=invoice.id, status_token=invoice.status_token) }}">Continue payment</a>{% endif %}
+      {% if not order_cancelled %}<a class="button secondary" href="{{ url_for('public.status', invoice_id=invoice.id, status_token=invoice.status_token) }}">Payment status</a>{% endif %}
+      {% if not order_cancelled and invoice.status.value == "awaiting_payment" and invoice.observed_atomic == 0 %}
+        <form method="post" action="{{ url_for('shopping.cancel_order', invoice_id=invoice.id) }}">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <button class="button danger" type="submit">Cancel order</button>
+        </form>
+      {% endif %}
     </div>
   </section>
 {% endblock %}

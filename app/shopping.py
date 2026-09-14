@@ -11,7 +11,14 @@ from app.orders import CartChangedError, CartError, CheckoutInProgressError
 from app.payments.invoice import InvoiceError, PaymentStatus, ServiceUnavailableError
 from app.payments.xmr_rate import XmrRateError
 from app.payments.xmr_wallet_rpc import XmrWalletRpcError, atomic_to_xmr_str
-from app.persistence import CatalogChangedError, FulfillmentStatus, PersistenceError
+from app.persistence import (
+    ActiveOrderExistsError,
+    CatalogChangedError,
+    FulfillmentStatus,
+    InvoiceNotFoundError,
+    OrderCancellationNotAllowedError,
+    PersistenceError,
+)
 from app.web import _invoice_creator, _rate_provider, customer_payment_state
 from app.web_security import FormSecurityError, consume_checkout_nonce, issue_checkout_nonce, require_csrf
 
@@ -76,6 +83,9 @@ def update_item(service_id: str):
 
 @shopping.get("/cart/checkout")
 def checkout_review():
+    active = _repository().get_active_customer_order(g.customer.id)
+    if active is not None:
+        return _redirect_to_active_order(active.id)
     if not _repository().get_cart(g.customer.id).ready:
         return redirect(url_for("shopping.cart"), code=303)
     return _render_checkout_review()
@@ -111,6 +121,8 @@ def checkout_cart():
         completed = True
     except CheckoutValidationError as exc:
         return _render_checkout_review(error=str(exc), errors=exc.errors, status_code=400)
+    except ActiveOrderExistsError as exc:
+        return _redirect_to_active_order(exc.invoice_id)
     except (CartChangedError, CheckoutInProgressError, CatalogChangedError, ServiceUnavailableError):
         return _render_checkout_review(
             error="The cart changed or checkout is already in progress. Review the current items and your orders before trying again.",
@@ -139,14 +151,38 @@ def order_detail(invoice_id: str):
     if invoice is None:
         abort(404)
     purchase = repository.get_admin_purchase(invoice.id)
+    order_cancelled = repository.is_customer_order_cancelled(
+        g.customer.id, invoice.id
+    )
     return render_template(
         "customer/order.html", invoice=invoice, items=repository.get_invoice_items(invoice.id),
         checkout_details=repository.get_order_checkout_details(invoice.id),
         account_delivery=repository.get_account_delivery(invoice.id),
+        order_cancelled=order_cancelled,
         xmr_amount=atomic_to_xmr_str(invoice.expected_atomic),
         customer_state=customer_payment_state(
             invoice, fulfilled=purchase.fulfillment_status is FulfillmentStatus.FULFILLED
         ),
+    )
+
+
+@shopping.post("/account/orders/<invoice_id>/cancel")
+def cancel_order(invoice_id: str):
+    try:
+        _repository().cancel_customer_order(
+            g.customer.id, invoice_id, now=_now()
+        )
+    except InvoiceNotFoundError:
+        abort(404)
+    except OrderCancellationNotAllowedError:
+        flash(
+            "This order can no longer be cancelled because payment was detected or processing has started.",
+            "error",
+        )
+    else:
+        flash("Order cancelled. You can now start another purchase.", "success")
+    return redirect(
+        url_for("shopping.order_detail", invoice_id=invoice_id), code=303
     )
 
 
@@ -177,8 +213,9 @@ def register_shopping(app) -> None:
 
 def _render_cart(*, error: str | None = None, status_code: int = 200):
     snapshot = _repository().get_cart(g.customer.id)
+    active_order = _repository().get_active_customer_order(g.customer.id)
     return render_template(
-        "cart.html", cart=snapshot, error=error,
+        "cart.html", cart=snapshot, error=error, active_order=active_order,
     ), status_code
 
 
@@ -206,3 +243,13 @@ def _repository():
 def _now() -> datetime:
     factory = current_app.extensions.get("servicesite_now_factory", lambda: datetime.now(timezone.utc))
     return factory()
+
+
+def _redirect_to_active_order(invoice_id: str):
+    flash(
+        "Finish or cancel your current order before starting another purchase.",
+        "error",
+    )
+    return redirect(
+        url_for("shopping.order_detail", invoice_id=invoice_id), code=303
+    )

@@ -2,8 +2,10 @@
 
 ## Database migration required
 
-The current checkout release requires **schema 7 → 8** (see
-`checkout-review.md`). The original cart release introduced schema 5 → 6.
+The current checkout release requires **schema 9 → 10**. Schema 10 adds a
+nullable cancellation timestamp to each customer-owned order. The original
+cart release introduced schema 5 → 6 and checkout review introduced later
+schema updates.
 Pulling source or restarting the web
 service does not run the migration automatically.
 
@@ -12,6 +14,11 @@ online backup, stop the web service, load the protected production environment,
 run `SQLiteDatabase.initialize()`, and restart only after it succeeds. Do not
 delete or recreate the production database. The initializer also supports
 recognized schema versions 1 through 7 and is safe to rerun.
+
+The schema 10 migration preserves all existing data and adds:
+
+- `customer_orders.cancelled_at`: records a customer cancellation without
+  deleting the invoice or changing payment reconciliation.
 
 The original cart migration created:
 
@@ -40,6 +47,16 @@ and requests have been committed together. `/cart/checkout` first collects a
 request for each service line and a validly formatted email or Telegram contact.
 Buy-now adds the selected service if missing, preserves existing quantities,
 and opens this review page without creating an invoice.
+
+Only one non-cancelled order in an unfinished payment state is allowed per
+customer. The guard runs before a rate quote or wallet subaddress request and
+is rechecked inside the invoice persistence transaction to prevent concurrent
+workers from creating multiple orders. Settled and expired orders do not block
+checkout. A customer can cancel only an `awaiting_payment` order for which no
+funds have been observed. Cancellation hides payment actions and releases the
+checkout guard. The invoice remains in the payment poller's normal open set
+until its original expiry so an accidental late transfer is not silently
+ignored.
 
 `/account` lists the 100 most recent owned orders. Each order detail checks the
 signed-in customer ID and returns the same 404 for an unknown or other
@@ -77,3 +94,17 @@ ownership, quantities, snapshot totals, stale reviews, concurrent claims,
 lease takeover, failure rollback, old bearer links, and migration preservation.
 No live wallet payment, production migration, or browser end-to-end test is
 performed by this change.
+
+## Schema 9 to 10 operator procedure
+
+Use the normal verified SQLite backup procedure, stop the web service, pull the
+reviewed revision, then run the existing initializer with the production
+environment loaded:
+
+```bash
+runuser -u servicesite -- sh -c 'cd /opt/servicesite/app && exec /opt/servicesite/.venv/bin/python -c "from pathlib import Path; from dotenv import load_dotenv; load_dotenv(\"/etc/servicesite/servicesite.env\"); from app.config import Settings; from app.persistence import SQLiteDatabase, SCHEMA_VERSION; p=Settings.from_env().database_path; assert Path(p).is_file(), \"Existing database not found; migration stopped\"; db=SQLiteDatabase(p); db.initialize(); c=db.connect(); assert c.execute(\"PRAGMA integrity_check\").fetchone()[0] == \"ok\"; assert not c.execute(\"PRAGMA foreign_key_check\").fetchall(); assert c.execute(\"SELECT value FROM schema_meta WHERE key=?\", (\"schema_version\",)).fetchone()[0] == str(SCHEMA_VERSION); assert \"cancelled_at\" in {row[1] for row in c.execute(\"PRAGMA table_info(customer_orders)\")}; c.close(); print(\"Migration complete: schema\", SCHEMA_VERSION)"'
+```
+
+If the inquiry tables from `docs/contact-join-inquiries.md` have not yet been
+initialized on this host, run that documented initializer separately before
+starting the web service.

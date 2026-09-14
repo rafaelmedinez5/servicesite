@@ -15,6 +15,7 @@ from flask import (
     Response,
     abort,
     current_app,
+    flash,
     g,
     redirect,
     render_template,
@@ -246,6 +247,22 @@ def create_checkout():
             url_for("customer.login", next=url_for("public.index")), code=303
         )
     try:
+        active_order = _repository().get_active_customer_order(g.customer.id)
+    except (PersistenceError, sqlite3.Error):
+        return _error_page(
+            "Checkout temporarily unavailable",
+            "Your current orders could not be checked. No payment is required.",
+            503,
+        )
+    if active_order is not None:
+        flash(
+            "Finish or cancel your current order before starting another purchase.",
+            "error",
+        )
+        return redirect(
+            url_for("shopping.order_detail", invoice_id=active_order.id), code=303
+        )
+    try:
         require_csrf(request.form.get("csrf_token"))
         service_id = request.form.get("service_id", "")
         if not isinstance(service_id, str) or not service_id.strip() or len(service_id) > 64:
@@ -296,9 +313,17 @@ def create_checkout():
 @public.get("/checkout/<invoice_id>/<status_token>")
 def checkout(invoice_id: str, status_token: str):
     invoice = _private_invoice(invoice_id, status_token)
+    if _cancelled_customer_order(invoice.id):
+        return redirect(
+            url_for("shopping.order_detail", invoice_id=invoice.id), code=303
+        )
     amount = atomic_to_xmr_str(invoice.expected_atomic)
     try:
         items = _repository().get_invoice_items(invoice.id)
+        customer_owns_order = (
+            g.customer is not None
+            and _repository().get_customer_order(g.customer.id, invoice.id) is not None
+        )
     except (PersistenceError, sqlite3.Error):
         abort(503)
     return render_template(
@@ -307,12 +332,19 @@ def checkout(invoice_id: str, status_token: str):
         xmr_amount=amount,
         monero_uri=build_monero_uri(invoice),
         items=items,
+        can_cancel_order=(
+            customer_owns_order
+            and invoice.status is PaymentStatus.AWAITING_PAYMENT
+            and invoice.observed_atomic == 0
+        ),
     )
 
 
 @public.get("/checkout/<invoice_id>/<status_token>/qr.png")
 def checkout_qr(invoice_id: str, status_token: str):
     invoice = _private_invoice(invoice_id, status_token)
+    if _cancelled_customer_order(invoice.id):
+        abort(404)
     qr = segno.make(build_monero_uri(invoice), micro=False, error="m")
     output = io.BytesIO()
     qr.save(output, kind="png", scale=5, border=2, dark="#000", light="#fff")
@@ -329,6 +361,10 @@ def checkout_qr(invoice_id: str, status_token: str):
 @public.get("/status/<invoice_id>/<status_token>")
 def status(invoice_id: str, status_token: str):
     invoice = _private_invoice(invoice_id, status_token)
+    if _cancelled_customer_order(invoice.id):
+        return redirect(
+            url_for("shopping.order_detail", invoice_id=invoice.id), code=303
+        )
     try:
         purchase = _repository().get_admin_purchase(invoice.id)
         items = _repository().get_invoice_items(invoice.id)
@@ -503,6 +539,17 @@ def _mark_private() -> None:
 
 def _repository() -> ServicesiteRepository:
     return current_app.extensions["servicesite_repository"]
+
+
+def _cancelled_customer_order(invoice_id: str) -> bool:
+    if getattr(g, "customer", None) is None:
+        return False
+    try:
+        return _repository().is_customer_order_cancelled(
+            g.customer.id, invoice_id
+        )
+    except (PersistenceError, sqlite3.Error):
+        abort(503)
 
 
 def _image_store() -> ServiceImageStore:
