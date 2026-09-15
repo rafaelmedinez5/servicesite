@@ -1,0 +1,32 @@
+{% set private_page = true %}
+{% extends "base.html" %}
+
+{% block title %}Users | Sektor-7{% endblock %}
+
+{% block content %}
+  {% include "admin/_nav.html" %}
+  <section class="admin-heading">
+    <p class="eyebrow">Administration</p>
+    <h1>Users</h1>
+    <p>All customer accounts registered on the site. Passwords and authentication details are never displayed.</p>
+  </section>
+
+  <div class="table-wrap card">
+    <table>
+      <thead>
+        <tr><th>Username</th><th>Created</th><th>Last updated</th></tr>
+      </thead>
+      <tbody>
+        {% for user in users %}
+          <tr>
+            <td><strong>@{{ user.username }}</strong></td>
+            <td>{{ user.created_at|display_datetime }}</td>
+            <td>{{ user.updated_at|display_datetime }}</td>
+          </tr>
+        {% else %}
+          <tr><td colspan="3">No users have registered yet.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+{% endblock %}

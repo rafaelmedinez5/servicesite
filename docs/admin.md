@@ -14,7 +14,9 @@ fully server-rendered and contains no JavaScript. It supports:
 - purchase filtering by category, service, UTC date, payment state, and
   fulfillment state;
 - purchase detail without bearer status tokens, deposit addresses, or deposit/
-  sweep transaction identifiers; and
+  sweep transaction identifiers;
+- viewing all registered customer usernames and account timestamps without
+  password hashes or login-guard details; and
 - marking a purchase fulfilled only after its payment reaches `settled`.
 
 Cart orders appear as one purchase with all saved service lines and the customer

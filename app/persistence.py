@@ -1112,6 +1112,19 @@ class ServicesiteRepository:
         finally:
             connection.close()
 
+    def list_customer_accounts(self) -> list[CustomerAccount]:
+        connection = self.database.connect()
+        try:
+            rows = connection.execute(
+                """
+                SELECT * FROM customer_accounts
+                ORDER BY created_at DESC, username COLLATE NOCASE ASC
+                """
+            ).fetchall()
+            return [_row_to_customer_account(row) for row in rows]
+        finally:
+            connection.close()
+
     def customer_login_allowed(self, customer_id: str, *, now: datetime) -> bool:
         _validate_customer_id(customer_id)
         _require_aware_datetime(now, "customer login attempt time")

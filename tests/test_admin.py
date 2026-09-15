@@ -297,6 +297,31 @@ def test_login_logout_and_session_cookie(admin_context):
     assert client.get("/admin").headers["Location"].endswith("/admin/login")
 
 
+def test_users_section_is_admin_only_and_redacts_credentials(admin_context):
+    _app, client, repository = admin_context
+    password_hash = generate_password_hash("customer-test-password")
+    repository.create_customer_account(
+        customer_id="customer-test-user-0001",
+        username="test.user",
+        password_hash=password_hash,
+        now=NOW,
+    )
+
+    anonymous = client.get("/admin/users")
+    assert anonymous.status_code == 303
+    assert anonymous.headers["Location"].endswith("/admin/login")
+
+    _login(client)
+    response = client.get("/admin/users")
+    body = response.get_data(as_text=True)
+
+    assert response.status_code == 200
+    assert "Users" in body
+    assert "@test.user" in body
+    assert "Registered users" in client.get("/admin").get_data(as_text=True)
+    assert password_hash not in body
+
+
 def test_recovery_pin_login_requires_username_csrf_and_shared_rate_limit(
     admin_context,
 ):

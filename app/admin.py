@@ -272,9 +272,11 @@ def logout():
 @admin.get("")
 def dashboard():
     try:
-        purchases = _repository().list_admin_purchases(limit=500)
-        categories = _repository().list_categories()
-        services = _repository().list_services()
+        repository = _repository()
+        purchases = repository.list_admin_purchases(limit=500)
+        categories = repository.list_categories()
+        services = repository.list_services()
+        users = repository.list_customer_accounts()
     except (PersistenceError, sqlite3.Error):
         abort(503)
     return render_template(
@@ -290,6 +292,7 @@ def dashboard():
         ),
         category_count=sum(not item.archived for item in categories),
         service_count=sum(not item.service.archived for item in services),
+        user_count=len(users),
     )
 
 
@@ -341,6 +344,15 @@ def password():
     session.clear()
     flash("Password changed. Sign in again with the new password.", "success")
     return redirect(url_for("admin.login"), code=303)
+
+
+@admin.get("/users")
+def users():
+    try:
+        records = _repository().list_customer_accounts()
+    except (PersistenceError, sqlite3.Error):
+        abort(503)
+    return render_template("admin/users.html", users=records)
 
 
 @admin.get("/categories")

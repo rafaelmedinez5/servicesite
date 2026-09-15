@@ -4,6 +4,7 @@
   <a href="{{ url_for('admin.services') }}">Services</a>
   <a href="{{ url_for('admin.purchases') }}">Purchases</a>
   <a href="{{ url_for('admin.inquiries') }}">Inquiries</a>
+  <a href="{{ url_for('admin.users') }}">Users</a>
   <a href="{{ url_for('admin.password') }}">Security</a>
   <form method="post" action="{{ url_for('admin.logout') }}">
     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
