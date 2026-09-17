@@ -205,6 +205,8 @@ class InvoiceRepository(Protocol):
         self, invoice: Invoice, lines: tuple[OrderLine, ...], *, customer_id: str,
         cart_version: int | None = None, claim_token: str | None = None,
         checkout_details: CheckoutDetails | None = None,
+        academy_tier_key: str | None = None,
+        academy_tuition_usd_cents: int | None = None,
     ) -> None: ...
 
 
@@ -282,11 +284,34 @@ class InvoiceCreator:
             checkout_details=checkout_details,
         )
 
+    def create_academy_enrollment_invoice(
+        self,
+        service: PurchasableService,
+        quote: XmrQuote,
+        *,
+        customer_id: str,
+        tier_key: str,
+        tuition_usd_cents: int,
+    ) -> Invoice:
+        if not isinstance(service, PurchasableService):
+            raise InvoiceValidationError("a validated Academy service is required")
+        _require_text(tier_key, "Academy tier", maximum=32)
+        _require_positive_int(tuition_usd_cents, "Academy tuition cents")
+        return self._create_invoice(
+            (OrderLine(service, 1),),
+            quote,
+            customer_id=customer_id,
+            academy_tier_key=tier_key,
+            academy_tuition_usd_cents=tuition_usd_cents,
+        )
+
     def _create_invoice(
         self, lines: tuple[OrderLine, ...], quote: XmrQuote,
         *, customer_id: str | None, cart_version: int | None = None,
         claim_token: str | None = None,
         checkout_details: CheckoutDetails | None = None,
+        academy_tier_key: str | None = None,
+        academy_tuition_usd_cents: int | None = None,
     ) -> Invoice:
         if not isinstance(quote, XmrQuote):
             raise InvoiceValidationError("a validated XMR quote is required")
@@ -359,6 +384,14 @@ class InvoiceCreator:
         )
         if customer_id is None:
             self.repository.insert_invoice(invoice, service)
+        elif academy_tier_key is not None:
+            self.repository.insert_order_invoice(
+                invoice,
+                lines,
+                customer_id=customer_id,
+                academy_tier_key=academy_tier_key,
+                academy_tuition_usd_cents=academy_tuition_usd_cents,
+            )
         else:
             self.repository.insert_order_invoice(
                 invoice, lines, customer_id=customer_id,

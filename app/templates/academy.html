@@ -1,0 +1,120 @@
+{% extends "base.html" %}
+
+{% block title %}Academy | Sektor-7{% endblock %}
+
+{% block content %}
+  <section class="academy-hero" aria-labelledby="academy-title">
+    <div>
+      <p class="eyebrow"><span class="eyebrow-line" aria-hidden="true"></span>Sektor-7 Academy</p>
+      <h1 id="academy-title">Three months. One disciplined path into authorized cybersecurity operations.</h1>
+      <p class="lede">A structured 12-week program built around legal scope, repeatable methodology, controlled labs, evidence quality, and professional reporting.</p>
+      <div class="academy-fee-callout">
+        <strong>{{ enrollment_fee_usd_cents|usd }} enrollment fee</strong>
+        <span>Paid once in XMR. Tier tuition is billed separately in three monthly installments.</span>
+      </div>
+    </div>
+    <aside class="card academy-boundary">
+      <p class="eyebrow">Program boundary</p>
+      <h2>Authorized environments only</h2>
+      <p>All practical work is limited to owned systems, purpose-built labs, or targets covered by explicit written authorization. The program does not support unauthorized access or harmful activity.</p>
+    </aside>
+  </section>
+
+  {% if error %}<p class="flash error" role="alert">{{ error }}</p>{% endif %}
+
+  {% if enrollment %}
+    <section class="card academy-enrollment-status" aria-labelledby="enrollment-status-title">
+      <p class="eyebrow">Your enrollment</p>
+      <h2 id="enrollment-status-title">{{ enrolled_tier.name }}</h2>
+      <p>Your tier selection is recorded. Complete the initial enrollment-fee payment before onboarding.</p>
+      <dl class="academy-status-facts">
+        <div><dt>Tuition</dt><dd>{{ enrolled_tier.tuition_usd_cents|usd }}</dd></div>
+        <div><dt>Monthly schedule</dt><dd>{% for amount in enrolled_tier.installments_usd_cents %}{{ amount|usd }}{% if not loop.last %} · {% endif %}{% endfor %}</dd></div>
+        <div><dt>Initial payment</dt><dd>{{ enrollment.enrollment_fee_payment_status|customer_payment_label }}</dd></div>
+      </dl>
+      <a class="button" href="{{ url_for('public.checkout', invoice_id=enrollment.enrollment_fee_invoice_id, status_token=enrollment.enrollment_fee_status_token) }}">Open enrollment payment</a>
+    </section>
+  {% endif %}
+
+  <section class="academy-section" aria-labelledby="curriculum-title">
+    <p class="eyebrow">Curriculum</p>
+    <h2 id="curriculum-title">What the three-month program covers</h2>
+    <div class="academy-curriculum">
+      <article class="card">
+        <span class="academy-month">Month 01</span>
+        <h3>Foundations</h3>
+        <ul>
+          <li>Authorization, scope, rules of engagement, and evidence handling</li>
+          <li>Networking, HTTP, Linux, Windows, and identity fundamentals</li>
+          <li>Python and shell automation for repeatable assessment tasks</li>
+          <li>Threat modeling, vulnerability triage, and risk communication</li>
+          <li>Clear technical notes and defensible findings</li>
+        </ul>
+      </article>
+      <article class="card">
+        <span class="academy-month">Month 02</span>
+        <h3>Offensive security tools</h3>
+        <ul>
+          <li>Authorized reconnaissance and attack-surface mapping</li>
+          <li>Web and API assessment methodology in controlled labs</li>
+          <li>Network and endpoint validation with safe test procedures</li>
+          <li>Exploit analysis and secure proof-of-concept development</li>
+          <li>Evidence capture, remediation mapping, and retesting</li>
+        </ul>
+      </article>
+      <article class="card">
+        <span class="academy-month">Month 03</span>
+        <h3>Real-world operations</h3>
+        <ul>
+          <li>Engagement planning, communication, and operational safety</li>
+          <li>Identity and directory-security scenarios in isolated ranges</li>
+          <li>Purple-team validation and detection-aware testing</li>
+          <li>Executive and technical report construction</li>
+          <li>Capstone assessment under a documented rules-of-engagement plan</li>
+        </ul>
+      </article>
+    </div>
+  </section>
+
+  <section class="academy-section" id="tiers" aria-labelledby="tiers-title">
+    <p class="eyebrow">Enrollment tiers</p>
+    <h2 id="tiers-title">Choose the level of support you need</h2>
+    <p>The tuition shown is the full three-month program price. The separate {{ enrollment_fee_usd_cents|usd }} enrollment fee is due now.</p>
+    <div class="academy-tiers">
+      {% for tier in tiers %}
+        <article class="card academy-tier{% if tier.key == 'operator' %} featured{% endif %}">
+          {% if tier.key == 'operator' %}<span class="academy-tier-label">Recommended</span>{% endif %}
+          <h3>{{ tier.name }}</h3>
+          <p class="academy-price">{{ tier.tuition_usd_cents|usd }}</p>
+          <p>{{ tier.summary }}</p>
+          <p><strong>Best for:</strong> {{ tier.target_student }}</p>
+          <div class="academy-installments">
+            <span>Three monthly tuition payments</span>
+            <strong>{% for amount in tier.installments_usd_cents %}{{ amount|usd }}{% if not loop.last %} · {% endif %}{% endfor %}</strong>
+          </div>
+          {% if not enrollment %}
+            {% if g.customer %}
+              <form method="post" action="{{ url_for('academy.enroll') }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <input type="hidden" name="checkout_nonce" value="{{ checkout_nonce }}">
+                <input type="hidden" name="tier" value="{{ tier.key }}">
+                <button class="button" type="submit">Enroll in {{ tier.name }}</button>
+              </form>
+            {% else %}
+              <a class="button" href="{{ url_for('customer.login', next=url_for('academy.overview')) }}">Log in to enroll</a>
+            {% endif %}
+          {% endif %}
+        </article>
+      {% endfor %}
+    </div>
+  </section>
+
+  <section class="card academy-billing-note">
+    <h2>How billing works</h2>
+    <ol>
+      <li>Select a tier and pay the one-time {{ enrollment_fee_usd_cents|usd }} enrollment fee in XMR.</li>
+      <li>After enrollment is confirmed, tuition is divided into the three monthly amounts shown above.</li>
+      <li>Monthly XMR payments are made manually; cryptocurrency payments are not automatically recurring.</li>
+    </ol>
+  </section>
+{% endblock %}

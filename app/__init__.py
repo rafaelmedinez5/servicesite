@@ -6,6 +6,7 @@ from pathlib import Path
 
 from flask import Flask, Request, abort, request
 
+from app.academy_routes import register_academy
 from app.admin import _usd_input, admin
 from app.checkout_details import MAX_CHECKOUT_BODY_BYTES
 from app.config import Settings
@@ -138,6 +139,7 @@ def create_app(test_config: dict | None = None) -> Flask:
     register_inquiries(app)
     register_web(app)
     register_customer_auth(app)
+    register_academy(app)
     register_shopping(app)
     app.register_blueprint(admin, url_prefix=app.config["ADMIN_PATH"])
     app.jinja_env.filters["atomic_xmr"] = atomic_to_xmr_str

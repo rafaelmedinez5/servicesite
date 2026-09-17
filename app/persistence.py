@@ -10,6 +10,12 @@ from enum import Enum
 from pathlib import Path
 from typing import Iterator
 
+from app.academy import (
+    ACADEMY_CATEGORY_ID,
+    ACADEMY_ENROLLMENT_FEE_CENTS,
+    ACADEMY_SERVICE_ID,
+    get_academy_tier,
+)
 from app.catalog import AdminServiceRecord, CategoryRecord, PurchasableService, ServiceRecord
 from app.checkout_details import CheckoutDetails
 from app.deliveries import AccountDelivery, DeliveryValidationError, validate_delivery_body
@@ -26,7 +32,7 @@ from app.payments.invoice import (
 from app.payments.xmr_wallet_rpc import MAX_ATOMIC_UNITS
 
 
-SCHEMA_VERSION = 10
+SCHEMA_VERSION = 11
 
 _ACTIVE_PAYMENT_STATUSES = (
     PaymentStatus.AWAITING_PAYMENT,
@@ -80,6 +86,10 @@ class OrderCancellationNotAllowedError(PersistenceError):
     """An order can no longer be safely cancelled by its customer."""
 
 
+class AcademyEnrollmentExistsError(PersistenceError):
+    """A customer has already selected an Academy tier."""
+
+
 class FulfillmentStatus(str, Enum):
     UNFULFILLED = "unfulfilled"
     FULFILLED = "fulfilled"
@@ -101,6 +111,18 @@ class CustomerAccount:
     credential_version: int
     created_at: datetime
     updated_at: datetime
+
+
+@dataclass(frozen=True)
+class AcademyEnrollmentRecord:
+    customer_id: str
+    username: str
+    tier_key: str
+    tuition_usd_cents: int
+    enrollment_fee_invoice_id: str
+    enrollment_fee_status_token: str
+    enrollment_fee_payment_status: PaymentStatus
+    created_at: datetime
 
 
 @dataclass(frozen=True)
@@ -186,6 +208,7 @@ class SQLiteDatabase:
                     "7",
                     "8",
                     "9",
+                    "10",
                     str(SCHEMA_VERSION),
                 }:
                     raise SchemaVersionError("database schema version is unsupported")
@@ -200,10 +223,12 @@ class SQLiteDatabase:
                     _upgrade_checkout_constraints(connection)
                 if previous_version in {"1", "2", "3", "4", "5", "6", "7", "8", "9"}:
                     _ensure_customer_order_cancellation_column(connection)
+                if previous_version in {"1", "2", "3", "4", "5", "6", "7", "8", "9", "10"}:
                     connection.execute(
                         "UPDATE schema_meta SET value=? WHERE key='schema_version'",
                         (str(SCHEMA_VERSION),),
                     )
+                _ensure_academy_catalog(connection)
         finally:
             connection.close()
 
@@ -486,6 +511,20 @@ class ServicesiteRepository:
         finally:
             connection.close()
 
+    def get_academy_enrollment_service(self) -> PurchasableService:
+        connection = self.database.connect()
+        try:
+            service = _fetch_service_snapshot(connection, ACADEMY_SERVICE_ID)
+            if (
+                service is None
+                or service.category_id != ACADEMY_CATEGORY_ID
+                or service.price_usd_cents != ACADEMY_ENROLLMENT_FEE_CENTS
+            ):
+                raise PersistenceError("Academy enrollment service is unavailable")
+            return service
+        finally:
+            connection.close()
+
     def get_purchasable_service_by_slug(
         self, service_slug: str
     ) -> PurchasableService | None:
@@ -656,6 +695,8 @@ class ServicesiteRepository:
         self, invoice: Invoice, lines: tuple[OrderLine, ...], *, customer_id: str,
         cart_version: int | None = None, claim_token: str | None = None,
         checkout_details: CheckoutDetails | None = None,
+        academy_tier_key: str | None = None,
+        academy_tuition_usd_cents: int | None = None,
     ) -> None:
         _validate_customer_id(customer_id)
         if not lines or len(lines) > MAX_CART_SERVICES:
@@ -666,14 +707,34 @@ class ServicesiteRepository:
             raise InvoicePersistenceError("cart checkout details are required")
         if checkout_details is not None:
             checkout_details.require_services(tuple(line.service.service_id for line in lines))
+        academy_tier = None
+        if academy_tier_key is not None or academy_tuition_usd_cents is not None:
+            academy_tier = get_academy_tier(academy_tier_key or "")
+            if (
+                academy_tier is None
+                or academy_tuition_usd_cents != academy_tier.tuition_usd_cents
+                or len(lines) != 1
+                or lines[0].service.service_id != ACADEMY_SERVICE_ID
+                or invoice.price_usd_cents != ACADEMY_ENROLLMENT_FEE_CENTS
+            ):
+                raise InvoicePersistenceError("Academy enrollment details are invalid")
         try:
             with self.database.transaction(immediate=True) as connection:
                 active = _fetch_active_customer_order(connection, customer_id)
                 if active is not None:
                     raise ActiveOrderExistsError(active.id)
                 for line in lines:
-                    if _fetch_purchasable_service(connection, line.service.service_id) != line.service:
+                    expected_service = (
+                        _fetch_service_snapshot(connection, line.service.service_id)
+                        if academy_tier is not None
+                        else _fetch_purchasable_service(connection, line.service.service_id)
+                    )
+                    if expected_service != line.service:
                         raise CatalogChangedError("an order service changed before persistence")
+                if academy_tier is not None and connection.execute(
+                    "SELECT 1 FROM academy_enrollments WHERE customer_id=?", (customer_id,)
+                ).fetchone() is not None:
+                    raise AcademyEnrollmentExistsError("an Academy enrollment already exists")
                 if cart_version is not None:
                     cart = _fetch_cart(connection, customer_id)
                     claim = connection.execute(
@@ -706,6 +767,20 @@ class ServicesiteRepository:
                             service.category_description, service.price_usd_cents, line.quantity,
                         ),
                     )
+                if academy_tier is not None:
+                    connection.execute(
+                        """INSERT INTO academy_enrollments(
+                            customer_id, tier_key, tuition_usd_cents,
+                            enrollment_fee_invoice_id, created_at
+                        ) VALUES (?, ?, ?, ?, ?)""",
+                        (
+                            customer_id,
+                            academy_tier.key,
+                            academy_tier.tuition_usd_cents,
+                            invoice.id,
+                            _serialize_datetime(invoice.created_at),
+                        ),
+                    )
                 if checkout_details is not None:
                     connection.execute(
                         "INSERT INTO order_checkout_details(invoice_id, delivery_method, delivery_address) "
@@ -724,6 +799,31 @@ class ServicesiteRepository:
                     connection.execute("DELETE FROM cart_checkout_claims WHERE customer_id=?", (customer_id,))
         except sqlite3.IntegrityError as exc:
             raise InvoicePersistenceError("order could not be saved without violating an invariant") from exc
+
+    def get_academy_enrollment(
+        self, customer_id: str
+    ) -> AcademyEnrollmentRecord | None:
+        _validate_customer_id(customer_id)
+        connection = self.database.connect()
+        try:
+            row = connection.execute(
+                _ACADEMY_ENROLLMENT_SELECT + " WHERE e.customer_id=?",
+                (customer_id,),
+            ).fetchone()
+            return _row_to_academy_enrollment(row) if row is not None else None
+        finally:
+            connection.close()
+
+    def list_academy_enrollments(self) -> list[AcademyEnrollmentRecord]:
+        connection = self.database.connect()
+        try:
+            rows = connection.execute(
+                _ACADEMY_ENROLLMENT_SELECT
+                + " ORDER BY e.created_at DESC, a.username COLLATE NOCASE"
+            ).fetchall()
+            return [_row_to_academy_enrollment(row) for row in rows]
+        finally:
+            connection.close()
 
     def get_invoice_items(self, invoice_id: str) -> tuple[OrderLine, ...]:
         connection = self.database.connect()
@@ -834,6 +934,10 @@ class ServicesiteRepository:
             )
             if result.rowcount != 1:
                 raise PersistenceError("order cancellation changed concurrently")
+            connection.execute(
+                "DELETE FROM academy_enrollments WHERE customer_id=? AND enrollment_fee_invoice_id=?",
+                (customer_id, invoice_id),
+            )
 
     def get_order_username(self, invoice_id: str) -> str | None:
         connection = self.database.connect()
@@ -2106,6 +2210,14 @@ CREATE TABLE IF NOT EXISTS customer_orders (
     cancelled_at TEXT
 );
 
+CREATE TABLE IF NOT EXISTS academy_enrollments (
+    customer_id TEXT PRIMARY KEY REFERENCES customer_accounts(id) ON DELETE RESTRICT,
+    tier_key TEXT NOT NULL CHECK (tier_key IN ('foundation', 'operator', 'black')),
+    tuition_usd_cents INTEGER NOT NULL CHECK (tuition_usd_cents > 0),
+    enrollment_fee_invoice_id TEXT NOT NULL UNIQUE REFERENCES customer_orders(invoice_id) ON DELETE RESTRICT,
+    created_at TEXT NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS invoice_items (
     invoice_id TEXT NOT NULL REFERENCES invoices(id) ON DELETE RESTRICT,
     position INTEGER NOT NULL CHECK (position BETWEEN 1 AND 20),
@@ -2125,6 +2237,7 @@ CREATE TABLE IF NOT EXISTS invoice_items (
 );
 
 CREATE INDEX IF NOT EXISTS idx_customer_orders_customer ON customer_orders(customer_id);
+CREATE INDEX IF NOT EXISTS idx_academy_enrollments_created ON academy_enrollments(created_at);
 CREATE INDEX IF NOT EXISTS idx_invoice_items_service ON invoice_items(service_id, invoice_id);
 CREATE INDEX IF NOT EXISTS idx_invoice_items_category ON invoice_items(category_id, invoice_id);
 
@@ -2176,3 +2289,100 @@ CREATE INDEX IF NOT EXISTS idx_invoices_service
 CREATE INDEX IF NOT EXISTS idx_invoices_admin
     ON invoices(fulfillment_status, status, created_at);
 """
+
+
+_ACADEMY_ENROLLMENT_SELECT = """
+    SELECT
+        e.customer_id,
+        a.username,
+        e.tier_key,
+        e.tuition_usd_cents,
+        e.enrollment_fee_invoice_id,
+        i.status_token,
+        i.status AS payment_status,
+        e.created_at
+    FROM academy_enrollments AS e
+    JOIN customer_accounts AS a ON a.id=e.customer_id
+    JOIN invoices AS i ON i.id=e.enrollment_fee_invoice_id
+"""
+
+
+def _ensure_academy_catalog(connection: sqlite3.Connection) -> None:
+    now = _serialize_datetime(datetime.now(timezone.utc))
+    connection.execute(
+        """INSERT INTO categories(
+            id, name, slug, description, published, archived, sort_order,
+            created_at, updated_at
+        ) VALUES (?, 'Academy', 'academy-program',
+                  'Internal catalog record for Academy enrollment payments.',
+                  0, 0, 1000, ?, ?)
+        ON CONFLICT(id) DO UPDATE SET
+            name='Academy', slug='academy-program',
+            description='Internal catalog record for Academy enrollment payments.',
+            published=0, archived=0, sort_order=1000""",
+        (ACADEMY_CATEGORY_ID, now, now),
+    )
+    connection.execute(
+        """INSERT INTO services(
+            id, category_id, name, slug, description, price_usd_cents,
+            duration_label, published, archived, sort_order, version,
+            created_at, updated_at, image_key
+        ) VALUES (?, ?, 'Academy enrollment fee', 'academy-enrollment-fee',
+                  'One-time Academy enrollment fee. Tuition is billed separately.',
+                  ?, 'One-time enrollment', 0, 0, 1000, 1, ?, ?, NULL)
+        ON CONFLICT(id) DO UPDATE SET
+            category_id=excluded.category_id,
+            name=excluded.name,
+            slug=excluded.slug,
+            description=excluded.description,
+            price_usd_cents=excluded.price_usd_cents,
+            duration_label=excluded.duration_label,
+            published=0, archived=0, sort_order=1000,
+            version=1, image_key=NULL""",
+        (
+            ACADEMY_SERVICE_ID,
+            ACADEMY_CATEGORY_ID,
+            ACADEMY_ENROLLMENT_FEE_CENTS,
+            now,
+            now,
+        ),
+    )
+
+
+def _fetch_service_snapshot(
+    connection: sqlite3.Connection, service_id: str
+) -> PurchasableService | None:
+    row = connection.execute(
+        """
+        SELECT
+            s.id AS service_id,
+            s.slug AS service_slug,
+            s.version AS service_version,
+            s.name AS service_name,
+            s.description AS service_description,
+            s.duration_label,
+            s.image_key,
+            s.price_usd_cents,
+            c.id AS category_id,
+            c.name AS category_name,
+            c.description AS category_description
+        FROM services AS s
+        JOIN categories AS c ON c.id=s.category_id
+        WHERE s.id=? AND s.archived=0 AND c.archived=0
+        """,
+        (service_id,),
+    ).fetchone()
+    return _row_to_purchasable_service(row) if row is not None else None
+
+
+def _row_to_academy_enrollment(row: sqlite3.Row) -> AcademyEnrollmentRecord:
+    return AcademyEnrollmentRecord(
+        customer_id=row["customer_id"],
+        username=row["username"],
+        tier_key=row["tier_key"],
+        tuition_usd_cents=int(row["tuition_usd_cents"]),
+        enrollment_fee_invoice_id=row["enrollment_fee_invoice_id"],
+        enrollment_fee_status_token=row["status_token"],
+        enrollment_fee_payment_status=PaymentStatus(row["payment_status"]),
+        created_at=_parse_datetime(row["created_at"]),
+    )

@@ -12,6 +12,7 @@
       <div class="hero-actions">
         <a class="button" href="{{ url_for('public.index') }}#services">Browse services <span aria-hidden="true">&#8594;</span></a>
         <a class="button secondary" href="{{ url_for('shopping.cart') }}">View cart</a>
+        <a class="button secondary" href="{{ url_for('academy.overview') }}">Academy</a>
         <form method="post" action="{{ url_for('customer.logout') }}">
           <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
           <button class="button secondary" type="submit">Log out</button>

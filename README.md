@@ -33,6 +33,8 @@ app/
   __init__.py             Flask application factory and Task 0 routes
   admin.py                authenticated catalog, purchase, and fulfillment routes
   customer_auth.py        customer registration, login, logout, and session loading
+  academy.py              fixed Academy tiers and installment schedules
+  academy_routes.py       public program page and enrollment-fee checkout
   orders.py               cart snapshots, quantities, and order line values
   checkout_details.py     validated per-item requests and delivery contacts
   deliveries.py           validated customer-facing account delivery messages
@@ -52,6 +54,7 @@ app/
   templates/index.html    session-gated service catalog
   templates/service_detail.html  individual service information and purchase form
   templates/customer/     customer registration, login, and account views
+  templates/academy.html  public Academy curriculum, tiers, and enrollment state
 deploy/systemd/           sanitized web, poll, timer, and wallet-RPC units
 docs/
   architecture.md
@@ -181,13 +184,13 @@ invoices are preserved. See `docs/cart-orders.md`.
 
 ## Current database migration
 
-**Database migration required: schema 9 to 10.** Schema 10 adds the customer
-order cancellation timestamp used by the one-unfinished-order checkout guard.
-Existing invoices, accounts, carts, requests, service images, and payment state
-are preserved. Back up the database, stop the web service, pull the update, run
-the documented initializer, and restart only after success. There are no new
-dependencies. See `docs/cart-orders.md` and the operator procedure in
-`docs/deploy-xmr.md`.
+**Database migration required: schema 10 to 11.** Schema 11 adds Academy
+enrollments and the internal catalog records used for the one-time USD 100 XMR
+enrollment fee. Existing invoices, accounts, carts, requests, service images,
+and payment state are preserved. Back up the database, stop the web service,
+pull the update, run the documented initializer, and restart only after success.
+There are no new dependencies. See `docs/academy.md` and the operator procedure
+in `docs/deploy-xmr.md`.
 
 ## Next task
 

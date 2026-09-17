@@ -21,6 +21,7 @@ from flask import (
 )
 from werkzeug.security import check_password_hash, generate_password_hash
 
+from app.academy import ACADEMY_CATEGORY_ID, ACADEMY_SERVICE_ID, get_academy_tier
 from app.catalog import CatalogValidationError, CategoryRecord, ServiceRecord
 from app.deliveries import DeliveryValidationError
 from app.payments.invoice import PaymentStatus
@@ -277,6 +278,7 @@ def dashboard():
         categories = repository.list_categories()
         services = repository.list_services()
         users = repository.list_customer_accounts()
+        academy_enrollments = repository.list_academy_enrollments()
     except (PersistenceError, sqlite3.Error):
         abort(503)
     return render_template(
@@ -290,9 +292,10 @@ def dashboard():
             and purchase.fulfillment_status is FulfillmentStatus.UNFULFILLED
             for purchase in purchases
         ),
-        category_count=sum(not item.archived for item in categories),
-        service_count=sum(not item.service.archived for item in services),
+        category_count=sum(not item.archived and item.id != ACADEMY_CATEGORY_ID for item in categories),
+        service_count=sum(not item.service.archived and item.service.id != ACADEMY_SERVICE_ID for item in services),
         user_count=len(users),
+        academy_enrollment_count=len(academy_enrollments),
     )
 
 
@@ -355,10 +358,27 @@ def users():
     return render_template("admin/users.html", users=records)
 
 
+@admin.get("/academy")
+def academy_enrollments():
+    try:
+        records = _repository().list_academy_enrollments()
+    except (PersistenceError, sqlite3.Error):
+        abort(503)
+    return render_template(
+        "admin/academy.html",
+        enrollments=tuple(
+            (record, get_academy_tier(record.tier_key)) for record in records
+        ),
+    )
+
+
 @admin.get("/categories")
 def categories():
     try:
-        records = _repository().list_categories()
+        records = tuple(
+            item for item in _repository().list_categories()
+            if item.id != ACADEMY_CATEGORY_ID
+        )
     except (PersistenceError, sqlite3.Error):
         abort(503)
     return render_template("admin/categories.html", categories=records)
@@ -373,6 +393,8 @@ def category_new():
 
 @admin.route("/categories/<category_id>/edit", methods=["GET", "POST"])
 def category_edit(category_id: str):
+    if category_id == ACADEMY_CATEGORY_ID:
+        abort(404)
     record = _repository().get_category(category_id)
     if record is None:
         abort(404)
@@ -383,6 +405,8 @@ def category_edit(category_id: str):
 
 @admin.post("/categories/<category_id>/archive")
 def category_archive(category_id: str):
+    if category_id == ACADEMY_CATEGORY_ID:
+        abort(404)
     _require_admin_csrf()
     try:
         _repository().archive_category(category_id, now=_now())
@@ -396,7 +420,10 @@ def category_archive(category_id: str):
 @admin.get("/services")
 def services():
     try:
-        records = _repository().list_services()
+        records = tuple(
+            item for item in _repository().list_services()
+            if item.service.id != ACADEMY_SERVICE_ID
+        )
     except (PersistenceError, sqlite3.Error):
         abort(503)
     return render_template("admin/services.html", services=records)
@@ -414,6 +441,8 @@ def service_new():
 
 @admin.route("/services/<service_id>/edit", methods=["GET", "POST"])
 def service_edit(service_id: str):
+    if service_id == ACADEMY_SERVICE_ID:
+        abort(404)
     record = _repository().get_service(service_id)
     if record is None:
         abort(404)
@@ -427,6 +456,8 @@ def service_edit(service_id: str):
 
 @admin.post("/services/<service_id>/archive")
 def service_archive(service_id: str):
+    if service_id == ACADEMY_SERVICE_ID:
+        abort(404)
     _require_admin_csrf()
     try:
         service = _repository().get_service(service_id)

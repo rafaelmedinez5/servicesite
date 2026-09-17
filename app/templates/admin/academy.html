@@ -1,0 +1,34 @@
+{% set private_page = true %}
+{% extends "base.html" %}
+
+{% block title %}Academy enrollments | Sektor-7{% endblock %}
+
+{% block content %}
+  {% include "admin/_nav.html" %}
+  <section class="admin-heading">
+    <p class="eyebrow">Academy</p>
+    <h1>Enrollments</h1>
+    <p>Tier selections and initial enrollment-fee payment states. Monthly tuition invoices are not generated in this release.</p>
+  </section>
+
+  <div class="table-wrap card">
+    <table>
+      <thead>
+        <tr><th>User</th><th>Tier</th><th>Tuition</th><th>Initial payment</th><th>Enrolled</th></tr>
+      </thead>
+      <tbody>
+        {% for enrollment, tier in enrollments %}
+          <tr>
+            <td><strong>@{{ enrollment.username }}</strong></td>
+            <td>{{ tier.name if tier else enrollment.tier_key }}</td>
+            <td>{{ enrollment.tuition_usd_cents|usd }}</td>
+            <td><a href="{{ url_for('admin.purchase_detail', invoice_id=enrollment.enrollment_fee_invoice_id) }}">{{ enrollment.enrollment_fee_payment_status|customer_payment_label }}</a></td>
+            <td>{{ enrollment.created_at|display_datetime }}</td>
+          </tr>
+        {% else %}
+          <tr><td colspan="5">No Academy enrollments have been submitted.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+{% endblock %}

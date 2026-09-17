@@ -1955,6 +1955,73 @@ button.remove-button:focus-visible { color: var(--text); }
 .admin-stats span { display: block; color: var(--muted); }
 .admin-stats strong { display: block; margin-top: 0.5rem; font-size: 2rem; }
 
+/* Academy */
+.academy-hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1.45fr) minmax(18rem, 0.55fr);
+  gap: clamp(1.5rem, 4vw, 3rem);
+  align-items: center;
+  padding: clamp(2.5rem, 7vw, 5.5rem) 0;
+}
+.academy-hero h1 { max-width: 18ch; }
+.academy-fee-callout {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.65rem 1rem;
+  align-items: baseline;
+  margin-top: 1.5rem;
+  padding-left: 1rem;
+  border-left: 2px solid var(--cyan);
+}
+.academy-fee-callout strong { color: var(--cyan); font-size: 1.15rem; }
+.academy-fee-callout span { color: var(--muted); }
+.academy-boundary { border-color: rgba(72, 214, 214, 0.38); }
+.academy-section { margin: clamp(3rem, 8vw, 6rem) 0; }
+.academy-curriculum,
+.academy-tiers {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1rem;
+  margin-top: 1.5rem;
+}
+.academy-curriculum article,
+.academy-tier { padding: clamp(1.25rem, 3vw, 2rem); }
+.academy-curriculum ul { padding-left: 1.15rem; color: var(--muted); }
+.academy-curriculum li + li { margin-top: 0.65rem; }
+.academy-month,
+.academy-tier-label {
+  color: var(--cyan);
+  font-size: 0.76rem;
+  font-weight: 700;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+}
+.academy-tier { display: flex; flex-direction: column; }
+.academy-tier.featured { border-color: var(--cyan); }
+.academy-price { margin: 0.25rem 0 1rem; color: var(--text); font-size: 2rem; font-weight: 700; }
+.academy-installments {
+  margin: auto 0 1.25rem;
+  padding-top: 1.25rem;
+  border-top: 1px solid var(--border);
+}
+.academy-installments span,
+.academy-installments strong { display: block; }
+.academy-installments span { color: var(--muted); font-size: 0.82rem; }
+.academy-installments strong { margin-top: 0.4rem; font-size: 0.9rem; }
+.academy-enrollment-status { margin: 1rem 0 3rem; padding: clamp(1.5rem, 4vw, 2.5rem); }
+.academy-status-facts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1rem; }
+.academy-status-facts dt { color: var(--muted); font-size: 0.8rem; text-transform: uppercase; }
+.academy-status-facts dd { margin: 0.35rem 0 0; }
+.academy-billing-note { margin-bottom: clamp(3rem, 8vw, 6rem); padding: clamp(1.5rem, 4vw, 2.5rem); }
+.academy-billing-note li + li { margin-top: 0.65rem; }
+
+@media (max-width: 800px) {
+  .academy-hero,
+  .academy-curriculum,
+  .academy-tiers,
+  .academy-status-facts { grid-template-columns: 1fr; }
+}
+
 .admin-login,
 .admin-form-card,
 .admin-detail { max-width: 58rem; padding: clamp(1.4rem, 4vw, 2.3rem); }

@@ -16,7 +16,9 @@ fully server-rendered and contains no JavaScript. It supports:
 - purchase detail without bearer status tokens, deposit addresses, or deposit/
   sweep transaction identifiers;
 - viewing all registered customer usernames and account timestamps without
-  password hashes or login-guard details; and
+  password hashes or login-guard details;
+- viewing Academy tier selections, locked tuition totals, and enrollment-fee
+  payment states; and
 - marking a purchase fulfilled only after its payment reaches `settled`.
 
 Cart orders appear as one purchase with all saved service lines and the customer
