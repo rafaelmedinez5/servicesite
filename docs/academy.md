@@ -52,3 +52,11 @@ upgrades schema 10 in place and preserves accounts, catalog records, orders,
 invoices, inquiries, and payment state. Back up the SQLite database, stop the
 web service, pull the reviewed revision, run `SQLiteDatabase.initialize()`, and
 restart only after the initializer succeeds.
+
+## Public page presentation
+
+The page introduces practical learning outcomes before the three-month curriculum
+and selective hiring opportunity. All course pricing, the monthly XMR schedule,
+and existing enrollment details are grouped in the final enrollment section.
+The curriculum anchor works without JavaScript. This presentation update adds no
+dependencies or database migration and leaves invoice creation unchanged.
