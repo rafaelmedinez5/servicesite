@@ -4,7 +4,7 @@ import sqlite3
 
 from flask import Blueprint, abort, flash, g, redirect, render_template, request, url_for
 
-from app.academy import ACADEMY_ENROLLMENT_FEE_CENTS, ACADEMY_TIERS, get_academy_tier
+from app.academy import ACADEMY_FIRST_MONTH_CENTS, ACADEMY_PROGRAM
 from app.payments.invoice import InvoiceError
 from app.payments.xmr_rate import XmrRateError
 from app.payments.xmr_wallet_rpc import XmrWalletRpcError
@@ -36,12 +36,9 @@ def overview():
             abort(503)
     return render_template(
         "academy.html",
-        tiers=ACADEMY_TIERS,
-        enrollment_fee_usd_cents=ACADEMY_ENROLLMENT_FEE_CENTS,
+        program=ACADEMY_PROGRAM,
+        first_month_usd_cents=ACADEMY_FIRST_MONTH_CENTS,
         enrollment=enrollment,
-        enrolled_tier=(
-            get_academy_tier(enrollment.tier_key) if enrollment is not None else None
-        ),
         checkout_nonce=issue_checkout_nonce() if g.customer is not None and enrollment is None else None,
     )
 
@@ -58,9 +55,7 @@ def enroll():
     except FormSecurityError:
         return _academy_error("The enrollment form expired. Review the program and try again.", 400)
 
-    tier = get_academy_tier(request.form.get("tier", ""))
-    if tier is None:
-        return _academy_error("Choose a valid Academy tier.", 400)
+    program = ACADEMY_PROGRAM
 
     repository = _repository()
     try:
@@ -80,8 +75,8 @@ def enroll():
             service,
             quote,
             customer_id=g.customer.id,
-            tier_key=tier.key,
-            tuition_usd_cents=tier.tuition_usd_cents,
+            tier_key=program.key,
+            tuition_usd_cents=program.tuition_usd_cents,
         )
     except AcademyEnrollmentExistsError:
         flash("Your Academy enrollment has already been recorded.", "error")
@@ -103,10 +98,9 @@ def enroll():
 def _academy_error(message: str, status_code: int):
     return render_template(
         "academy.html",
-        tiers=ACADEMY_TIERS,
-        enrollment_fee_usd_cents=ACADEMY_ENROLLMENT_FEE_CENTS,
+        program=ACADEMY_PROGRAM,
+        first_month_usd_cents=ACADEMY_FIRST_MONTH_CENTS,
         enrollment=None,
-        enrolled_tier=None,
         checkout_nonce=issue_checkout_nonce() if g.customer is not None else None,
         error=message,
     ), status_code

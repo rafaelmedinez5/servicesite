@@ -8,13 +8,13 @@
   <section class="admin-heading">
     <p class="eyebrow">Academy</p>
     <h1>Enrollments</h1>
-    <p>Tier selections and initial enrollment-fee payment states. Monthly tuition invoices are not generated in this release.</p>
+    <p>Program enrollments, course totals, and month-one payment states. Later monthly invoices are not generated in this release.</p>
   </section>
 
   <div class="table-wrap card">
     <table>
       <thead>
-        <tr><th>User</th><th>Tier</th><th>Tuition</th><th>Initial payment</th><th>Enrolled</th></tr>
+        <tr><th>User</th><th>Program</th><th>Course total</th><th>Month one</th><th>Enrolled</th></tr>
       </thead>
       <tbody>
         {% for enrollment, tier in enrollments %}
