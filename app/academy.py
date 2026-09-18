@@ -5,7 +5,7 @@ from dataclasses import dataclass
 
 ACADEMY_CATEGORY_ID = "academy-program"
 ACADEMY_SERVICE_ID = "academy-enrollment-fee"
-ACADEMY_ENROLLMENT_FEE_CENTS = 10_000
+ACADEMY_FIRST_MONTH_CENTS = 10_000
 
 
 @dataclass(frozen=True)
@@ -22,28 +22,16 @@ class AcademyTier:
         return tuple(base + (1 if index < remainder else 0) for index in range(3))
 
 
+ACADEMY_PROGRAM = AcademyTier(
+    key="operator",
+    name="Academy Program",
+    tuition_usd_cents=30_000,
+    summary="Twelve weeks of guided study, practical labs, feedback, and a final capstone assessment.",
+    target_student="Committed learners who want practical, professional cybersecurity skills.",
+)
+
 ACADEMY_TIERS = (
-    AcademyTier(
-        key="foundation",
-        name="Foundation",
-        tuition_usd_cents=50_000,
-        summary="Recorded modules, weekly text Q&A, and core lab access.",
-        target_student="Beginners building a disciplined technical foundation.",
-    ),
-    AcademyTier(
-        key="operator",
-        name="Operator",
-        tuition_usd_cents=150_000,
-        summary="Foundation plus weekly live sessions, mentoring, the full lab suite, and scenario-based exercises.",
-        target_student="Serious learners ready for sustained practical work.",
-    ),
-    AcademyTier(
-        key="black",
-        name="Black Tier",
-        tuition_usd_cents=500_000,
-        summary="Operator plus private mentoring, advanced secure-development study, and apprenticeship consideration.",
-        target_student="Advanced students pursuing professional specialization.",
-    ),
+    ACADEMY_PROGRAM,
 )
 
 ACADEMY_TIERS_BY_KEY = {tier.key: tier for tier in ACADEMY_TIERS}

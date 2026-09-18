@@ -2,27 +2,26 @@
 
 ## Release scope
 
-The first Academy release provides a public three-month program page, customer
-tier selection, a one-time USD 100 enrollment-fee invoice paid in XMR, and an
-administrator enrollment list. It does not generate the later tuition invoices,
+The Academy release provides a public three-month program page, one USD 300
+program plan, a USD 100 month-one invoice paid in XMR, and an administrator
+enrollment list. It does not generate the later monthly invoices,
 track lesson progress, host course media, or implement automatic recurring
 payments.
 
 Cryptocurrency payments are not automatically recurring. A later release must
-create each monthly invoice explicitly and keep its state separate from the
-initial enrollment fee.
+create each later monthly invoice explicitly and keep its state separate from
+the month-one payment.
 
 ## Pricing
 
-The enrollment fee is additional to tuition. The selected tuition total is
-stored with the enrollment so later price changes cannot rewrite an existing
-student's agreement.
+The full three-month program costs USD 300. There is no enrollment fee. The
+student pays USD 100 for month one when enrolling, then USD 100 for each of
+months two and three. The course total is stored with the enrollment so later
+price changes cannot rewrite an existing student's agreement.
 
-| Tier | Three-month tuition | Monthly schedule |
+| Plan | Three-month total | Monthly schedule |
 | --- | ---: | --- |
-| Foundation | USD 500.00 | USD 166.67, USD 166.67, USD 166.66 |
-| Operator | USD 1,500.00 | USD 500.00 each month |
-| Black Tier | USD 5,000.00 | USD 1,666.67, USD 1,666.67, USD 1,666.66 |
+| Academy Program | USD 300.00 | USD 100.00 each month |
 
 ## Payment and account behavior
 
@@ -30,18 +29,18 @@ student's agreement.
   single-use checkout nonce.
 - A customer can hold only one Academy enrollment.
 - The existing unfinished-order guard applies before enrollment begins.
-- The enrollment fee uses the canonical XMR quote, unique subaddress, invoice,
+- The month-one payment uses the canonical XMR quote, unique subaddress, invoice,
   confirmation, sweep, and status flow.
-- Cancelling an unpaid enrollment-fee order releases the Academy selection so
-  the customer can choose again. Cancellation remains blocked after any payment
+- Cancelling an unpaid month-one order releases the Academy enrollment so the
+  customer can enroll again. Cancellation remains blocked after any payment
   is detected.
 - The internal Academy catalog records are not published and cannot be edited
   through normal catalog administration.
 
 ## Administration
 
-The protected Academy section lists the username, selected tier, locked tuition
-total, initial payment state, and enrollment time. Its payment-state link opens
+The protected Academy section lists the username, program, locked course total,
+month-one payment state, and enrollment time. Its payment-state link opens
 the existing redacted purchase-detail view. Password hashes, deposit addresses,
 status tokens, and transaction identifiers are not displayed.
 

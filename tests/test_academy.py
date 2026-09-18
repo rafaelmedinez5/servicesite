@@ -110,11 +110,15 @@ def test_academy_page_is_public_and_describes_authorized_program(academy_context
 
     assert response.status_code == 200
     assert "Sektor-7 Academy" in body
-    assert "Authorized environments only" in body
-    assert "$100.00 USD enrollment fee" in body
-    assert "$500.00 USD" in body
-    assert "$1,500.00 USD" in body
-    assert "$5,000.00 USD" in body
+    assert "Train. Prove yourself. Stand out." in body
+    assert "could be hired into Sektor-7" in body
+    assert "Hiring is selective and is not guaranteed" in body
+    assert "$300.00 USD total" in body
+    assert "$100.00 USD now for month one" in body
+    assert "No enrollment fee" in body
+    assert "$500.00 USD" not in body
+    assert "$1,500.00 USD" not in body
+    assert "$5,000.00 USD" not in body
     assert "Log in to enroll" in body
     assert repository.get_purchasable_service(ACADEMY_SERVICE_ID) is None
     assert all(item.id != ACADEMY_CATEGORY_ID for item in repository.list_categories(include_archived=False) if item.published)
@@ -123,7 +127,7 @@ def test_academy_page_is_public_and_describes_authorized_program(academy_context
     assert "/login?next=/academy" in anonymous_enroll.headers["Location"]
 
 
-def test_customer_enrollment_creates_exact_fee_invoice_and_admin_record(academy_context):
+def test_customer_enrollment_creates_month_one_invoice_and_admin_record(academy_context):
     _app, client, repository = academy_context
     _login_customer(client)
     page = client.get("/academy")
@@ -134,7 +138,7 @@ def test_customer_enrollment_creates_exact_fee_invoice_and_admin_record(academy_
         data={
             "csrf_token": tokens["csrf_token"],
             "checkout_nonce": tokens["checkout_nonce"],
-            "tier": "operator",
+            "tier": "black",
         },
     )
     enrollment = repository.get_academy_enrollment("academy-customer-00000001")
@@ -143,7 +147,7 @@ def test_customer_enrollment_creates_exact_fee_invoice_and_admin_record(academy_
     assert "/checkout/" in response.headers["Location"]
     assert enrollment is not None
     assert enrollment.tier_key == "operator"
-    assert enrollment.tuition_usd_cents == 150_000
+    assert enrollment.tuition_usd_cents == 30_000
     invoice = repository.get_customer_order(
         enrollment.customer_id, enrollment.enrollment_fee_invoice_id
     )
@@ -157,29 +161,30 @@ def test_customer_enrollment_creates_exact_fee_invoice_and_admin_record(academy_
     admin_body = admin_page.get_data(as_text=True)
     assert admin_page.status_code == 200
     assert "@academy.student" in admin_body
-    assert "Operator" in admin_body
-    assert "$1,500.00 USD" in admin_body
+    assert "Academy Program" in admin_body
+    assert "$300.00 USD" in admin_body
+    assert "Month one" in admin_body
     assert "Awaiting payment" in admin_body
 
 
-def test_enrollment_requires_valid_csrf_nonce_and_tier(academy_context):
+def test_enrollment_requires_valid_csrf_and_nonce(academy_context):
     _app, client, repository = academy_context
     _login_customer(client)
 
     assert client.post("/academy/enroll", data={"tier": "operator"}).status_code == 400
+    assert repository.get_academy_enrollment("academy-customer-00000001") is None
     page = client.get("/academy")
     tokens = _tokens(page)
-    invalid = client.post(
+    valid = client.post(
         "/academy/enroll",
         data={
             "csrf_token": tokens["csrf_token"],
             "checkout_nonce": tokens["checkout_nonce"],
-            "tier": "not-a-tier",
         },
     )
 
-    assert invalid.status_code == 400
-    assert repository.get_academy_enrollment("academy-customer-00000001") is None
+    assert valid.status_code == 303
+    assert repository.get_academy_enrollment("academy-customer-00000001") is not None
 
 
 def test_internal_academy_catalog_records_are_hidden_from_admin_catalog(academy_context):
@@ -197,7 +202,7 @@ def test_cancelling_unpaid_fee_releases_academy_enrollment(academy_context):
     tokens = _tokens(client.get("/academy"))
     client.post(
         "/academy/enroll",
-        data={**tokens, "tier": "foundation"},
+        data=tokens,
     )
     enrollment = repository.get_academy_enrollment("academy-customer-00000001")
     assert enrollment is not None

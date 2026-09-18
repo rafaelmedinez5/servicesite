@@ -17,7 +17,7 @@ fully server-rendered and contains no JavaScript. It supports:
   sweep transaction identifiers;
 - viewing all registered customer usernames and account timestamps without
   password hashes or login-guard details;
-- viewing Academy tier selections, locked tuition totals, and enrollment-fee
+- viewing Academy program enrollments, locked course totals, and month-one
   payment states; and
 - marking a purchase fulfilled only after its payment reaches `settled`.
 

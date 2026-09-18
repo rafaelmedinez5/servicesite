@@ -12,7 +12,7 @@ from typing import Iterator
 
 from app.academy import (
     ACADEMY_CATEGORY_ID,
-    ACADEMY_ENROLLMENT_FEE_CENTS,
+    ACADEMY_FIRST_MONTH_CENTS,
     ACADEMY_SERVICE_ID,
     get_academy_tier,
 )
@@ -518,7 +518,7 @@ class ServicesiteRepository:
             if (
                 service is None
                 or service.category_id != ACADEMY_CATEGORY_ID
-                or service.price_usd_cents != ACADEMY_ENROLLMENT_FEE_CENTS
+                or service.price_usd_cents != ACADEMY_FIRST_MONTH_CENTS
             ):
                 raise PersistenceError("Academy enrollment service is unavailable")
             return service
@@ -715,7 +715,7 @@ class ServicesiteRepository:
                 or academy_tuition_usd_cents != academy_tier.tuition_usd_cents
                 or len(lines) != 1
                 or lines[0].service.service_id != ACADEMY_SERVICE_ID
-                or invoice.price_usd_cents != ACADEMY_ENROLLMENT_FEE_CENTS
+                or invoice.price_usd_cents != ACADEMY_FIRST_MONTH_CENTS
             ):
                 raise InvoicePersistenceError("Academy enrollment details are invalid")
         try:
@@ -2327,9 +2327,9 @@ def _ensure_academy_catalog(connection: sqlite3.Connection) -> None:
             id, category_id, name, slug, description, price_usd_cents,
             duration_label, published, archived, sort_order, version,
             created_at, updated_at, image_key
-        ) VALUES (?, ?, 'Academy enrollment fee', 'academy-enrollment-fee',
-                  'One-time Academy enrollment fee. Tuition is billed separately.',
-                  ?, 'One-time enrollment', 0, 0, 1000, 1, ?, ?, NULL)
+        ) VALUES (?, ?, 'Academy month one', 'academy-enrollment-fee',
+                  'First monthly payment for the three-month Academy program.',
+                  ?, 'Month one', 0, 0, 1000, 1, ?, ?, NULL)
         ON CONFLICT(id) DO UPDATE SET
             category_id=excluded.category_id,
             name=excluded.name,
@@ -2342,7 +2342,7 @@ def _ensure_academy_catalog(connection: sqlite3.Connection) -> None:
         (
             ACADEMY_SERVICE_ID,
             ACADEMY_CATEGORY_ID,
-            ACADEMY_ENROLLMENT_FEE_CENTS,
+            ACADEMY_FIRST_MONTH_CENTS,
             now,
             now,
         ),
