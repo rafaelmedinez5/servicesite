@@ -110,11 +110,14 @@ def test_academy_page_is_public_and_describes_authorized_program(academy_context
 
     assert response.status_code == 200
     assert "Sektor-7 Academy" in body
-    assert "Train. Prove yourself. Stand out." in body
-    assert "could be hired into Sektor-7" in body
+    assert "Build practical cybersecurity skills." in body
+    assert "Strong performance can open the door to Sektor-7." in body
     assert "Hiring is selective and is not guaranteed" in body
-    assert "$300.00 USD total" in body
-    assert "$100.00 USD now for month one" in body
+    assert "$300.00 USD" in body
+    assert "$100.00 USD" in body
+    assert "$" not in body.split('id="enroll"')[0]
+    assert body.index('id="curriculum"') < body.index('id="opportunity-title"') < body.index('id="enroll"')
+    assert 'href="#curriculum"' in body
     assert "No enrollment fee" in body
     assert "$500.00 USD" not in body
     assert "$1,500.00 USD" not in body

@@ -1956,39 +1956,41 @@ button.remove-button:focus-visible { color: var(--text); }
 .admin-stats strong { display: block; margin-top: 0.5rem; font-size: 2rem; }
 
 /* Academy */
+.academy-page { --muted: #b8bfca; }
 .academy-hero {
-  max-width: 58rem;
-  padding: clamp(2.5rem, 7vw, 5.5rem) 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1.35fr) minmax(0, 0.85fr);
+  gap: clamp(2rem, 5vw, 4rem);
+  align-items: center;
+  padding: clamp(2rem, 4vw, 3.5rem) 0 1rem;
 }
-.academy-hero h1 { max-width: 14ch; }
-.academy-fee-callout {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.65rem 1rem;
-  align-items: baseline;
-  margin-top: 1.5rem;
-  padding-left: 1rem;
-  border-left: 2px solid var(--cyan);
-}
-.academy-fee-callout strong { color: var(--cyan); font-size: 1.15rem; }
-.academy-fee-callout span { color: var(--muted); }
-.academy-opportunity {
-  max-width: 62rem;
-  margin: 0 0 clamp(3rem, 8vw, 6rem);
-  padding: clamp(1.5rem, 4vw, 2.5rem) 0 clamp(1.5rem, 4vw, 2.5rem) clamp(1.25rem, 3vw, 2rem);
-  border-left: 3px solid var(--cyan);
-}
-.academy-opportunity h2 { max-width: 24ch; }
-.academy-section { margin: clamp(3rem, 8vw, 6rem) 0; }
-.academy-curriculum {
+.academy-hero h1 { max-width: 16ch; font-size: clamp(2.5rem, 5vw, 4.5rem); }
+.academy-hero .lede { font-size: 1.1rem; }
+.academy-hero-note { color: var(--muted); font-size: 0.9rem; margin-top: 1rem; }
+.academy-project-preview { padding: clamp(1.5rem, 3vw, 2rem); }
+.academy-project-preview h2 { font-size: 1.5rem; }
+.academy-project-preview ol { padding-left: 1.5rem; margin-bottom: 0; }
+.academy-project-preview li { padding: 0.8rem 0 0.8rem 0.4rem; }
+.academy-project-preview li::marker { color: var(--cyan); font-weight: 700; }
+.academy-project-preview strong, .academy-project-preview span { display: block; }
+.academy-project-preview span { color: var(--muted); margin-top: 0.3rem; }
+.academy-opportunity { padding: clamp(1.5rem, 3vw, 2rem); border-left: 3px solid var(--cyan); }
+.academy-opportunity h2 { max-width: 32ch; }
+.academy-opportunity p { max-width: 65ch; }
+.academy-section { margin: clamp(2.5rem, 5vw, 4rem) 0; scroll-margin-top: 2rem; }
+.academy-curriculum, .academy-outcomes {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 1rem;
+  gap: 1.25rem;
   margin-top: 1.5rem;
 }
-.academy-curriculum article { padding: clamp(1.25rem, 3vw, 2rem); }
+.academy-outcomes article { padding-top: 1.25rem; border-top: 2px solid var(--border); }
+.academy-outcomes p { color: var(--muted); }
+.academy-curriculum article { display: flex; flex-direction: column; padding: clamp(1.25rem, 2.5vw, 1.75rem); }
 .academy-curriculum ul { padding-left: 1.15rem; color: var(--muted); }
 .academy-curriculum li + li { margin-top: 0.65rem; }
+.academy-deliverable { margin-top: auto; padding-top: 1rem; border-top: 1px solid var(--border); color: var(--muted); }
+.academy-deliverable strong { display: block; color: var(--text); margin-bottom: 0.4rem; }
 .academy-month {
   color: var(--cyan);
   font-size: 0.76rem;
@@ -2004,28 +2006,28 @@ button.remove-button:focus-visible { color: var(--text); }
   padding: clamp(1.5rem, 4vw, 2.75rem);
 }
 .academy-plan-price { align-self: center; }
-.academy-plan-price span,
-.academy-installments small { color: var(--muted); }
+.academy-plan-price span { color: var(--muted); }
 .academy-installments {
   margin: 0;
   padding-top: 1.25rem;
   border-top: 1px solid var(--border);
 }
 .academy-plan .academy-installments { grid-column: 1 / -1; }
-.academy-installments span,
-.academy-installments strong { display: block; }
-.academy-installments span { color: var(--muted); font-size: 0.82rem; }
-.academy-installments strong { margin-top: 0.4rem; font-size: 0.9rem; }
-.academy-installments small { display: block; margin-top: 0.5rem; }
+.academy-payment-schedule { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1rem; list-style: none; padding: 0; }
+.academy-payment-schedule span, .academy-payment-schedule strong { display: block; }
+.academy-payment-schedule span { color: var(--muted); font-size: 0.9rem; }
+.academy-payment-schedule strong { margin-top: 0.4rem; }
+.academy-installments p { color: var(--muted); }
 .academy-scope-note { max-width: 58rem; margin-top: 1.25rem; color: var(--muted); }
 .academy-enrollment-status { margin: 1rem 0 3rem; padding: clamp(1.5rem, 4vw, 2.5rem); }
 .academy-status-facts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1rem; }
 .academy-status-facts dt { color: var(--muted); font-size: 0.8rem; text-transform: uppercase; }
 .academy-status-facts dd { margin: 0.35rem 0 0; }
-.academy-billing-note { max-width: 58rem; margin-bottom: clamp(3rem, 8vw, 6rem); }
-.academy-billing-note li + li { margin-top: 0.65rem; }
 
 @media (max-width: 800px) {
+  .academy-hero,
+  .academy-outcomes,
+  .academy-payment-schedule,
   .academy-curriculum,
   .academy-plan,
   .academy-status-facts { grid-template-columns: 1fr; }

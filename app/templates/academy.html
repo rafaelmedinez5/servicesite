@@ -1,18 +1,68 @@
 {% extends "base.html" %}
 {% block title %}Academy | Sektor-7{% endblock %}
 {% block content %}
+  <div class="academy-page">
+  {% if error %}<p class="flash error" role="alert">{{ error }}</p>{% endif %}
   <section class="academy-hero" aria-labelledby="academy-title">
-    <p class="eyebrow"><span class="eyebrow-line" aria-hidden="true"></span>Sektor-7 Academy</p>
-    <h1 id="academy-title">Train. Prove yourself. Stand out.</h1>
-    <p class="lede">A focused three-month program in professional, authorized cybersecurity—built around practical labs, sound judgment, and work you can defend.</p>
-    <div class="academy-fee-callout">
-      <strong>{{ program.tuition_usd_cents|usd }} total</strong>
-      <span>Pay {{ first_month_usd_cents|usd }} now for month one. No enrollment fee.</span>
+    <div>
+      <p class="eyebrow"><span class="eyebrow-line" aria-hidden="true"></span>Sektor-7 Academy</p>
+      <h1 id="academy-title">Build practical cybersecurity skills.</h1>
+      <p class="lede">Three months of hands-on labs, guided study, and feedback. Learn to assess systems, document findings, and explain how to fix them.</p>
+      <a class="button" href="#curriculum">Explore the program</a>
+      <p class="academy-hero-note">Three months · Practical labs · Final assessment</p>
+    </div>
+    <aside class="card academy-project-preview" aria-labelledby="project-preview-title">
+      <p class="eyebrow">Your final project</p>
+      <h2 id="project-preview-title">From a lab to a clear assessment.</h2>
+      <ol>
+        <li><strong>Define the scope</strong><span>Plan an authorized assessment.</span></li>
+        <li><strong>Test and document</strong><span>Collect evidence and explain your findings.</span></li>
+        <li><strong>Recommend improvements</strong><span>Turn technical results into a useful report.</span></li>
+      </ol>
+    </aside>
+  </section>
+
+  <section class="academy-section" aria-labelledby="outcomes-title">
+    <p class="eyebrow">What you’ll build</p>
+    <h2 id="outcomes-title">Skills you can put into practice.</h2>
+    <div class="academy-outcomes">
+      <article><h3>Assessment scripts</h3><p>Use Python and shell automation to make repeatable assessment tasks easier.</p></article>
+      <article><h3>Documented findings</h3><p>Capture evidence, explain the risk, and connect each finding to a recommended fix.</p></article>
+      <article><h3>A final report</h3><p>Bring your work together in a capstone assessment with technical and executive reporting.</p></article>
     </div>
   </section>
 
-  {% if error %}<p class="flash error" role="alert">{{ error }}</p>{% endif %}
+  <section class="academy-section" id="curriculum" aria-labelledby="curriculum-title">
+    <p class="eyebrow">Curriculum</p>
+    <h2 id="curriculum-title">Your three-month learning path</h2>
+    <div class="academy-curriculum">
+      <article class="card">
+        <span class="academy-month">Month 01</span><h3>Foundations</h3>
+        <ul><li>Networking, operating systems, and identity basics</li><li>Authorization, scope, and evidence handling</li><li>Python and shell scripting for assessment tasks</li></ul>
+        <p class="academy-deliverable"><strong>Put it into practice</strong>Assessment scripts and clear technical notes.</p>
+      </article>
+      <article class="card">
+        <span class="academy-month">Month 02</span><h3>Security testing and assessment</h3>
+        <ul><li>Reconnaissance and attack-surface mapping</li><li>Web, API, and network testing in controlled labs</li><li>Evidence capture, remediation, and retesting</li></ul>
+        <p class="academy-deliverable"><strong>Put it into practice</strong>Documented findings with evidence and recommended fixes.</p>
+      </article>
+      <article class="card">
+        <span class="academy-month">Month 03</span><h3>Applied assessment and final project</h3>
+        <ul><li>Engagement planning and professional communication</li><li>Identity-security scenarios and purple-team validation</li><li>Capstone assessment and report writing</li></ul>
+        <p class="academy-deliverable"><strong>Put it into practice</strong>A final assessment report for technical and executive readers.</p>
+      </article>
+    </div>
+    <p class="academy-scope-note"><strong>Lab policy:</strong> All practical work is limited to owned systems, purpose-built labs, or targets covered by explicit written authorization.</p>
+  </section>
 
+  <section class="card academy-opportunity" aria-labelledby="opportunity-title">
+    <p class="eyebrow">Where strong performance can lead</p>
+    <h2 id="opportunity-title">Strong performance can open the door to Sektor-7.</h2>
+    <p>Show technical skill, sound judgment, and clear communication throughout the program, and you may be invited to interview for a role with the group.</p>
+    <p class="academy-scope-note">Hiring is selective and is not guaranteed. Enrollment is for training; consideration for a role depends on your performance.</p>
+  </section>
+
+  <section class="academy-section" id="enroll" aria-labelledby="enroll-title">
   {% if enrollment %}
     <section class="card academy-enrollment-status" aria-labelledby="enrollment-status-title">
       <p class="eyebrow">Your enrollment</p>
@@ -27,28 +77,16 @@
     </section>
   {% endif %}
 
-  <section class="academy-opportunity" aria-labelledby="opportunity-title">
-    <p class="eyebrow">Where strong performance can lead</p>
-    <h2 id="opportunity-title">Do excellent work. You could be hired into Sektor-7.</h2>
-    <p>Students who consistently demonstrate technical skill, sound judgment, clear communication, and professional discipline may be invited to interview for a role with the group. Hiring is selective and is not guaranteed, but this program is a real opportunity to prove what you can do.</p>
-  </section>
-
-  <section class="academy-section" aria-labelledby="curriculum-title">
-    <p class="eyebrow">Curriculum</p>
-    <h2 id="curriculum-title">Three months of practical development</h2>
-    <div class="academy-curriculum">
-      <article class="card"><span class="academy-month">Month 01</span><h3>Foundations</h3><ul><li>Authorization, scope, rules of engagement, and evidence handling</li><li>Networking, HTTP, Linux, Windows, and identity fundamentals</li><li>Python and shell automation for repeatable assessment tasks</li><li>Threat modeling, vulnerability triage, and risk communication</li><li>Clear technical notes and defensible findings</li></ul></article>
-      <article class="card"><span class="academy-month">Month 02</span><h3>Offensive security tools</h3><ul><li>Authorized reconnaissance and attack-surface mapping</li><li>Web and API assessment methodology in controlled labs</li><li>Network and endpoint validation with safe test procedures</li><li>Exploit analysis and secure proof-of-concept development</li><li>Evidence capture, remediation mapping, and retesting</li></ul></article>
-      <article class="card"><span class="academy-month">Month 03</span><h3>Real-world operations</h3><ul><li>Engagement planning, communication, and operational safety</li><li>Identity and directory-security scenarios in isolated ranges</li><li>Purple-team validation and detection-aware testing</li><li>Executive and technical report construction</li><li>Capstone assessment under a documented rules-of-engagement plan</li></ul></article>
-    </div>
-    <p class="academy-scope-note"><strong>Lab policy:</strong> All practical work is limited to owned systems, purpose-built labs, or targets covered by explicit written authorization.</p>
-  </section>
-
-  <section class="academy-section" id="enroll" aria-labelledby="enroll-title">
     <div class="card academy-plan">
-      <div><p class="eyebrow">One program. One price.</p><h2 id="enroll-title">{{ program.name }}</h2><p>{{ program.summary }}</p></div>
-      <div class="academy-plan-price"><p class="academy-price">{{ program.tuition_usd_cents|usd }}</p><span>Total for all three months</span></div>
-      <div class="academy-installments"><span>Payment schedule</span><strong>{% for amount in program.installments_usd_cents %}{{ amount|usd }}{% if not loop.last %} · {% endif %}{% endfor %}</strong><small>{{ first_month_usd_cents|usd }} is due now. There is no enrollment fee.</small></div>
+      <div><p class="eyebrow">Enrollment</p><h2 id="enroll-title">{{ program.name }}</h2><p>{{ program.summary }}</p></div>
+      <div class="academy-plan-price"><p class="academy-price">{{ program.tuition_usd_cents|usd }}</p><span>Total for all three months · No enrollment fee</span></div>
+      <div class="academy-installments">
+        <h3>Three monthly payments</h3>
+        <ol class="academy-payment-schedule">
+          {% for amount in program.installments_usd_cents %}<li><span>Month {{ loop.index }}{% if loop.first %} · Due at enrollment{% endif %}</span><strong>{{ amount|usd }}</strong></li>{% endfor %}
+        </ol>
+        <p>Pay in XMR. Monthly payments are made manually and are not automatically recurring.</p>
+      </div>
       {% if not enrollment %}
         {% if g.customer %}<form method="post" action="{{ url_for('academy.enroll') }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="checkout_nonce" value="{{ checkout_nonce }}"><button class="button" type="submit">Enroll and pay month one</button></form>
         {% else %}<a class="button" href="{{ url_for('customer.login', next=url_for('academy.overview')) }}">Log in to enroll</a>{% endif %}
@@ -56,5 +94,5 @@
     </div>
   </section>
 
-  <section class="academy-billing-note"><h2>How billing works</h2><ol><li>Pay {{ first_month_usd_cents|usd }} in XMR to begin month one.</li><li>Pay {{ first_month_usd_cents|usd }} for month two and {{ first_month_usd_cents|usd }} for month three.</li><li>Monthly XMR payments are made manually; cryptocurrency payments are not automatically recurring.</li></ol></section>
+  </div>
 {% endblock %}
