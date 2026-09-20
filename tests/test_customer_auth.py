@@ -117,6 +117,7 @@ def test_site_entry_captcha_is_required_correct_and_single_use(customer_context)
     app, client, _ = customer_context
     app.config["SITE_ACCESS_GATE_ENABLED"] = True
     page = client.get("/")
+    assert "<title>Hacking Academy | Sektor-7</title>" in page.get_data(as_text=True)
     data = {"csrf_token": _csrf(page)}
 
     missing = client.post("/", data=data)
