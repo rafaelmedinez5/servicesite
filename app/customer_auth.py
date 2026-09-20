@@ -46,6 +46,7 @@ _ANONYMOUS_ENDPOINTS = frozenset(
         "public.join",
         "public.join_submit",
         "public.pgp_key",
+        "public.service_image",
         "academy.overview",
         "academy.enroll",
         "static",
