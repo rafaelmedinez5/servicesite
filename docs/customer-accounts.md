@@ -1,7 +1,9 @@
 # Customer accounts
 
-The root page presents a server-authenticated, single-use arithmetic CAPTCHA
-before showing the public homepage catalog. Customer accounts provide the
+The root page presents a server-authenticated, single-use arithmetic CAPTCHA.
+Until it is solved, every browser page redirects to the root access check. Static
+assets, `/health`, and the internal payment poller remain available because they
+are rendering and machine-operation endpoints. Customer accounts provide the
 identity boundary for individual service pages and checkout; creating an invoice
 requires a valid customer session.
 
@@ -29,7 +31,8 @@ hashes.
 - First-time homepage access requires a separate server-authenticated,
   single-use arithmetic CAPTCHA. Its verified flag lasts for the browser
   session. The challenge is stored as a keyed digest and expires after ten
-  minutes.
+  minutes. Successful verification redirects to the homepage; browser routes
+  cannot be opened beforehand.
 - Customer login requires a server-authenticated, single-use arithmetic CAPTCHA
   that expires after ten minutes. A failed CAPTCHA is rejected before any
   username lookup or password-rate-limit mutation.

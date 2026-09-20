@@ -15,6 +15,7 @@ def test_application_smoke(monkeypatch, tmp_path):
     app = create_app(
         {
             "TESTING": True,
+            "SITE_ACCESS_GATE_ENABLED": True,
             "DB_PATH": str(tmp_path / "smoke.db"),
             "SERVICESITE_REPOSITORY": ServicesiteRepository(database),
         }
@@ -24,7 +25,9 @@ def test_application_smoke(monkeypatch, tmp_path):
     entry = client.get("/")
     assert entry.status_code == 200
     assert "Confirm you are human" in entry.get_data(as_text=True)
-    assert client.get("/login").status_code == 200
+    login = client.get("/login")
+    assert login.status_code == 303
+    assert login.headers["Location"].endswith("/")
     health = client.get("/health")
     assert health.status_code == 200
     assert health.get_data(as_text=True) == "OK"

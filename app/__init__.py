@@ -79,6 +79,7 @@ def create_app(test_config: dict | None = None) -> Flask:
         XMR_SWEEP_RECONCILE_SECONDS=settings.xmr_sweep_reconcile_seconds,
         X_INTERNAL_TOKEN=settings.internal_token,
         ALLOW_PUBLIC_XMR_WALLET_RPC=settings.allow_public_xmr_wallet_rpc,
+        SITE_ACCESS_GATE_ENABLED=True,
     )
     if test_config:
         app.config.update(test_config)
@@ -98,6 +99,10 @@ def create_app(test_config: dict | None = None) -> Flask:
         PERMANENT_SESSION_LIFETIME=timedelta(hours=app.config["ADMIN_SESSION_HOURS"]),
         SESSION_REFRESH_EACH_REQUEST=False,
     )
+    if app.config["TESTING"] and not (
+        test_config and "SITE_ACCESS_GATE_ENABLED" in test_config
+    ):
+        app.config["SITE_ACCESS_GATE_ENABLED"] = False
 
     @app.before_request
     def enforce_request_size():
