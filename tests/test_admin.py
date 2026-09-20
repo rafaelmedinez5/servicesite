@@ -21,6 +21,7 @@ from app.persistence import FulfillmentStatus, SQLiteDatabase, ServicesiteReposi
 
 NOW = datetime(2026, 8, 23, 12, 0, tzinfo=timezone.utc)
 CSRF_PATTERN = re.compile(r'name="csrf_token" value="([^"]+)"')
+CAPTCHA_PATTERN = re.compile(r'class="captcha-question">(\d+) \+ (\d+)</strong>')
 TEST_SESSION_SECRET = secrets.token_urlsafe(32)
 TEST_ADMIN_PASSWORD = secrets.token_urlsafe(24)
 TEST_SETUP_PASSWORD = secrets.token_urlsafe(24)
@@ -87,6 +88,12 @@ def _csrf(response) -> str:
     match = CSRF_PATTERN.search(response.get_data(as_text=True))
     assert match is not None
     return match.group(1)
+
+
+def _captcha(response) -> str:
+    match = CAPTCHA_PATTERN.search(response.get_data(as_text=True))
+    assert match is not None
+    return str(int(match.group(1)) + int(match.group(2)))
 
 
 def _login(client):
@@ -593,6 +600,26 @@ def test_admin_uploads_metadata_free_service_image_with_unrelated_name(admin_con
     assert public_image.headers["Content-Disposition"] == 'inline; filename="service-image.webp"'
     assert "immutable" in public_image.headers["Cache-Control"]
     assert private_preview.headers["Cache-Control"] == "no-store, private, max-age=0"
+
+    app.config["SITE_ACCESS_GATE_ENABLED"] = True
+    visitor = app.test_client()
+    blocked_image = visitor.get(public_path)
+    assert blocked_image.status_code == 303
+    assert blocked_image.headers["Location"].endswith("/")
+    access_page = visitor.get("/")
+    verified = visitor.post(
+        "/",
+        data={
+            "csrf_token": _csrf(access_page),
+            "captcha_answer": _captcha(access_page),
+        },
+    )
+    assert verified.status_code == 303
+    homepage = visitor.get("/").get_data(as_text=True)
+    assert public_path in homepage
+    verified_image = visitor.get(public_path)
+    assert verified_image.status_code == 200
+    assert verified_image.mimetype == "image/webp"
 
 
 def test_replacing_removing_and_archiving_images_revoke_public_urls(admin_context):
