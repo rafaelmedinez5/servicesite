@@ -23,13 +23,7 @@
   </section>
 
   {% if categories %}
-    <section class="catalog" id="services" aria-labelledby="services-title">
-      <header class="catalog-intro">
-        <p class="eyebrow"><span class="eyebrow-line" aria-hidden="true"></span>Services</p>
-        <h2 id="services-title">Choose the service that fits your needs.</h2>
-        <p>Each listing explains what is included and shows its price. Final payment details appear at checkout.</p>
-      </header>
-
+    <section class="catalog" id="services" aria-label="Services">
       {% for category in categories %}
         <section class="catalog-section" id="category-{{ category.id }}" aria-labelledby="category-title-{{ category.id }}">
           <header class="section-heading category-section-heading">

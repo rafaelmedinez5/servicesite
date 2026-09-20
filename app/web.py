@@ -25,6 +25,12 @@ from flask import (
 
 from app.catalog import CategoryRecord, PurchasableService
 from app.orders import CartError
+from app.login_captcha import (
+    issue_site_captcha,
+    mark_site_access_verified,
+    site_access_verified,
+    verify_site_captcha,
+)
 from app.payments.invoice import (
     Invoice,
     InvoiceCreator,
@@ -77,9 +83,26 @@ class CustomerPaymentState:
     fulfillment_text: str
 
 
-@public.get("/")
+@public.route("/", methods=["GET", "POST"])
 def index():
     g.no_store = True
+    if not getattr(g, "site_authenticated", False) and not site_access_verified():
+        g.private_response = True
+        if request.method == "GET":
+            return render_template(
+                "access_gate.html", captcha_question=issue_site_captcha()
+            )
+        try:
+            require_csrf(request.form.get("csrf_token"))
+        except FormSecurityError:
+            return _site_access_response("The form expired. Try again.", 400)
+        if not verify_site_captcha(request.form.get("captcha_answer")):
+            return _site_access_response(
+                "Check the verification answer and try again.", 400
+            )
+        mark_site_access_verified()
+        return redirect(url_for("public.index"), code=303)
+
     try:
         category_records = _published_category_records()
         services = _repository().list_purchasable_services()
@@ -92,6 +115,17 @@ def index():
     return render_template(
         "index.html",
         categories=_group_services(category_records, services),
+    )
+
+
+def _site_access_response(error: str, status_code: int):
+    return (
+        render_template(
+            "access_gate.html",
+            error=error,
+            captcha_question=issue_site_captcha(),
+        ),
+        status_code,
     )
 
 

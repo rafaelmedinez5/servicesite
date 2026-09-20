@@ -35,6 +35,7 @@ _ANONYMOUS_ENDPOINTS = frozenset(
         "customer.login",
         "customer.register",
         "health",
+        "public.index",
         "public.about",
         "public.contact",
         "public.contact_submit",

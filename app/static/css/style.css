@@ -573,25 +573,6 @@ p {
   scroll-margin-top: 2rem;
 }
 
-.catalog-intro {
-  max-width: 48rem;
-  margin-inline: auto;
-  margin-bottom: 3rem;
-  text-align: center;
-}
-
-.catalog-intro h2 {
-  max-width: 47rem;
-  margin-bottom: 0.8rem;
-  font-size: clamp(2.2rem, 5vw, 3.8rem);
-}
-
-.catalog-intro > p {
-  max-width: 40rem;
-  margin-inline: auto;
-  margin-bottom: 0;
-}
-
 .page-hero {
   max-width: 60rem;
   margin-bottom: clamp(4rem, 8vw, 6.5rem);
@@ -2161,10 +2142,6 @@ th { color: var(--muted); font-size: 0.78rem; text-transform: uppercase; }
 
   .home-hero h1 {
     font-size: clamp(2.8rem, 14vw, 4.4rem);
-  }
-
-  .catalog-intro h2 {
-    font-size: clamp(2.4rem, 12vw, 3.5rem);
   }
 
   .payment-layout {

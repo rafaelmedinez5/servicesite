@@ -1,14 +1,15 @@
 # Customer accounts
 
-Customer accounts provide the identity boundary for catalog access and
-checkout. Anonymous visitors are redirected to login before the catalog or an
-individual service can be viewed; creating an invoice requires a valid customer
-session.
+The root page presents a server-authenticated, single-use arithmetic CAPTCHA
+before showing the public homepage catalog. Customer accounts provide the
+identity boundary for individual service pages and checkout; creating an invoice
+requires a valid customer session.
 
 ## Routes
 
 | Method | Route | Behavior |
 | --- | --- | --- |
+| `GET, POST` | `/` | Verify a first-time browser session, then show the homepage catalog |
 | `GET, POST` | `/register` | Validate a new username/password and create the account |
 | `GET, POST` | `/login` | Verify credentials and start the signed session |
 | `GET` | `/account` | Show the current username and checkout readiness |
@@ -25,6 +26,10 @@ hashes.
 
 - Registration, login, and logout submissions require the signed-session CSRF
   token.
+- First-time homepage access requires a separate server-authenticated,
+  single-use arithmetic CAPTCHA. Its verified flag lasts for the browser
+  session. The challenge is stored as a keyed digest and expires after ten
+  minutes.
 - Customer login requires a server-authenticated, single-use arithmetic CAPTCHA
   that expires after ten minutes. A failed CAPTCHA is rejected before any
   username lookup or password-rate-limit mutation.

@@ -85,8 +85,9 @@ def test_auth_pages_are_private_and_navigation_offers_account_creation(
     register = client.get("/register")
     login = client.get("/login")
 
-    assert home.status_code == 303
-    assert home.headers["Location"].endswith("/login?next=/")
+    assert home.status_code == 200
+    assert "Confirm you are human" in home.get_data(as_text=True)
+    assert 'action="/"' in home.get_data(as_text=True)
     login_body = login.get_data(as_text=True)
     register_body = register.get_data(as_text=True)
     assert 'href="/login"' in login_body
@@ -111,6 +112,44 @@ def test_auth_pages_are_private_and_navigation_offers_account_creation(
             '<meta name="robots" content="noindex, nofollow, noarchive">'
             in response.get_data(as_text=True)
         )
+
+
+def test_site_entry_captcha_is_required_correct_and_single_use(customer_context):
+    _, client, _ = customer_context
+    page = client.get("/")
+    data = {"csrf_token": _csrf(page)}
+
+    missing = client.post("/", data=data)
+    assert missing.status_code == 400
+    assert "verification answer" in missing.get_data(as_text=True)
+
+    fresh = missing
+    successful = client.post(
+        "/",
+        data={
+            "csrf_token": _csrf(fresh),
+            "captcha_answer": _captcha(fresh),
+        },
+    )
+    assert successful.status_code == 303
+    assert successful.headers["Location"].endswith("/")
+
+    homepage = client.get("/")
+    assert homepage.status_code == 200
+    body = homepage.get_data(as_text=True)
+    assert "Sektor-7 provides targeted, surgical security engagements" in body
+    assert "Confirm you are human" not in body
+
+    with client.session_transaction() as browser_session:
+        browser_session.pop("_site_access_verified")
+    replay = client.post(
+        "/",
+        data={
+            "csrf_token": _csrf(fresh),
+            "captcha_answer": _captcha(fresh),
+        },
+    )
+    assert replay.status_code == 400
 
 
 def test_registration_normalizes_username_hashes_password_and_starts_session(
@@ -323,8 +362,11 @@ def test_customer_forms_require_csrf(customer_context):
 def test_anonymous_access_is_limited_to_entry_and_information_pages(customer_context):
     _, client, _ = customer_context
 
+    entry = client.get("/")
+    assert entry.status_code == 200
+    assert "Confirm you are human" in entry.get_data(as_text=True)
+
     for path in (
-        "/",
         "/categories/example",
         "/services/example",
         "/cart",
