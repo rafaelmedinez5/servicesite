@@ -86,7 +86,11 @@ class CustomerPaymentState:
 @public.route("/", methods=["GET", "POST"])
 def index():
     g.no_store = True
-    if not getattr(g, "site_authenticated", False) and not site_access_verified():
+    if (
+        current_app.config.get("SITE_ACCESS_GATE_ENABLED", True)
+        and not getattr(g, "site_authenticated", False)
+        and not site_access_verified()
+    ):
         g.private_response = True
         if request.method == "GET":
             return render_template(

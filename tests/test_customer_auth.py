@@ -86,8 +86,7 @@ def test_auth_pages_are_private_and_navigation_offers_account_creation(
     login = client.get("/login")
 
     assert home.status_code == 200
-    assert "Confirm you are human" in home.get_data(as_text=True)
-    assert 'action="/"' in home.get_data(as_text=True)
+    assert "Sektor-7 provides targeted, surgical security engagements" in home.get_data(as_text=True)
     login_body = login.get_data(as_text=True)
     register_body = register.get_data(as_text=True)
     assert 'href="/login"' in login_body
@@ -115,7 +114,8 @@ def test_auth_pages_are_private_and_navigation_offers_account_creation(
 
 
 def test_site_entry_captcha_is_required_correct_and_single_use(customer_context):
-    _, client, _ = customer_context
+    app, client, _ = customer_context
+    app.config["SITE_ACCESS_GATE_ENABLED"] = True
     page = client.get("/")
     data = {"csrf_token": _csrf(page)}
 
@@ -150,6 +150,43 @@ def test_site_entry_captcha_is_required_correct_and_single_use(customer_context)
         },
     )
     assert replay.status_code == 400
+
+
+def test_site_entry_gate_blocks_every_browser_page_until_verified(customer_context):
+    app, client, _ = customer_context
+    app.config["SITE_ACCESS_GATE_ENABLED"] = True
+
+    for path in (
+        "/login",
+        "/register",
+        "/about",
+        "/academy",
+        "/join",
+        "/contact",
+        "/pgp-key",
+        "/services/example",
+        "/admin/login",
+        "/missing-page",
+    ):
+        response = client.get(path)
+        assert response.status_code == 303
+        assert response.headers["Location"].endswith("/")
+
+    assert client.get("/static/css/style.css").status_code == 200
+    assert client.get("/health").status_code == 200
+
+    entry = client.get("/")
+    verified = client.post(
+        "/",
+        data={
+            "csrf_token": _csrf(entry),
+            "captcha_answer": _captcha(entry),
+        },
+    )
+    assert verified.status_code == 303
+    assert client.get("/about").status_code == 200
+    assert client.get("/login").status_code == 200
+    assert client.get("/admin/login").status_code == 200
 
 
 def test_registration_normalizes_username_hashes_password_and_starts_session(
@@ -364,7 +401,7 @@ def test_anonymous_access_is_limited_to_entry_and_information_pages(customer_con
 
     entry = client.get("/")
     assert entry.status_code == 200
-    assert "Confirm you are human" in entry.get_data(as_text=True)
+    assert "Sektor-7 provides targeted, surgical security engagements" in entry.get_data(as_text=True)
 
     for path in (
         "/categories/example",

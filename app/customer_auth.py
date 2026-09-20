@@ -21,7 +21,11 @@ from flask import (
 from werkzeug.security import check_password_hash, generate_password_hash
 
 from app.admin import admin_session_authenticated
-from app.login_captcha import issue_login_captcha, verify_login_captcha
+from app.login_captcha import (
+    issue_login_captcha,
+    site_access_verified,
+    verify_login_captcha,
+)
 from app.persistence import CustomerAccount, PersistenceError, ServicesiteRepository
 from app.web_security import FormSecurityError, require_csrf
 
@@ -81,6 +85,13 @@ def require_site_session():
     g.site_authenticated = g.customer is not None or g.admin_authenticated
     if g.site_authenticated:
         return None
+    if (
+        current_app.config.get("SITE_ACCESS_GATE_ENABLED", True)
+        and not site_access_verified()
+        and request.endpoint not in {"public.index", "static", "health"}
+        and request.blueprint != "internal"
+    ):
+        return redirect(url_for("public.index"), code=303)
     if request.endpoint is None:
         return None
     if request.endpoint in _ANONYMOUS_ENDPOINTS:
