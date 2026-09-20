@@ -216,7 +216,8 @@ def test_public_catalog_renders_only_published_services(web_context):
     assert "We don't scan. We don't audit. We don't consult." in body
     assert "Sektor-7 provides targeted, surgical security engagements" in body
     assert 'id="services"' in body
-    assert "Choose the service that fits your needs." in body
+    assert "Choose the service that fits your needs." not in body
+    assert 'class="catalog-intro"' not in body
     assert "Three clear steps." not in body
     assert "Engagement protocol" not in body
     assert "How we operate" not in body

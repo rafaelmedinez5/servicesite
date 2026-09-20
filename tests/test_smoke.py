@@ -22,8 +22,8 @@ def test_application_smoke(monkeypatch, tmp_path):
     client = app.test_client()
 
     entry = client.get("/")
-    assert entry.status_code == 303
-    assert entry.headers["Location"].endswith("/login?next=/")
+    assert entry.status_code == 200
+    assert "Confirm you are human" in entry.get_data(as_text=True)
     assert client.get("/login").status_code == 200
     health = client.get("/health")
     assert health.status_code == 200

@@ -1,0 +1,31 @@
+{% set private_page = true %}
+{% extends "base.html" %}
+
+{% block title %}Access check | Sektor-7{% endblock %}
+
+{% block content %}
+  <section class="auth-layout" aria-labelledby="access-title">
+    <div class="auth-intro">
+      <img class="auth-brand-icon" src="{{ url_for('static', filename='branding/sektor7-icon.png') }}" alt="" width="512" height="512">
+      <p class="eyebrow"><span class="eyebrow-line" aria-hidden="true"></span>Sektor-7</p>
+      <h1 id="access-title">Verify access.</h1>
+      <p class="lede">Complete the quick check to enter the site.</p>
+    </div>
+
+    <div class="card auth-card">
+      <p class="terminal-label">Access check</p>
+      <h2>Confirm you are human</h2>
+      {% if error %}<p class="form-error" role="alert">{{ error }}</p>{% endif %}
+      <form class="admin-form" method="post" action="{{ url_for('public.index') }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <label class="captcha-field">
+          Verification
+          <span class="captcha-prompt">What is <strong class="captcha-question">{{ captcha_question }}</strong>?</span>
+          <input name="captcha_answer" inputmode="numeric" pattern="[0-9]{1,3}" maxlength="3" autocomplete="off" required autofocus>
+          <small>Solve this check to continue.</small>
+        </label>
+        <button type="submit">Enter Sektor-7 <span aria-hidden="true">&#8594;</span></button>
+      </form>
+    </div>
+  </section>
+{% endblock %}

@@ -12,7 +12,7 @@
   </head>
   <body>
     <header class="site-header">
-      <a class="brand" href="{{ url_for('public.index') if g.site_authenticated else url_for('customer.login') }}" aria-label="Sektor-7 {{ 'home' if g.site_authenticated else 'login' }}">
+      <a class="brand" href="{{ url_for('public.index') }}" aria-label="Sektor-7 home">
         <img class="brand-icon" src="{{ url_for('static', filename='branding/sektor7-icon.png') }}" alt="" width="512" height="512">
         <img class="brand-wordmark" src="{{ url_for('static', filename='branding/sektor7-wordmark.png') }}" alt="" width="640" height="144">
       </a>
