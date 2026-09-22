@@ -22,6 +22,7 @@ from werkzeug.security import check_password_hash, generate_password_hash
 
 from app.admin import admin_session_authenticated
 from app.login_captcha import (
+    clear_session_preserving_site_access,
     issue_login_captcha,
     site_access_verified,
     verify_login_captcha,
@@ -295,7 +296,7 @@ def logout():
         require_csrf(request.form.get("csrf_token"))
     except FormSecurityError:
         abort(400)
-    session.clear()
+    clear_session_preserving_site_access()
     return redirect(url_for("customer.login"), code=303)
 
 
@@ -339,7 +340,7 @@ def _password_matches(password_hash: str, candidate: str) -> bool:
 
 
 def _start_customer_session(account: CustomerAccount) -> None:
-    session.clear()
+    clear_session_preserving_site_access()
     session[_CUSTOMER_SESSION_KEY] = {
         "id": account.id,
         "username": account.username,

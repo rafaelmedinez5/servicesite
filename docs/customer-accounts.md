@@ -32,7 +32,9 @@ hashes.
   single-use arithmetic CAPTCHA. Its verified flag lasts for the browser
   session. The challenge is stored as a keyed digest and expires after ten
   minutes. Successful verification redirects to the homepage; browser routes
-  cannot be opened beforehand.
+  cannot be opened beforehand. Authentication changes and logout clear account
+  and administrator state while preserving the completed access check for the
+  rest of the browser session.
 - Customer login requires a server-authenticated, single-use arithmetic CAPTCHA
   that expires after ten minutes. A failed CAPTCHA is rejected before any
   username lookup or password-rate-limit mutation.

@@ -24,6 +24,7 @@ from werkzeug.security import check_password_hash, generate_password_hash
 from app.academy import ACADEMY_CATEGORY_ID, ACADEMY_SERVICE_ID, get_academy_tier
 from app.catalog import CatalogValidationError, CategoryRecord, ServiceRecord
 from app.deliveries import DeliveryValidationError
+from app.login_captcha import clear_session_preserving_site_access
 from app.payments.invoice import PaymentStatus
 from app.payments.xmr_wallet_rpc import atomic_to_xmr_str
 from app.persistence import (
@@ -52,7 +53,7 @@ def protect_admin_routes():
     if request.endpoint in {"admin.login", "admin.pin_login"}:
         return None
     if not admin_session_authenticated():
-        session.clear()
+        clear_session_preserving_site_access()
         return redirect(url_for("admin.login"), code=303)
     return None
 
@@ -266,7 +267,7 @@ def logout():
         require_csrf(request.form.get("csrf_token"))
     except FormSecurityError:
         abort(400)
-    session.clear()
+    clear_session_preserving_site_access()
     return redirect(url_for("admin.login"), code=303)
 
 
@@ -315,7 +316,7 @@ def password():
             "admin/password.html", error="The password could not be changed."
         ), 503
     if credential is None:
-        session.clear()
+        clear_session_preserving_site_access()
         return redirect(url_for("admin.login"), code=303)
     if not _password_matches(credential.password_hash, current_password):
         return render_template(
@@ -341,10 +342,10 @@ def password():
             "admin/password.html", error="The password could not be changed."
         ), 503
     if not changed:
-        session.clear()
+        clear_session_preserving_site_access()
         return redirect(url_for("admin.login"), code=303)
 
-    session.clear()
+    clear_session_preserving_site_access()
     flash("Password changed. Sign in again with the new password.", "success")
     return redirect(url_for("admin.login"), code=303)
 
@@ -713,7 +714,7 @@ def _password_matches(password_hash: str, candidate: str) -> bool:
 
 
 def _start_admin_session(username: str, credential_version: int) -> None:
-    session.clear()
+    clear_session_preserving_site_access()
     session[_ADMIN_SESSION_KEY] = {
         "username": username,
         "credential_version": credential_version,

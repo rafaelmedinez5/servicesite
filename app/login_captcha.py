@@ -55,6 +55,14 @@ def mark_site_access_verified() -> None:
     session[_SITE_ACCESS_KEY] = True
 
 
+def clear_session_preserving_site_access() -> None:
+    """Reset authentication state without making a verified browser repeat entry."""
+    verified = site_access_verified()
+    session.clear()
+    if verified:
+        mark_site_access_verified()
+
+
 def _verify_captcha(session_key: str, purpose: str, candidate: str | None) -> bool:
     challenge = session.pop(session_key, None)
     if not isinstance(challenge, dict) or not isinstance(candidate, str):
