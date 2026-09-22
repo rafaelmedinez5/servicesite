@@ -188,6 +188,12 @@ def test_site_entry_gate_blocks_every_browser_page_until_verified(customer_conte
     assert client.get("/about").status_code == 200
     assert client.get("/login").status_code == 200
     assert client.get("/admin/login").status_code == 200
+    admin_redirect = client.get("/admin")
+    assert admin_redirect.status_code == 303
+    assert admin_redirect.headers["Location"].endswith("/admin/login")
+    admin_login = client.get(admin_redirect.headers["Location"])
+    assert admin_login.status_code == 200
+    assert "Confirm you are human" not in admin_login.get_data(as_text=True)
 
 
 def test_registration_normalizes_username_hashes_password_and_starts_session(
